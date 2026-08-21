@@ -15,11 +15,11 @@ describe("parseCommand", () => {
     expect(result.architecture.nodes[0].data.label).toBe("Cache");
   });
 
-  test("assigns a unique id when a node with the same slug already exists", () => {
-    const withCache = parseCommand("add node Cache", emptyArchitecture);
+  test("assigns a unique id when two different labels slugify to the same value", () => {
+    const withCache = parseCommand("add node Cache!", emptyArchitecture);
     if (!withCache.ok) throw new Error("expected first add to succeed");
 
-    const result = parseCommand("add node Cache", withCache.architecture);
+    const result = parseCommand("add node Cache?", withCache.architecture);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -231,5 +231,194 @@ describe("parseCommand", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected an unrecognized-command failure");
     expect(result.message).toBe('Unrecognized command: ""');
+  });
+
+  test('accepts "create node" as an alias for adding a node', () => {
+    const result = parseCommand("create node Cache", emptyArchitecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes[0].data.label).toBe("Cache");
+  });
+
+  test('accepts "new node" as an alias for adding a node', () => {
+    const result = parseCommand("new node Cache", emptyArchitecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes[0].data.label).toBe("Cache");
+  });
+
+  test('accepts "add a node called" as an alias for adding a node', () => {
+    const result = parseCommand("add a node called Cache", emptyArchitecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes[0].data.label).toBe("Cache");
+  });
+
+  test("rejects adding a node with a blank label", () => {
+    const result = parseCommand("add node", emptyArchitecture);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected blank label to be rejected");
+    expect(result.message).toBe("A node label cannot be blank.");
+  });
+
+  test("rejects adding a node whose label already exists (case-insensitive)", () => {
+    const withCache = parseCommand("add node Cache", emptyArchitecture);
+    if (!withCache.ok) throw new Error("expected first add to succeed");
+
+    const result = parseCommand("add node cache", withCache.architecture);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected duplicate label to be rejected");
+    expect(result.message).toBe('A node named "Cache" already exists.');
+    expect(withCache.architecture.nodes).toHaveLength(1);
+  });
+
+  test('accepts "link ... to ..." as an alias for connect', () => {
+    const architecture: Architecture = {
+      nodes: [
+        { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
+        { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+      ],
+      edges: [],
+    };
+
+    const result = parseCommand("link Web Server to Database", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.edges[0]).toMatchObject({
+      source: "node-web-server",
+      target: "node-database",
+    });
+  });
+
+  test('accepts "connect ... and ..." as an alias for "connect ... to ..."', () => {
+    const architecture: Architecture = {
+      nodes: [
+        { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
+        { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+      ],
+      edges: [],
+    };
+
+    const result = parseCommand("connect Web Server and Database", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.edges[0]).toMatchObject({
+      source: "node-web-server",
+      target: "node-database",
+    });
+  });
+
+  test('accepts "delete node" as an alias for remove node', () => {
+    const architecture: Architecture = {
+      nodes: [{ id: "node-cache", position: { x: 0, y: 0 }, data: { label: "Cache" } }],
+      edges: [],
+    };
+
+    const result = parseCommand("delete node Cache", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes).toHaveLength(0);
+  });
+
+  test('accepts "delete edge ... to ..." as an alias for remove edge', () => {
+    const architecture: Architecture = {
+      nodes: [
+        { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
+        { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+      ],
+      edges: [
+        { id: "edge-web-server-database", source: "node-web-server", target: "node-database" },
+      ],
+    };
+
+    const result = parseCommand("delete edge Web Server to Database", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.edges).toHaveLength(0);
+  });
+
+  test('accepts "disconnect ... from ..." as an alias for remove edge', () => {
+    const architecture: Architecture = {
+      nodes: [
+        { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
+        { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+      ],
+      edges: [
+        { id: "edge-web-server-database", source: "node-web-server", target: "node-database" },
+      ],
+    };
+
+    const result = parseCommand("disconnect Web Server from Database", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.edges).toHaveLength(0);
+  });
+
+  test("treats labels differing only by internal whitespace as duplicates", () => {
+    const withWebServer = parseCommand("add node Web Server", emptyArchitecture);
+    if (!withWebServer.ok) throw new Error("expected first add to succeed");
+
+    const result = parseCommand("add node Web  Server", withWebServer.architecture);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected duplicate label to be rejected");
+    expect(result.message).toBe('A node named "Web Server" already exists.');
+  });
+
+  test("collapses repeated internal whitespace when storing a new node's label", () => {
+    const result = parseCommand("add node Foo   Bar", emptyArchitecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes[0].data.label).toBe("Foo Bar");
+  });
+
+  test("finds a node by label even when the reference has different internal spacing", () => {
+    const architecture: Architecture = {
+      nodes: [{ id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } }],
+      edges: [],
+    };
+
+    const result = parseCommand("remove node Web  Server", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.nodes).toHaveLength(0);
+  });
+
+  test("rejects a label made up only of invisible characters", () => {
+    const result = parseCommand("add node ​", emptyArchitecture);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected invisible-only label to be rejected");
+    expect(result.message).toBe("A node label cannot be blank.");
+  });
+
+  test('accepts "disconnect ... and ..." as an alias for remove edge', () => {
+    const architecture: Architecture = {
+      nodes: [
+        { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
+        { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+      ],
+      edges: [
+        { id: "edge-web-server-database", source: "node-web-server", target: "node-database" },
+      ],
+    };
+
+    const result = parseCommand("disconnect Web Server and Database", architecture);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.architecture.edges).toHaveLength(0);
   });
 });

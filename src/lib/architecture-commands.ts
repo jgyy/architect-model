@@ -4,6 +4,24 @@ export type CommandResult =
     | { ok: true; architecture: Architecture; message: string }
     | { ok: false; message: string };
 
+// zero-width space/non-joiner/joiner and byte-order-mark: characters that
+// survive .trim() but render as nothing.
+const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
+
+// collapses runs of internal whitespace (not just leading/trailing) so labels
+// that only differ by extra spaces ("Web  Server" vs "Web Server") are
+// treated as the same label everywhere — on storage and on lookup.
+function normalizeLabel(label: string): string {
+    return label.trim().replace(/\s+/g, " ");
+}
+
+// distinct from a plain blank check: strips invisible characters (zero-width
+// space, etc.) that survive .trim() but render as nothing, so a label made
+// up only of those doesn't slip past the blank-label validation.
+function isBlankLabel(label: string): boolean {
+    return label.replace(INVISIBLE_CHARS_PATTERN, "").trim().length === 0;
+}
+
 function slugify(label: string): string {
     return label
         .trim()
@@ -27,7 +45,7 @@ function findNodeByLabel(
     label: string,
     architecture: Architecture,
 ): ArchitectureNode | undefined {
-    const needle = label.trim().toLowerCase();
+    const needle = normalizeLabel(label).toLowerCase();
     const exact = architecture.nodes.find(
         (node) => node.data.label.toLowerCase() === needle,
     );
@@ -39,20 +57,45 @@ function findNodeByLabel(
     );
 }
 
+function findNodeByExactLabel(
+    label: string,
+    architecture: Architecture,
+): ArchitectureNode | undefined {
+    const needle = normalizeLabel(label).toLowerCase();
+    return architecture.nodes.find(
+        (node) => node.data.label.toLowerCase() === needle,
+    );
+}
+
+function matchFirst(patterns: RegExp[], text: string): RegExpMatchArray | null {
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) return match;
+    }
+    return null;
+}
+
+// "<A> <sep> <B>" is ambiguous when a label itself contains a separator word
+// (e.g. "Point to Point Link"): try every split point across every separator
+// and prefer the one where both sides resolve to real nodes, falling back to
+// the first split (in separator-list order) for error reporting.
 function splitConnectionArgs(
     rest: string,
+    separators: string[],
 ): { sourceLabel: string; targetLabel: string }[] {
     const lower = rest.toLowerCase();
     const splits: { sourceLabel: string; targetLabel: string }[] = [];
-    let from = 0;
-    while (true) {
-        const idx = lower.indexOf(" to ", from);
-        if (idx === -1) break;
-        splits.push({
-            sourceLabel: rest.slice(0, idx).trim(),
-            targetLabel: rest.slice(idx + 4).trim(),
-        });
-        from = idx + 1;
+    for (const separator of separators) {
+        let from = 0;
+        while (true) {
+            const idx = lower.indexOf(separator, from);
+            if (idx === -1) break;
+            splits.push({
+                sourceLabel: rest.slice(0, idx).trim(),
+                targetLabel: rest.slice(idx + separator.length).trim(),
+            });
+            from = idx + 1;
+        }
     }
     return splits;
 }
@@ -64,14 +107,15 @@ type ResolvedEndpoints = {
     target: ArchitectureNode | undefined;
 };
 
-// "<A> to <B>" is ambiguous when a label itself contains " to " (e.g. "Point to
-// Point Link"): try every " to " split point and prefer the one where both sides
-// resolve to real nodes, falling back to the first split for error reporting.
+const CONNECT_SEPARATORS = [" to ", " and "];
+const DISCONNECT_SEPARATORS = [" to ", " from ", " and "];
+
 function resolveConnectionEndpoints(
     rest: string,
     architecture: Architecture,
+    separators: string[],
 ): ResolvedEndpoints | null {
-    const splits = splitConnectionArgs(rest);
+    const splits = splitConnectionArgs(rest, separators);
     if (splits.length === 0) return null;
 
     const resolved = splits.map((split) => ({
@@ -83,15 +127,42 @@ function resolveConnectionEndpoints(
     return resolved.find((r) => r.source && r.target) ?? resolved[0];
 }
 
+const ADD_NODE_PATTERNS = [
+    /^add node(?:\s+(.*))?$/i,
+    /^create node(?:\s+(.*))?$/i,
+    /^new node(?:\s+(.*))?$/i,
+    /^add a node called(?:\s+(.*))?$/i,
+];
+
+const CONNECT_PATTERNS = [/^connect (.+)$/i, /^link (.+)$/i];
+
+const REMOVE_NODE_PATTERNS = [/^remove node (.+)$/i, /^delete node (.+)$/i];
+
+const REMOVE_EDGE_PATTERNS = [
+    /^remove edge (.+)$/i,
+    /^delete edge (.+)$/i,
+    /^disconnect (.+)$/i,
+];
+
 export function parseCommand(
     input: string,
     architecture: Architecture,
 ): CommandResult {
     const trimmed = input.trim();
 
-    const addNodeMatch = trimmed.match(/^add node (.+)$/i);
+    const addNodeMatch = matchFirst(ADD_NODE_PATTERNS, trimmed);
     if (addNodeMatch) {
-        const label = addNodeMatch[1].trim();
+        const label = normalizeLabel(addNodeMatch[1] ?? "");
+        if (isBlankLabel(label)) {
+            return { ok: false, message: "A node label cannot be blank." };
+        }
+        const duplicate = findNodeByExactLabel(label, architecture);
+        if (duplicate) {
+            return {
+                ok: false,
+                message: `A node named "${duplicate.data.label}" already exists.`,
+            };
+        }
         const node: ArchitectureNode = {
             id: uniqueNodeId(slugify(label), architecture),
             position: { x: architecture.nodes.length * 250, y: 0 },
@@ -104,9 +175,13 @@ export function parseCommand(
         };
     }
 
-    const connectMatch = trimmed.match(/^connect (.+)$/i);
+    const connectMatch = matchFirst(CONNECT_PATTERNS, trimmed);
     if (connectMatch) {
-        const resolved = resolveConnectionEndpoints(connectMatch[1], architecture);
+        const resolved = resolveConnectionEndpoints(
+            connectMatch[1],
+            architecture,
+            CONNECT_SEPARATORS,
+        );
         if (!resolved) {
             return { ok: false, message: `Unrecognized command: "${trimmed}"` };
         }
@@ -144,7 +219,7 @@ export function parseCommand(
         };
     }
 
-    const removeNodeMatch = trimmed.match(/^remove node (.+)$/i);
+    const removeNodeMatch = matchFirst(REMOVE_NODE_PATTERNS, trimmed);
     if (removeNodeMatch) {
         const label = removeNodeMatch[1].trim();
         const node = findNodeByLabel(label, architecture);
@@ -163,9 +238,13 @@ export function parseCommand(
         };
     }
 
-    const removeEdgeMatch = trimmed.match(/^remove edge (.+)$/i);
+    const removeEdgeMatch = matchFirst(REMOVE_EDGE_PATTERNS, trimmed);
     if (removeEdgeMatch) {
-        const resolved = resolveConnectionEndpoints(removeEdgeMatch[1], architecture);
+        const resolved = resolveConnectionEndpoints(
+            removeEdgeMatch[1],
+            architecture,
+            DISCONNECT_SEPARATORS,
+        );
         if (!resolved) {
             return { ok: false, message: `Unrecognized command: "${trimmed}"` };
         }
