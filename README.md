@@ -7,11 +7,12 @@ full brief.
 
 ## Status
 
-**Step 2 (current):** Text-based architecture updates. The architecture is
-still rendered visually via [React Flow](https://reactflow.dev), seeded with
-the example Internet → Web Server → Database architecture, and can now be
-edited by typing commands into the sidebar. Simulation exploration is not
-implemented yet.
+**Step 3 (current):** Simulation exploration. The architecture is rendered
+visually via [React Flow](https://reactflow.dev), seeded with the example
+Internet → Web Server → Database architecture, and can be edited by typing
+commands into the sidebar (Step 2). A Simulation panel now lets you step
+forward/backward through an example attack trace, showing the step's
+description and highlighting the node it points to on the canvas.
 
 ## Run locally
 
@@ -28,8 +29,9 @@ Then open http://localhost:3000.
 npm test
 ```
 
-Covers `src/lib/architecture-commands.ts`, the text-command parser — the
-piece of business logic behind every architecture edit.
+Covers `src/lib/architecture-commands.ts` (the text-command parser) and
+`src/lib/simulation.ts` (step-index clamping and step→node resolution) — the
+business logic behind every architecture edit and every simulation step.
 
 ## Supported commands
 
@@ -47,6 +49,21 @@ and by substring** — `connect web to cache` matches "Web Server" and "Cache".
 Anything that doesn't match one of the four forms above, or references a node
 that doesn't exist, is rejected with an inline error message in the command
 log rather than silently doing nothing or crashing.
+
+## Simulation exploration
+
+The sidebar's "Simulation" panel walks through a fixed example trace (an
+attacker moving Internet → Web Server → Database) seeded in
+`src/data/example-simulation.ts`, independent of the command log below it:
+
+- Shows the current step number, its description, and which node it points
+  to (highlighted on the canvas with an orange border).
+- **Prev** / **Next** buttons move through the trace one step at a time and
+  disable at the first/last step.
+- If a step's node has since been removed via a text command (e.g. `remove
+  node Web Server`), the panel keeps showing the step's description but
+  swaps the highlight for a "(node no longer in architecture)" note instead
+  of crashing or highlighting nothing silently.
 
 ## Key design decisions and assumptions
 
@@ -74,6 +91,18 @@ log rather than silently doing nothing or crashing.
   (`x = 250 * index`); there's no automatic re-fit of the viewport after an
   edit, so a node added far to the right may render outside the initial view
   (use the "Fit View" control to recenter).
+- **The simulation trace is static example data, not derived from or edited
+  by the architecture commands.** The brief only requires stepping through a
+  trace and highlighting its nodes; trace and architecture are otherwise
+  independent, so an edit that removes a step's node doesn't try to repair
+  or re-point the trace — it degrades to the "node no longer in
+  architecture" note described above. This keeps two genuinely separate
+  concerns (editing a graph vs. replaying a trace over it) from being
+  entangled for a case the assignment doesn't ask for.
+- **Step-index math is a pure, tested helper** (`clampStepIndex`), and
+  resolving a step's node against the *current* architecture is a separate
+  pure helper (`resolveStepNode`) — same "logic in `lib/`, tested in
+  isolation, UI just renders the result" pattern as the command parser.
 
 ## What I'd improve with more time
 
@@ -85,5 +114,7 @@ log rather than silently doing nothing or crashing.
 - Chat-style command history bonus: currently the log is append-only for the
   session; persisting it (or the architecture itself) across reloads would
   need `localStorage` or a backend, neither of which the brief requires.
-- Simulation trace exploration (part C of the brief) — a natural next step
-  once text-based editing is solid.
+- Let the simulation trace itself be authored/edited via text commands (e.g.
+  `add step ...`), instead of shipping only the one bundled example trace.
+- Auto-advance/"play" through the simulation on a timer, for a hands-free
+  walkthrough during a demo.
