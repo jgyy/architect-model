@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
-import type { NodeChange } from "@xyflow/react";
+import type { Connection, NodeChange } from "@xyflow/react";
 
-import { applyPersistableNodeChanges } from "@/lib/node-changes";
-import type { ArchitectureNode } from "@/types/architecture";
+import {
+    applyPersistableNodeChanges,
+    createEdgeFromConnection,
+} from "@/lib/node-changes";
+import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 const nodes: ArchitectureNode[] = [
     {
@@ -62,5 +65,65 @@ describe("applyPersistableNodeChanges", () => {
 
     test("leaves nodes untouched when there are no changes", () => {
         expect(applyPersistableNodeChanges([], nodes)).toEqual(nodes);
+    });
+});
+
+function connection(source: string, target: string): Connection {
+    return { source, target, sourceHandle: null, targetHandle: null };
+}
+
+describe("createEdgeFromConnection", () => {
+    const architecture: Architecture = {
+        nodes,
+        edges: [
+            {
+                id: "edge-node-web-server-node-database",
+                source: "node-web-server",
+                target: "node-database",
+            },
+        ],
+    };
+
+    test("builds an edge from a valid connection", () => {
+        const edge = createEdgeFromConnection(
+            connection("node-database", "node-web-server"),
+            architecture,
+        );
+        expect(edge).toEqual({
+            id: "edge-node-database-node-web-server",
+            source: "node-database",
+            target: "node-web-server",
+        });
+    });
+
+    test("rejects a self-loop", () => {
+        const edge = createEdgeFromConnection(
+            connection("node-web-server", "node-web-server"),
+            architecture,
+        );
+        expect(edge).toBeNull();
+    });
+
+    test("rejects a connection duplicating an existing edge", () => {
+        const edge = createEdgeFromConnection(
+            connection("node-web-server", "node-database"),
+            architecture,
+        );
+        expect(edge).toBeNull();
+    });
+
+    test("rejects a connection missing a source or target", () => {
+        expect(
+            createEdgeFromConnection(
+                connection("", "node-web-server"),
+                architecture,
+            ),
+        ).toBeNull();
+        expect(
+            createEdgeFromConnection(
+                connection("node-web-server", ""),
+                architecture,
+            ),
+        ).toBeNull();
     });
 });

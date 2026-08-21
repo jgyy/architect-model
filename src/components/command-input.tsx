@@ -121,17 +121,14 @@ export function CommandInput({
     }
 
     return (
-        <form
-            onSubmit={onSubmit}
-            className="border-b border-black/[.08] p-3 dark:border-white/[.145]"
-        >
+        <form onSubmit={onSubmit} className="border-b border-border p-3">
             <label
                 htmlFor="command-input"
-                className="block text-xs font-medium text-black/60 dark:text-white/60"
+                className="block text-xs font-medium tracking-wide text-muted-foreground uppercase"
             >
                 Command
             </label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1.5 flex gap-2">
                 <div className="relative flex-1">
                     <input
                         id="command-input"
@@ -152,13 +149,13 @@ export function CommandInput({
                         role="combobox"
                         aria-expanded={options.length > 0}
                         aria-controls="command-suggestions"
-                        className="w-full rounded border border-black/[.15] bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/[.2] dark:focus:border-white/40"
+                        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-sm text-foreground outline-none focus:border-accent"
                     />
                     {options.length > 0 && (
                         <ul
                             id="command-suggestions"
                             role="listbox"
-                            className="absolute top-full left-0 z-10 mt-1 max-h-40 w-full overflow-y-auto rounded border border-black/[.15] bg-background shadow-md dark:border-white/[.2]"
+                            className="absolute top-full left-0 z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-background shadow-md"
                         >
                             {options.map((node, index) => (
                                 <li
@@ -172,10 +169,10 @@ export function CommandInput({
                                             event.preventDefault()
                                         }
                                         onClick={() => selectSuggestion(node)}
-                                        className={`block w-full px-2 py-1 text-left text-sm ${
+                                        className={`block w-full px-2.5 py-1.5 text-left text-sm ${
                                             index === activeOptionIndex
-                                                ? "bg-black/[.06] dark:bg-white/[.1]"
-                                                : ""
+                                                ? "bg-accent/10 text-accent"
+                                                : "text-foreground"
                                         }`}
                                     >
                                         {node.data.label}
@@ -187,14 +184,16 @@ export function CommandInput({
                 </div>
                 <button
                     type="submit"
-                    className="shrink-0 rounded bg-foreground px-3 py-1 text-sm text-background"
+                    className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
                 >
                     Run
                 </button>
             </div>
-            <details className="mt-2 text-xs text-black/60 dark:text-white/60">
-                <summary className="cursor-pointer">Supported commands</summary>
-                <ul className="mt-1 space-y-0.5 font-mono">
+            <details className="mt-2 text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none hover:text-foreground">
+                    Supported commands
+                </summary>
+                <ul className="mt-1.5 space-y-0.5 font-mono">
                     {SUPPORTED_COMMANDS.map((command) => (
                         <li key={command}>{command}</li>
                     ))}
