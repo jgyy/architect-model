@@ -329,15 +329,16 @@ describe("parseCommand", () => {
         expect(result.message).toBe('No node named "Databasee".');
     });
 
-    test("reports unrecognized commands instead of silently doing nothing", () => {
+    test("reports unrecognized commands instead of silently doing nothing, with a hint of supported commands", () => {
         const result = parseCommand("do something weird", emptyArchitecture);
 
         expect(result.ok).toBe(false);
         if (result.ok)
             throw new Error("expected an unrecognized-command failure");
-        expect(result.message).toBe(
+        expect(result.message).toContain(
             'Unrecognized command: "do something weird"',
         );
+        expect(result.message).toContain("add node <label>");
     });
 
     test("trims whitespace-only input before echoing it back in the error", () => {
@@ -346,7 +347,66 @@ describe("parseCommand", () => {
         expect(result.ok).toBe(false);
         if (result.ok)
             throw new Error("expected an unrecognized-command failure");
-        expect(result.message).toBe('Unrecognized command: ""');
+        expect(result.message).toContain('Unrecognized command: ""');
+    });
+
+    test("reports a missing separator when connect has no recognizable separator", () => {
+        const result = parseCommand("connect Web Server", emptyArchitecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected a missing-separator failure");
+        expect(result.message).toContain("separator");
+    });
+
+    test("reports an ambiguous label when removing a node whose reference matches multiple nodes", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-app-server",
+                    position: { x: 250, y: 0 },
+                    data: { label: "App Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("remove node Server", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("Web Server");
+        expect(result.message).toContain("App Server");
+        expect(result.message).toContain("multiple nodes");
+    });
+
+    test("reports an ambiguous label when adding a step whose reference matches multiple nodes", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-app-server",
+                    position: { x: 250, y: 0 },
+                    data: { label: "App Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("add step Server", architecture, []);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("multiple nodes");
     });
 
     test('accepts "create node" as an alias for adding a node', () => {
