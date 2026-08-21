@@ -1,4 +1,4 @@
-import { ArchitectureCanvas } from "@/components/architecture-canvas";
+import { ArchitectureWorkspace } from "@/components/architecture-workspace";
 import { exampleArchitecture } from "@/data/example-architecture";
 
 export default function Home() {
@@ -7,8 +7,8 @@ export default function Home() {
       <header className="border-b border-black/[.08] px-6 py-4 dark:border-white/[.145]">
         <h1 className="text-xl font-semibold">Architecture Model</h1>
       </header>
-      <div className="flex-1">
-        <ArchitectureCanvas architecture={exampleArchitecture} />
+      <div className="min-h-0 flex-1">
+        <ArchitectureWorkspace initialArchitecture={exampleArchitecture} />
       </div>
     </div>
   );
