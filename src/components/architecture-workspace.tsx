@@ -17,7 +17,7 @@ import {
     clampStepIndex,
     resolveStepNode,
 } from "@/lib/simulation";
-import type { Architecture } from "@/types/architecture";
+import type { Architecture, ArchitectureNode } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
 
 type ArchitectureWorkspaceProps = {
@@ -88,6 +88,11 @@ export function ArchitectureWorkspace({
         [trace.length],
     );
 
+    // Stable across unrelated re-renders, same reason as handleStepChange
+    const handleNodesChange = useCallback((nodes: ArchitectureNode[]) => {
+        setArchitecture((current) => ({ ...current, nodes }));
+    }, []);
+
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const text = input.trim();
@@ -119,6 +124,7 @@ export function ArchitectureWorkspace({
                 <ArchitectureCanvas
                     architecture={architecture}
                     highlightedNodeId={highlightedNodeId}
+                    onNodesChange={handleNodesChange}
                 />
             </div>
             <aside className="flex w-96 flex-col border-l border-black/[.08] dark:border-white/[.145]">

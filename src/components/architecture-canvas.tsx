@@ -1,20 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
     Background,
     Controls,
     MiniMap,
     ReactFlow,
     useReactFlow,
+    type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { Architecture } from "@/types/architecture";
+import { applyPersistableNodeChanges } from "@/lib/node-changes";
+import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 type ArchitectureCanvasProps = {
     architecture: Architecture;
     highlightedNodeId?: string;
+    onNodesChange: (nodes: ArchitectureNode[]) => void;
 };
 
 const HIGHLIGHT_STYLE = {
@@ -41,19 +44,36 @@ function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
 export function ArchitectureCanvas({
     architecture,
     highlightedNodeId,
+    onNodesChange,
 }: ArchitectureCanvasProps) {
     const nodes = highlightedNodeId
         ? architecture.nodes.map((node) =>
-              node.id === highlightedNodeId
-                  ? { ...node, style: { ...node.style, ...HIGHLIGHT_STYLE } }
-                  : node,
-          )
+            node.id === highlightedNodeId
+                ? { ...node, style: { ...node.style, ...HIGHLIGHT_STYLE } }
+                : node,
+        )
         : architecture.nodes;
 
     const nodeIds = architecture.nodes.map((node) => node.id).join(",");
 
+    // Apply against the un-highlighted `architecture.nodes`
+    const handleNodesChange = useCallback(
+        (changes: NodeChange<ArchitectureNode>[]) => {
+            onNodesChange(
+                applyPersistableNodeChanges(changes, architecture.nodes),
+            );
+        },
+        [architecture.nodes, onNodesChange],
+    );
+
     return (
-        <ReactFlow nodes={nodes} edges={architecture.edges} fitView>
+        <ReactFlow
+            nodes={nodes}
+            edges={architecture.edges}
+            onNodesChange={handleNodesChange}
+            deleteKeyCode={null}
+            fitView
+        >
             <Background />
             <Controls />
             <MiniMap />

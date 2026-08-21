@@ -36,6 +36,10 @@ exact → starts-with → contains. Click, or Arrow keys + Enter, to insert the
 exact label and keep typing; Escape dismisses it. `add node` never
 suggests, since that label is new rather than a reference.
 
+Nodes are draggable; positions persist to `localStorage` and survive a
+reload. Removal only happens via `remove node <label>` — Delete/Backspace
+on the canvas is disabled, so it's always logged and always cleans up edges.
+
 ## Chat history & simulation exploration
 
 The command log, architecture, simulation trace, current step, and playback
@@ -86,6 +90,9 @@ the step commands above):
   typing (cheaper than the parser's exhaustive search) and tracks cursor
   position, not just the input value, so fixing `A` after `B` is typed only
   suggests for `A`.
+- **`onNodesChange` (`lib/node-changes.ts`) only applies `"position"`
+  changes**, against `architecture.nodes` (not the highlight-styled render
+  array); `deleteKeyCode={null}` backs it up, keeping removal text-only.
 
 ## What I'd improve with more time
 
