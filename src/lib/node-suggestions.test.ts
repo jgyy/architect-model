@@ -163,6 +163,31 @@ describe("suggestNodeReference", () => {
         expect(suggestion!.replaceTo).toBe("add step".length);
     });
 
+    test("suggests matching nodes for a partial 'insert step <n>' label", () => {
+        const suggestion = suggestNodeReference("insert step 2 Cac", architecture);
+
+        expect(labels(suggestion!.matches)).toEqual(["Cache"]);
+    });
+
+    test("suggests every node right after 'insert step <n>' with no argument typed yet", () => {
+        const suggestion = suggestNodeReference("insert step 2", architecture);
+
+        expect(suggestion).not.toBeNull();
+        expect(labels(suggestion!.matches)).toEqual([
+            "Cache",
+            "Database",
+            "Web Server",
+        ]);
+        expect(suggestion!.replaceFrom).toBe("insert step 2".length);
+        expect(suggestion!.replaceTo).toBe("insert step 2".length);
+    });
+
+    test("returns null for 'insert step' before a position number is typed", () => {
+        const suggestion = suggestNodeReference("insert step", architecture);
+
+        expect(suggestion).toBeNull();
+    });
+
     test("caps suggestions at the given limit", () => {
         const many: Architecture = {
             nodes: [

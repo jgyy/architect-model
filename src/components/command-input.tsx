@@ -14,8 +14,10 @@ const SUPPORTED_COMMANDS = [
     'remove node <label>           — e.g. "remove node Cache" (alias: delete node)',
     'remove edge <A> to <B>        — e.g. "remove edge Web Server to Cache" (aliases: delete edge, disconnect A from B, disconnect A and B)',
     'add step <label>              — e.g. "add step Cache" (appends a simulation step reaching that node)',
+    'insert step <n> <label>       — e.g. "insert step 2 Cache" (inserts a step at that position, shifting later ones down)',
     'set step <n> description ...  — e.g. "set step 2 description Attacker pivots to Cache"',
     'remove step <n>               — e.g. "remove step 2"',
+    'move step <a> to <b>          — e.g. "move step 3 to 1" (relocates a step, renumbering the rest)',
 ];
 
 type CommandInputProps = {
@@ -46,7 +48,6 @@ export function CommandInput({
     }
 
     // selectSuggestion queues a target here; applied once `value`'s DOM
-    // update has committed, since setSelectionRange needs the new text first
     const pendingCursorRef = useRef<number | null>(null);
     useEffect(() => {
         const pending = pendingCursorRef.current;
