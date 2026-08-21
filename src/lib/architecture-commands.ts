@@ -3,6 +3,7 @@ import {
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
+    INSERT_STEP_PATTERNS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
     matchFirst,
@@ -154,6 +155,8 @@ const SET_STEP_DESCRIPTION_PATTERNS = [
 ];
 
 const REMOVE_STEP_PATTERNS = [/^remove step (\d+)$/i];
+
+const MOVE_STEP_PATTERNS = [/^move step (\d+) to (\d+)$/i];
 
 function renumberSteps(trace: SimulationTrace): SimulationTrace {
     return trace.map((step, index) => ({ ...step, step: index + 1 }));
@@ -338,6 +341,47 @@ export function parseCommand(
         };
     }
 
+    const insertStepMatch = matchFirst(INSERT_STEP_PATTERNS, trimmed);
+    if (insertStepMatch) {
+        const position = Number(insertStepMatch[1]);
+        const label = normalizeLabel(insertStepMatch[2] ?? "");
+        if (isBlankLabel(label)) {
+            return { ok: false, message: "A step must reference a node." };
+        }
+        const resolved = findNodeOrAmbiguity(label, architecture);
+        if (resolved === null) {
+            return { ok: false, message: `No node named "${label}".` };
+        }
+        if (Array.isArray(resolved)) {
+            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+        }
+        const node = resolved;
+        const maxPosition = trace.length + 1;
+        if (position < 1 || position > maxPosition) {
+            return {
+                ok: false,
+                message: `No position numbered ${position}; valid positions are 1-${maxPosition}.`,
+            };
+        }
+        const index = position - 1;
+        const step: SimulationStep = {
+            step: position,
+            nodeId: node.id,
+            description: `Reaches "${node.data.label}".`,
+        };
+        const nextTrace = [
+            ...trace.slice(0, index),
+            step,
+            ...trace.slice(index),
+        ];
+        return {
+            ok: true,
+            architecture,
+            trace: renumberSteps(nextTrace),
+            message: `Inserted step ${position}: reaches "${node.data.label}".`,
+        };
+    }
+
     const setStepDescriptionMatch = matchFirst(
         SET_STEP_DESCRIPTION_PATTERNS,
         trimmed,
@@ -380,8 +424,43 @@ export function parseCommand(
         };
     }
 
+    const moveStepMatch = matchFirst(MOVE_STEP_PATTERNS, trimmed);
+    if (moveStepMatch) {
+        const from = Number(moveStepMatch[1]);
+        const to = Number(moveStepMatch[2]);
+        const fromIndex = from - 1;
+        if (fromIndex < 0 || fromIndex >= trace.length) {
+            return { ok: false, message: `No step numbered ${from}.` };
+        }
+        const toIndex = to - 1;
+        if (toIndex < 0 || toIndex >= trace.length) {
+            return { ok: false, message: `No step numbered ${to}.` };
+        }
+        if (from === to) {
+            return {
+                ok: true,
+                architecture,
+                trace,
+                message: `Step ${from} is already at position ${to}.`,
+            };
+        }
+        const step = trace[fromIndex];
+        const remaining = trace.filter((_, i) => i !== fromIndex);
+        const nextTrace = [
+            ...remaining.slice(0, toIndex),
+            step,
+            ...remaining.slice(toIndex),
+        ];
+        return {
+            ok: true,
+            architecture,
+            trace: renumberSteps(nextTrace),
+            message: `Moved step ${from} to position ${to}.`,
+        };
+    }
+
     return {
         ok: false,
-        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; add step <label>; set step <n> description <text>; remove step <n>.`,
+        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; add step <label>; insert step <n> <label>; set step <n> description <text>; remove step <n>; move step <a> to <b>.`,
     };
 }
