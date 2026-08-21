@@ -47,6 +47,8 @@ const sampleState: PersistedState = {
             description: "Attacker reaches Cache",
         },
     ],
+    stepIndex: 0,
+    speedIndex: 1,
 };
 
 describe("loadPersistedState", () => {
@@ -139,6 +141,37 @@ describe("loadPersistedState", () => {
                         message: 'Added node "Cache".',
                     },
                 ],
+            }),
+        );
+
+        expect(loadPersistedState(storage)).toBeNull();
+    });
+
+    test("returns null when stepIndex is missing", () => {
+        const storage = createFakeStorage();
+        storage.setItem(
+            "architect-model:session",
+            JSON.stringify({
+                architecture: sampleState.architecture,
+                log: [],
+                trace: [],
+                speedIndex: 1,
+            }),
+        );
+
+        expect(loadPersistedState(storage)).toBeNull();
+    });
+
+    test("returns null when speedIndex is not a number", () => {
+        const storage = createFakeStorage();
+        storage.setItem(
+            "architect-model:session",
+            JSON.stringify({
+                architecture: sampleState.architecture,
+                log: [],
+                trace: [],
+                stepIndex: 0,
+                speedIndex: "1x",
             }),
         );
 
