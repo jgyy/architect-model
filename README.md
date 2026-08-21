@@ -5,9 +5,10 @@ input and exploring a simulation trace through it.
 
 ## Status
 
-**Step 10 (current):** full brief + Step 7-9 bonus items (aliases, persisted
-history, validation, canvas auto-fit, editable trace, auto-play, node-ref
-autocomplete), plus an adjustable auto-play speed for the simulation.
+**Step 11 (current):** full brief + Step 7-10 bonus items (aliases, persisted
+history, validation, canvas auto-fit, editable trace, auto-play with
+adjustable speed, node-ref autocomplete), plus the simulation's current step
+and playback speed now persist across a reload.
 
 ## Run locally
 
@@ -44,14 +45,16 @@ suggests, since that label is new rather than a reference.
 
 ## Chat history & simulation exploration
 
-The command log, architecture, and simulation trace save to `localStorage`
-after every change and restore on reload (**Clear history** resets to the
-seeded example). The "Simulation" panel steps through a trace (seeded from
-`src/data/example-simulation.ts`, editable via the step commands above):
+The command log, architecture, simulation trace, current step, and playback
+speed all save to `localStorage` after every change and restore on reload,
+resuming at the saved step/speed but always paused (**Clear history** resets
+everything to the seeded example, step 1, 1x). The "Simulation" panel steps
+through a trace (seeded from `src/data/example-simulation.ts`, editable via
+the step commands above):
 
 - **Prev**/**Next** step through the trace; **Play**/**Pause** auto-advances,
   stopping at the last step. The speed selector (0.5x-4x, default 1x =
-  1.5s/step) sets the tick interval and applies immediately, even mid-play.
+  1.5s/step) applies immediately, even mid-play.
 - Degrades gracefully: shows "(node no longer in architecture)" if a step's
   node was removed, and re-clamps if you remove the step you're viewing.
 
@@ -75,25 +78,22 @@ seeded example). The "Simulation" panel steps through a trace (seeded from
   directly, so it's unit-tested with a fake in-memory store.
 - **The canvas re-fits via `fitView()` imperatively** on node-id changes,
   since the `fitView` prop only runs once, on mount.
-- **Auto-play schedules one `setTimeout` per tick, not `setInterval`**, so
-  it can't drift and auto-stops at the last step; a plain index into a
-  static speed list (kept local to `SimulationPanel`, not `lib/`, since
-  there's no branching logic worth testing) sets the interval, so changing
-  it mid-play just reschedules the pending tick for free.
+- **Auto-play schedules one `setTimeout` per tick, not `setInterval`**, so it
+  can't drift and auto-stops at the last step; the speed list
+  (`PLAY_SPEEDS`/`DEFAULT_SPEED_INDEX` in `lib/simulation.ts`) sets the
+  interval, so changing it mid-play just reschedules the pending tick.
+- **Speed index is lifted into `ArchitectureWorkspace`** (controlled via
+  props, not local `SimulationPanel` state) since only the parent saves to
+  `localStorage`; `isPlaying` stays local and unpersisted so a reload never
+  auto-resumes playback. The persisted `stepIndex` is the already-clamped
+  `safeStepIndex`, so a save can never write an out-of-range index.
 - **The autocomplete's command patterns live in `lib/node-reference.ts`**,
-  shared with the parser, so the two can never recognize different
-  command shapes as they evolve.
-- **Suggestion matching splits `"<A> <sep> <B>"` at the last separator**
-  while typing — cheaper than the parser's exhaustive search, and matches
-  how someone types left-to-right.
-- **The autocomplete tracks cursor position, not just the input value.**
-  For `connect`/`remove edge`, which argument gets suggestions (and what
-  span gets replaced) is chosen by comparing the caret offset to the
-  separator, so fixing `A` after `B` is typed suggests only for `A`.
+  shared with the parser, so the two never recognize different shapes.
+  Suggestion matching splits `"<A> <sep> <B>"` at the last separator while
+  typing (cheaper than the parser's exhaustive search) and tracks cursor
+  position, not just the input value, so fixing `A` after `B` is typed only
+  suggests for `A`.
 
 ## What I'd improve with more time
 
-- Persist the simulation's current step (and chosen playback speed)
-  alongside the architecture and log, so a reload resumes exactly where
-  you left off instead of resetting to step 1 / 1x.
 - Sync persisted state across open tabs; insert/reorder steps mid-trace.

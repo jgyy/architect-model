@@ -16,6 +16,8 @@ export type PersistedState = {
     architecture: Architecture;
     log: LogEntry[];
     trace: SimulationTrace;
+    stepIndex: number;
+    speedIndex: number;
 };
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -80,7 +82,9 @@ function isPersistedState(value: unknown): value is PersistedState {
         Array.isArray(value.log) &&
         value.log.every(isLogEntry) &&
         Array.isArray(value.trace) &&
-        value.trace.every(isSimulationStep)
+        value.trace.every(isSimulationStep) &&
+        typeof value.stepIndex === "number" &&
+        typeof value.speedIndex === "number"
     );
 }
 

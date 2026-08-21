@@ -2,23 +2,17 @@
 
 import { useEffect, useState } from "react";
 
-import { getNextPlayIndex, resolveStepNode } from "@/lib/simulation";
+import { PLAY_SPEEDS, getNextPlayIndex, resolveStepNode } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
-
-const PLAY_SPEEDS = [
-    { label: "0.5x", intervalMs: 3000 },
-    { label: "1x", intervalMs: 1500 },
-    { label: "2x", intervalMs: 750 },
-    { label: "4x", intervalMs: 375 },
-];
-const DEFAULT_SPEED_INDEX = 1;
 
 type SimulationPanelProps = {
     trace: SimulationTrace;
     architecture: Architecture;
     currentStepIndex: number;
     onStepChange: (index: number) => void;
+    speedIndex: number;
+    onSpeedChange: (index: number) => void;
 };
 
 export function SimulationPanel({
@@ -26,9 +20,10 @@ export function SimulationPanel({
     architecture,
     currentStepIndex,
     onStepChange,
+    speedIndex,
+    onSpeedChange,
 }: SimulationPanelProps) {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
 
     // Recursive setTimeout, not setInterval
     useEffect(() => {
@@ -93,7 +88,7 @@ export function SimulationPanel({
                     aria-label="Playback speed"
                     value={speedIndex}
                     onChange={(event) =>
-                        setSpeedIndex(Number(event.target.value))
+                        onSpeedChange(Number(event.target.value))
                     }
                     className="rounded border border-black/[.15] px-2 py-1 text-sm dark:border-white/[.2] dark:bg-transparent"
                 >

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import {
+    DEFAULT_SPEED_INDEX,
+    PLAY_SPEEDS,
     clampStepIndex,
     getNextPlayIndex,
     resolveStepNode,
@@ -58,6 +60,17 @@ describe("resolveStepNode", () => {
         };
 
         expect(resolveStepNode(step, architecture)).toBeUndefined();
+    });
+});
+
+describe("PLAY_SPEEDS", () => {
+    test("DEFAULT_SPEED_INDEX points at the 1x entry", () => {
+        expect(PLAY_SPEEDS[DEFAULT_SPEED_INDEX].label).toBe("1x");
+    });
+
+    test("is a valid index into PLAY_SPEEDS", () => {
+        expect(DEFAULT_SPEED_INDEX).toBeGreaterThanOrEqual(0);
+        expect(DEFAULT_SPEED_INDEX).toBeLessThan(PLAY_SPEEDS.length);
     });
 });
 

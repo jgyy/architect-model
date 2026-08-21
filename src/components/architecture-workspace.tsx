@@ -12,7 +12,11 @@ import {
     savePersistedState,
     type LogEntry,
 } from "@/lib/persistence";
-import { clampStepIndex, resolveStepNode } from "@/lib/simulation";
+import {
+    DEFAULT_SPEED_INDEX,
+    clampStepIndex,
+    resolveStepNode,
+} from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
 
@@ -30,6 +34,7 @@ export function ArchitectureWorkspace({
     const [input, setInput] = useState("");
     const [log, setLog] = useState<LogEntry[]>([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
     const [hydrated, setHydrated] = useState(false);
 
     // localStorage doesn't exist during SSR
@@ -40,15 +45,26 @@ export function ArchitectureWorkspace({
             setArchitecture(persisted.architecture);
             setLog(persisted.log);
             setTrace(persisted.trace);
+            setCurrentStepIndex(persisted.stepIndex);
+            setSpeedIndex(persisted.speedIndex);
         }
         setHydrated(true);
     }, []);
     /* eslint-enable react-hooks/set-state-in-effect */
 
+    // a remove-step command can shrink the trace out
+    const safeStepIndex = clampStepIndex(currentStepIndex, trace.length);
+
     useEffect(() => {
         if (!hydrated) return;
-        savePersistedState(window.localStorage, { architecture, log, trace });
-    }, [architecture, log, trace, hydrated]);
+        savePersistedState(window.localStorage, {
+            architecture,
+            log,
+            trace,
+            stepIndex: safeStepIndex,
+            speedIndex,
+        });
+    }, [architecture, log, trace, safeStepIndex, speedIndex, hydrated]);
 
     function handleClearHistory() {
         clearPersistedState(window.localStorage);
@@ -56,10 +72,9 @@ export function ArchitectureWorkspace({
         setLog([]);
         setTrace(initialSimulationTrace);
         setCurrentStepIndex(0);
+        setSpeedIndex(DEFAULT_SPEED_INDEX);
     }
 
-    // a remove-step command can shrink the trace out
-    const safeStepIndex = clampStepIndex(currentStepIndex, trace.length);
     const currentStep = trace[safeStepIndex];
     const highlightedNodeId = currentStep
         ? resolveStepNode(currentStep, architecture)?.id
@@ -119,6 +134,8 @@ export function ArchitectureWorkspace({
                         architecture={architecture}
                         currentStepIndex={safeStepIndex}
                         onStepChange={handleStepChange}
+                        speedIndex={speedIndex}
+                        onSpeedChange={setSpeedIndex}
                     />
                 )}
                 <div className="flex items-center justify-between border-b border-black/[.08] px-3 py-2 dark:border-white/[.145]">
