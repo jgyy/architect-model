@@ -3,6 +3,7 @@ import type {
     ArchitectureEdge,
     ArchitectureNode,
 } from "@/types/architecture";
+import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type LogEntry = {
     id: number;
@@ -14,6 +15,7 @@ export type LogEntry = {
 export type PersistedState = {
     architecture: Architecture;
     log: LogEntry[];
+    trace: SimulationTrace;
 };
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -57,6 +59,15 @@ function isLogEntry(value: unknown): value is LogEntry {
     );
 }
 
+function isSimulationStep(value: unknown): value is SimulationStep {
+    if (!isRecord(value)) return false;
+    return (
+        typeof value.step === "number" &&
+        typeof value.nodeId === "string" &&
+        typeof value.description === "string"
+    );
+}
+
 function isPersistedState(value: unknown): value is PersistedState {
     if (!isRecord(value)) return false;
     const architecture = value.architecture;
@@ -67,7 +78,9 @@ function isPersistedState(value: unknown): value is PersistedState {
         Array.isArray(architecture.edges) &&
         architecture.edges.every(isArchitectureEdge) &&
         Array.isArray(value.log) &&
-        value.log.every(isLogEntry)
+        value.log.every(isLogEntry) &&
+        Array.isArray(value.trace) &&
+        value.trace.every(isSimulationStep)
     );
 }
 

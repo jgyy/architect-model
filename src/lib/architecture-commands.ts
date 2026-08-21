@@ -1,23 +1,24 @@
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
+import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type CommandResult =
-    | { ok: true; architecture: Architecture; message: string }
+    | {
+          ok: true;
+          architecture: Architecture;
+          trace: SimulationTrace;
+          message: string;
+      }
     | { ok: false; message: string };
 
-// zero-width space/non-joiner/joiner and byte-order-mark: characters that
-// survive .trim() but render as nothing.
+// zero-width space/non-joiner/joiner and byte-order-mark
 const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
 
-// collapses runs of internal whitespace (not just leading/trailing) so labels
-// that only differ by extra spaces ("Web  Server" vs "Web Server") are
-// treated as the same label everywhere — on storage and on lookup.
+// collapses runs of internal whitespace (not just leading/trailing)
 function normalizeLabel(label: string): string {
     return label.trim().replace(/\s+/g, " ");
 }
 
-// distinct from a plain blank check: strips invisible characters (zero-width
-// space, etc.) that survive .trim() but render as nothing, so a label made
-// up only of those doesn't slip past the blank-label validation.
+// distinct from a plain blank check
 function isBlankLabel(label: string): boolean {
     return label.replace(INVISIBLE_CHARS_PATTERN, "").trim().length === 0;
 }
@@ -144,9 +145,22 @@ const REMOVE_EDGE_PATTERNS = [
     /^disconnect (.+)$/i,
 ];
 
+const ADD_STEP_PATTERNS = [/^add step(?:\s+(.*))?$/i];
+
+const SET_STEP_DESCRIPTION_PATTERNS = [
+    /^set step (\d+) description(?:\s+(.*))?$/i,
+];
+
+const REMOVE_STEP_PATTERNS = [/^remove step (\d+)$/i];
+
+function renumberSteps(trace: SimulationTrace): SimulationTrace {
+    return trace.map((step, index) => ({ ...step, step: index + 1 }));
+}
+
 export function parseCommand(
     input: string,
     architecture: Architecture,
+    trace: SimulationTrace = [],
 ): CommandResult {
     const trimmed = input.trim();
 
@@ -174,6 +188,7 @@ export function parseCommand(
                 ...architecture,
                 nodes: [...architecture.nodes, node],
             },
+            trace,
             message: `Added node "${label}".`,
         };
     }
@@ -221,6 +236,7 @@ export function parseCommand(
                 ...architecture,
                 edges: [...architecture.edges, edge],
             },
+            trace,
             message: `Connected "${source.data.label}" to "${target.data.label}".`,
         };
     }
@@ -241,6 +257,7 @@ export function parseCommand(
                         edge.source !== node.id && edge.target !== node.id,
                 ),
             },
+            trace,
             message: `Removed node "${node.data.label}".`,
         };
     }
@@ -277,7 +294,73 @@ export function parseCommand(
                 ...architecture,
                 edges: architecture.edges.filter((e) => e.id !== edge.id),
             },
+            trace,
             message: `Removed edge from "${source.data.label}" to "${target.data.label}".`,
+        };
+    }
+
+    const addStepMatch = matchFirst(ADD_STEP_PATTERNS, trimmed);
+    if (addStepMatch) {
+        const label = normalizeLabel(addStepMatch[1] ?? "");
+        if (isBlankLabel(label)) {
+            return { ok: false, message: "A step must reference a node." };
+        }
+        const node = findNodeByLabel(label, architecture);
+        if (!node) {
+            return { ok: false, message: `No node named "${label}".` };
+        }
+        const step: SimulationStep = {
+            step: trace.length + 1,
+            nodeId: node.id,
+            description: `Reaches "${node.data.label}".`,
+        };
+        return {
+            ok: true,
+            architecture,
+            trace: [...trace, step],
+            message: `Added step ${step.step}: reaches "${node.data.label}".`,
+        };
+    }
+
+    const setStepDescriptionMatch = matchFirst(
+        SET_STEP_DESCRIPTION_PATTERNS,
+        trimmed,
+    );
+    if (setStepDescriptionMatch) {
+        const stepNumber = Number(setStepDescriptionMatch[1]);
+        const description = normalizeLabel(setStepDescriptionMatch[2] ?? "");
+        if (isBlankLabel(description)) {
+            return {
+                ok: false,
+                message: "A step description cannot be blank.",
+            };
+        }
+        const index = stepNumber - 1;
+        if (index < 0 || index >= trace.length) {
+            return { ok: false, message: `No step numbered ${stepNumber}.` };
+        }
+        return {
+            ok: true,
+            architecture,
+            trace: trace.map((step, i) =>
+                i === index ? { ...step, description } : step,
+            ),
+            message: `Updated step ${stepNumber}'s description.`,
+        };
+    }
+
+    const removeStepMatch = matchFirst(REMOVE_STEP_PATTERNS, trimmed);
+    if (removeStepMatch) {
+        const stepNumber = Number(removeStepMatch[1]);
+        const index = stepNumber - 1;
+        if (index < 0 || index >= trace.length) {
+            return { ok: false, message: `No step numbered ${stepNumber}.` };
+        }
+        return {
+            ok: true,
+            architecture,
+            trace: renumberSteps(trace.filter((_, i) => i !== index)),
+            message: `Removed step ${stepNumber}.`,
         };
     }
 

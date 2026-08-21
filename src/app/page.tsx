@@ -11,7 +11,7 @@ export default function Home() {
             <div className="min-h-0 flex-1">
                 <ArchitectureWorkspace
                     initialArchitecture={exampleArchitecture}
-                    simulationTrace={exampleSimulationTrace}
+                    initialSimulationTrace={exampleSimulationTrace}
                 />
             </div>
         </div>

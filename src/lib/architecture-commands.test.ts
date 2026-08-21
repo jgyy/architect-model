@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { parseCommand } from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
+import type { SimulationTrace } from "@/types/simulation";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
 
@@ -628,5 +629,162 @@ describe("parseCommand", () => {
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.architecture.edges).toHaveLength(0);
+    });
+
+    test("adds a step pointing to an existing node with an auto-generated description", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("add step Web Server", architecture, []);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture).toEqual(architecture);
+        expect(result.trace).toEqual([
+            {
+                step: 1,
+                nodeId: "node-web-server",
+                description: 'Reaches "Web Server".',
+            },
+        ]);
+    });
+
+    test("appends a step after existing ones, numbering it contiguously", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [],
+        };
+        const trace: SimulationTrace = [
+            {
+                step: 1,
+                nodeId: "node-web-server",
+                description: "Starts at Web Server",
+            },
+        ];
+
+        const result = parseCommand("add step Database", architecture, trace);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.trace).toHaveLength(2);
+        expect(result.trace[1]).toMatchObject({
+            step: 2,
+            nodeId: "node-database",
+        });
+    });
+
+    test("fails to add a step for a node that doesn't exist", () => {
+        const result = parseCommand("add step Cache", emptyArchitecture, []);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected add step to fail");
+        expect(result.message).toBe('No node named "Cache".');
+    });
+
+    test("rejects adding a step with no node reference", () => {
+        const result = parseCommand("add step", emptyArchitecture, []);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected blank step to be rejected");
+        expect(result.message).toBe("A step must reference a node.");
+    });
+
+    test("updates a step's description by its 1-indexed position", () => {
+        const trace: SimulationTrace = [
+            {
+                step: 1,
+                nodeId: "node-web-server",
+                description: "old description",
+            },
+        ];
+
+        const result = parseCommand(
+            "set step 1 description Attacker pivots to Web Server",
+            emptyArchitecture,
+            trace,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.trace).toEqual([
+            {
+                step: 1,
+                nodeId: "node-web-server",
+                description: "Attacker pivots to Web Server",
+            },
+        ]);
+    });
+
+    test("rejects setting a step's description to blank", () => {
+        const trace: SimulationTrace = [
+            { step: 1, nodeId: "node-web-server", description: "old" },
+        ];
+
+        const result = parseCommand(
+            "set step 1 description",
+            emptyArchitecture,
+            trace,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected blank description to be rejected");
+        expect(result.message).toBe("A step description cannot be blank.");
+    });
+
+    test("fails to set the description of a step number that doesn't exist", () => {
+        const result = parseCommand(
+            "set step 1 description Anything",
+            emptyArchitecture,
+            [],
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected out-of-range step to fail");
+        expect(result.message).toBe("No step numbered 1.");
+    });
+
+    test("removes a step by its 1-indexed position, renumbering the rest", () => {
+        const trace: SimulationTrace = [
+            { step: 1, nodeId: "node-a", description: "first" },
+            { step: 2, nodeId: "node-b", description: "second" },
+            { step: 3, nodeId: "node-c", description: "third" },
+        ];
+
+        const result = parseCommand("remove step 2", emptyArchitecture, trace);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.trace).toEqual([
+            { step: 1, nodeId: "node-a", description: "first" },
+            { step: 2, nodeId: "node-c", description: "third" },
+        ]);
+    });
+
+    test("fails to remove a step number that doesn't exist", () => {
+        const result = parseCommand("remove step 5", emptyArchitecture, []);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected out-of-range remove to fail");
+        expect(result.message).toBe("No step numbered 5.");
     });
 });

@@ -20,35 +20,35 @@ const SUPPORTED_COMMANDS = [
     'connect <A> to <B>            — e.g. "connect Web Server to Cache" (aliases: connect A and B, link A to B, link A and B)',
     'remove node <label>           — e.g. "remove node Cache" (alias: delete node)',
     'remove edge <A> to <B>        — e.g. "remove edge Web Server to Cache" (aliases: delete edge, disconnect A from B, disconnect A and B)',
+    'add step <label>              — e.g. "add step Cache" (appends a simulation step reaching that node)',
+    'set step <n> description ...  — e.g. "set step 2 description Attacker pivots to Cache"',
+    'remove step <n>               — e.g. "remove step 2"',
 ];
 
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
-    simulationTrace?: SimulationTrace;
+    initialSimulationTrace?: SimulationTrace;
 };
 
 export function ArchitectureWorkspace({
     initialArchitecture,
-    simulationTrace = [],
+    initialSimulationTrace = [],
 }: ArchitectureWorkspaceProps) {
     const [architecture, setArchitecture] = useState(initialArchitecture);
+    const [trace, setTrace] = useState(initialSimulationTrace);
     const [input, setInput] = useState("");
     const [log, setLog] = useState<LogEntry[]>([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [hydrated, setHydrated] = useState(false);
 
-    // localStorage doesn't exist during SSR, so state starts at the seeded
-    // defaults (matching the server-rendered markup), and this one-time mount
-    // effect syncs in whatever was persisted from a prior session. Per Next's
-    // guidance on client-only state (localStorage, prefs), useEffect is the
-    // documented trade-off for non-flash-sensitive data: no hydration error,
-    // at the cost of a one-time flash from defaults to the persisted session.
+    // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const persisted = loadPersistedState(window.localStorage);
         if (persisted) {
             setArchitecture(persisted.architecture);
             setLog(persisted.log);
+            setTrace(persisted.trace);
         }
         setHydrated(true);
     }, []);
@@ -56,23 +56,26 @@ export function ArchitectureWorkspace({
 
     useEffect(() => {
         if (!hydrated) return;
-        savePersistedState(window.localStorage, { architecture, log });
-    }, [architecture, log, hydrated]);
+        savePersistedState(window.localStorage, { architecture, log, trace });
+    }, [architecture, log, trace, hydrated]);
 
     function handleClearHistory() {
         clearPersistedState(window.localStorage);
         setArchitecture(initialArchitecture);
         setLog([]);
+        setTrace(initialSimulationTrace);
         setCurrentStepIndex(0);
     }
 
-    const currentStep = simulationTrace[currentStepIndex];
+    // a remove-step command can shrink the trace out
+    const safeStepIndex = clampStepIndex(currentStepIndex, trace.length);
+    const currentStep = trace[safeStepIndex];
     const highlightedNodeId = currentStep
         ? resolveStepNode(currentStep, architecture)?.id
         : undefined;
 
     function handleStepChange(index: number) {
-        setCurrentStepIndex(clampStepIndex(index, simulationTrace.length));
+        setCurrentStepIndex(clampStepIndex(index, trace.length));
     }
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -80,9 +83,10 @@ export function ArchitectureWorkspace({
         const text = input.trim();
         if (!text) return;
 
-        const result = parseCommand(text, architecture);
+        const result = parseCommand(text, architecture, trace);
         if (result.ok) {
             setArchitecture(result.architecture);
+            setTrace(result.trace);
         }
         setLog((entries) => [
             ...entries,
@@ -145,11 +149,11 @@ export function ArchitectureWorkspace({
                         </ul>
                     </details>
                 </form>
-                {simulationTrace.length > 0 && (
+                {trace.length > 0 && (
                     <SimulationPanel
-                        trace={simulationTrace}
+                        trace={trace}
                         architecture={architecture}
-                        currentStepIndex={currentStepIndex}
+                        currentStepIndex={safeStepIndex}
                         onStepChange={handleStepChange}
                     />
                 )}
