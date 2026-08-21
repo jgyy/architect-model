@@ -1,18 +1,13 @@
 # architect-model
 
 A small web app for updating a system architecture (nodes + edges) via text
-input and exploring a simulation trace through it. See
-[`docs/programming-assignment.md`](docs/programming-assignment.md) for the
-full brief.
+input and exploring a simulation trace through it.
 
 ## Status
 
-**Step 3 (current):** Simulation exploration. The architecture is rendered
-visually via [React Flow](https://reactflow.dev), seeded with the example
-Internet → Web Server → Database architecture, and can be edited by typing
-commands into the sidebar (Step 2). A Simulation panel now lets you step
-forward/backward through an example attack trace, showing the step's
-description and highlighting the node it points to on the canvas.
+**Step 4 (current):** Full brief implemented — visual architecture (React
+Flow), text-command editing, simulation stepping, plus the Bonus items:
+command aliases, persisted chat history, and extra validation.
 
 ## Run locally
 
@@ -29,92 +24,69 @@ Then open http://localhost:3000.
 npm test
 ```
 
-Covers `src/lib/architecture-commands.ts` (the text-command parser) and
-`src/lib/simulation.ts` (step-index clamping and step→node resolution) — the
-business logic behind every architecture edit and every simulation step.
+Covers the command parser (`architecture-commands.ts`), simulation helpers
+(`simulation.ts`), and session persistence (`persistence.ts`).
 
 ## Supported commands
 
 Typed into the "Command" box in the sidebar, one at a time:
 
-| Command | Example | Effect |
-| --- | --- | --- |
-| `add node <label>` | `add node Cache` | Adds a new node with that label. |
-| `connect <A> to <B>` | `connect Web Server to Cache` | Adds an edge from node A to node B. Both must already exist. |
-| `remove node <label>` | `remove node Cache` | Removes the node and any edges touching it. |
-| `remove edge <A> to <B>` | `remove edge Web Server to Cache` | Removes the edge between A and B. |
+| Command | Aliases | Example | Effect |
+| --- | --- | --- | --- |
+| `add node <label>` | `create node`, `new node`, `add a node called` | `add node Cache` | Adds a node. Rejects a blank or already-used label. |
+| `connect <A> to <B>` | `connect <A> and <B>`, `link <A> to/and <B>` | `connect Web Server to Cache` | Adds an edge; both nodes must exist. |
+| `remove node <label>` | `delete node` | `remove node Cache` | Removes the node and its edges. |
+| `remove edge <A> to <B>` | `delete edge`, `disconnect <A> from/and <B>` | `remove edge Web Server to Cache` | Removes the edge. |
 
-Node references (`<A>`, `<B>`, `<label>` on removal) match **case-insensitively
-and by substring** — `connect web to cache` matches "Web Server" and "Cache".
-Anything that doesn't match one of the four forms above, or references a node
-that doesn't exist, is rejected with an inline error message in the command
-log rather than silently doing nothing or crashing.
+Node references match case-insensitively and by substring. Anything
+unrecognized, or referencing a missing node, is rejected with an inline
+error in the command log rather than doing nothing silently.
+
+## Chat history
+
+The command log and current architecture save to `localStorage` after every
+change and restore automatically on reload. Click **Clear history** to reset
+back to the seeded Internet → Web Server → Database example.
 
 ## Simulation exploration
 
-The sidebar's "Simulation" panel walks through a fixed example trace (an
-attacker moving Internet → Web Server → Database) seeded in
-`src/data/example-simulation.ts`, independent of the command log below it:
+The "Simulation" panel steps through a fixed example trace (seeded in
+`src/data/example-simulation.ts`), independent of the command log:
 
-- Shows the current step number, its description, and which node it points
-  to (highlighted on the canvas with an orange border).
-- **Prev** / **Next** buttons move through the trace one step at a time and
-  disable at the first/last step.
-- If a step's node has since been removed via a text command (e.g. `remove
-  node Web Server`), the panel keeps showing the step's description but
-  swaps the highlight for a "(node no longer in architecture)" note instead
-  of crashing or highlighting nothing silently.
+- Shows the step's description and highlights its node on the canvas.
+- **Prev**/**Next** move through the trace, disabling at the first/last step.
+- If a step's node was removed via a command, it shows "(node no longer in
+  architecture)" instead of crashing.
 
 ## Key design decisions and assumptions
 
-- **A structured mini-syntax, not free-text/NLP parsing.** The assignment
-  explicitly leaves "how flexible the input interpretation is" up to the
-  implementer. A small, predictable set of command forms keeps behavior easy
-  to reason about, test, and document, at the cost of not understanding
-  arbitrary phrasing (no LLM is used or required, per the brief).
-- **The command parser is a pure function** (`parseCommand(input, architecture)
-  -> CommandResult`) with no React or DOM dependency. It's exercised entirely
-  by unit tests; the UI component just calls it and applies the result. This
-  is also why architecture updates are immutable — the parser always returns
-  a new `Architecture` rather than mutating the one it was given.
-- **Node matching is case-insensitive substring matching**, not exact match.
-  This is more forgiving of casing/typos than exact match while staying much
-  simpler than fuzzy/ranked search; the trade-off is that overlapping labels
-  (e.g. "Database" and "Database Replica") could match ambiguously — not a
-  concern for the architectures this exercise deals with.
-- **The command log doubles as the validation/error-message UI** (a bonus
-  item): every command, successful or not, is appended with its outcome, so
-  a reviewer can see exactly what was typed and what happened as a result.
-  `connect` specifically rejects self-loops ("connect X to X") and duplicate
-  edges between the same pair of nodes, rather than silently creating them.
-- Visual layout of newly added nodes is a simple left-to-right cascade
-  (`x = 250 * index`); there's no automatic re-fit of the viewport after an
-  edit, so a node added far to the right may render outside the initial view
-  (use the "Fit View" control to recenter).
-- **The simulation trace is static example data, not derived from or edited
-  by the architecture commands.** The brief only requires stepping through a
-  trace and highlighting its nodes; trace and architecture are otherwise
-  independent, so an edit that removes a step's node doesn't try to repair
-  or re-point the trace — it degrades to the "node no longer in
-  architecture" note described above. This keeps two genuinely separate
-  concerns (editing a graph vs. replaying a trace over it) from being
-  entangled for a case the assignment doesn't ask for.
-- **Step-index math is a pure, tested helper** (`clampStepIndex`), and
-  resolving a step's node against the *current* architecture is a separate
-  pure helper (`resolveStepNode`) — same "logic in `lib/`, tested in
-  isolation, UI just renders the result" pattern as the command parser.
+- **Regex mini-syntax, not NLP.** Predictable, testable command forms; no
+  LLM is used or required, per the brief.
+- **Pure, tested logic in `lib/`; the UI just calls it.** The command parser,
+  simulation helpers, and persistence functions are all pure, with no
+  React/DOM dependency — architecture updates are immutable.
+- **Node matching is case-insensitive substring matching** (exact match
+  preferred), not fuzzy search — forgiving of typos, at the cost of possible
+  ambiguity between overlapping labels (not a concern here).
+- **Duplicate-label rejection is exact-match**, via a separate helper, so
+  `add node Web` isn't blocked just because "Web Server" already exists.
+- **The command log is the validation UI** (bonus item): every command is
+  appended with its outcome. `connect` also rejects self-loops and
+  duplicate edges.
+- **The simulation trace is static example data**, independent of the
+  architecture; removing a step's node degrades gracefully instead of
+  trying to repair the trace.
+- **Persistence takes a storage interface, not `window.localStorage`
+  directly**, so it's unit-tested in Node with a fake in-memory store.
+  Hydration follows Next's guidance for client-only state: state starts at
+  the SSR defaults, then a mount-only effect loads the persisted session —
+  a one-render flash instead of a hydration error.
 
 ## What I'd improve with more time
 
-- Auto-fit or auto-pan the view after an edit that adds a node outside the
-  current viewport, instead of requiring a manual "Fit View" click.
-- A richer node-reference picker (incremental filtering, highlighted matches,
-  keyboard navigation) instead of typed labels — useful once architectures
-  grow beyond a handful of nodes, but out of scope for this pass.
-- Chat-style command history bonus: currently the log is append-only for the
-  session; persisting it (or the architecture itself) across reloads would
-  need `localStorage` or a backend, neither of which the brief requires.
-- Let the simulation trace itself be authored/edited via text commands (e.g.
-  `add step ...`), instead of shipping only the one bundled example trace.
-- Auto-advance/"play" through the simulation on a timer, for a hands-free
-  walkthrough during a demo.
+- Auto-fit/pan the view after an edit adds a node outside the viewport.
+- A richer node-reference picker instead of typed labels.
+- Author/edit the simulation trace itself via text commands.
+- Auto-advance ("play") through the simulation on a timer.
+- Persist the simulation's current step alongside the architecture and log.
+- Sync persisted state across open tabs via the `storage` event.
