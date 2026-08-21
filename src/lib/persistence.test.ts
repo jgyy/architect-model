@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
     clearPersistedState,
+    interpretStorageEvent,
     loadPersistedState,
     savePersistedState,
     type PersistedState,
@@ -187,5 +188,47 @@ describe("clearPersistedState", () => {
         clearPersistedState(storage);
 
         expect(loadPersistedState(storage)).toBeNull();
+    });
+});
+
+describe("interpretStorageEvent", () => {
+    test("ignores a change to an unrelated storage key", () => {
+        expect(
+            interpretStorageEvent("some-other-key", JSON.stringify(sampleState)),
+        ).toEqual({ type: "irrelevant" });
+    });
+
+    test("reports a cleared change when the key is removed", () => {
+        expect(interpretStorageEvent("architect-model:session", null)).toEqual({
+            type: "cleared",
+        });
+    });
+
+    test("reports a cleared change when localStorage.clear() fires a null-key event", () => {
+        expect(interpretStorageEvent(null, null)).toEqual({ type: "cleared" });
+    });
+
+    test("reports invalid when the new value isn't valid JSON", () => {
+        expect(
+            interpretStorageEvent("architect-model:session", "{not json"),
+        ).toEqual({ type: "invalid" });
+    });
+
+    test("reports invalid when the new value doesn't look like a PersistedState", () => {
+        expect(
+            interpretStorageEvent(
+                "architect-model:session",
+                JSON.stringify({ foo: "bar" }),
+            ),
+        ).toEqual({ type: "invalid" });
+    });
+
+    test("reports the parsed state for a valid update", () => {
+        expect(
+            interpretStorageEvent(
+                "architect-model:session",
+                JSON.stringify(sampleState),
+            ),
+        ).toEqual({ type: "updated", state: sampleState });
     });
 });

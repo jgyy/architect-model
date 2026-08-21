@@ -111,3 +111,26 @@ export function savePersistedState(
 export function clearPersistedState(storage: StorageLike): void {
     storage.removeItem(STORAGE_KEY);
 }
+
+export type PersistedStateChange =
+    | { type: "irrelevant" }
+    | { type: "cleared" }
+    | { type: "invalid" }
+    | { type: "updated"; state: PersistedState };
+
+// Classifies a `window` `storage` event so another tab can react
+export function interpretStorageEvent(
+    key: string | null,
+    newValue: string | null,
+): PersistedStateChange {
+    if (key !== null && key !== STORAGE_KEY) return { type: "irrelevant" };
+    if (newValue === null) return { type: "cleared" };
+    try {
+        const parsed = JSON.parse(newValue);
+        return isPersistedState(parsed)
+            ? { type: "updated", state: parsed }
+            : { type: "invalid" };
+    } catch {
+        return { type: "invalid" };
+    }
+}
