@@ -3,13 +3,6 @@
 A small web app for updating a system architecture (nodes + edges) via text
 input and exploring a simulation trace through it.
 
-## Status
-
-**Step 11 (current):** full brief + Step 7-10 bonus items (aliases, persisted
-history, validation, canvas auto-fit, editable trace, auto-play with
-adjustable speed, node-ref autocomplete), plus the simulation's current step
-and playback speed now persist across a reload.
-
 ## Run locally
 
 ```bash

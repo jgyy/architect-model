@@ -63,6 +63,29 @@ function findNodeByLabel(
     );
 }
 
+// null = no match, undefined = ambiguous (multiple substring matches, no exact one)
+function findNodeOrAmbiguity(
+    label: string,
+    architecture: Architecture,
+): ArchitectureNode | ArchitectureNode[] | null {
+    const needle = normalizeLabel(label).toLowerCase();
+    const exact = architecture.nodes.find(
+        (node) => node.data.label.toLowerCase() === needle,
+    );
+    if (exact) return exact;
+    const matches = architecture.nodes.filter((node) =>
+        node.data.label.toLowerCase().includes(needle),
+    );
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+    return matches;
+}
+
+function ambiguousLabelMessage(label: string, matches: ArchitectureNode[]): string {
+    const names = matches.map((node) => `"${node.data.label}"`).join(", ");
+    return `"${label}" matches multiple nodes: ${names}. Be more specific.`;
+}
+
 function findNodeByExactLabel(
     label: string,
     architecture: Architecture,
@@ -180,7 +203,10 @@ export function parseCommand(
             CONNECT_SEPARATORS,
         );
         if (!resolved) {
-            return { ok: false, message: `Unrecognized command: "${trimmed}"` };
+            return {
+                ok: false,
+                message: `Couldn't find a "to" or "and" separator in "${connectMatch[1]}". Try: connect <A> to <B>.`,
+            };
         }
         const { source, target, sourceLabel, targetLabel } = resolved;
         if (!source) {
@@ -223,10 +249,14 @@ export function parseCommand(
     const removeNodeMatch = matchFirst(REMOVE_NODE_PATTERNS, trimmed);
     if (removeNodeMatch) {
         const label = removeNodeMatch[1].trim();
-        const node = findNodeByLabel(label, architecture);
-        if (!node) {
+        const resolved = findNodeOrAmbiguity(label, architecture);
+        if (resolved === null) {
             return { ok: false, message: `No node named "${label}".` };
         }
+        if (Array.isArray(resolved)) {
+            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+        }
+        const node = resolved;
         return {
             ok: true,
             architecture: {
@@ -249,7 +279,10 @@ export function parseCommand(
             DISCONNECT_SEPARATORS,
         );
         if (!resolved) {
-            return { ok: false, message: `Unrecognized command: "${trimmed}"` };
+            return {
+                ok: false,
+                message: `Couldn't find a "to"/"from"/"and" separator in "${removeEdgeMatch[1]}". Try: remove edge <A> to <B>.`,
+            };
         }
         const { source, target, sourceLabel, targetLabel } = resolved;
         if (!source) {
@@ -284,10 +317,14 @@ export function parseCommand(
         if (isBlankLabel(label)) {
             return { ok: false, message: "A step must reference a node." };
         }
-        const node = findNodeByLabel(label, architecture);
-        if (!node) {
+        const resolved = findNodeOrAmbiguity(label, architecture);
+        if (resolved === null) {
             return { ok: false, message: `No node named "${label}".` };
         }
+        if (Array.isArray(resolved)) {
+            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+        }
+        const node = resolved;
         const step: SimulationStep = {
             step: trace.length + 1,
             nodeId: node.id,
@@ -343,5 +380,8 @@ export function parseCommand(
         };
     }
 
-    return { ok: false, message: `Unrecognized command: "${trimmed}"` };
+    return {
+        ok: false,
+        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; add step <label>; set step <n> description <text>; remove step <n>.`,
+    };
 }
