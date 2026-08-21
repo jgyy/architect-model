@@ -5,9 +5,10 @@ input and exploring a simulation trace through it.
 
 ## Status
 
-**Step 4 (current):** Full brief implemented — visual architecture (React
+**Step 5 (current):** Full brief implemented — visual architecture (React
 Flow), text-command editing, simulation stepping, plus the Bonus items:
-command aliases, persisted chat history, and extra validation.
+command aliases, persisted chat history, and extra validation — plus the
+canvas now auto-fits/pans after edits that change the node set.
 
 ## Run locally
 
@@ -81,10 +82,14 @@ The "Simulation" panel steps through a fixed example trace (seeded in
   Hydration follows Next's guidance for client-only state: state starts at
   the SSR defaults, then a mount-only effect loads the persisted session —
   a one-render flash instead of a hydration error.
+- **The canvas re-fits via React Flow's imperative `fitView()`, not just
+  the `fitView` prop.** The prop only runs once, on mount; a child
+  component inside `<ReactFlow>` watches the node-id list and calls
+  `fitView()` again whenever it changes, so an added or removed node is
+  never left outside the viewport.
 
 ## What I'd improve with more time
 
-- Auto-fit/pan the view after an edit adds a node outside the viewport.
 - A richer node-reference picker instead of typed labels.
 - Author/edit the simulation trace itself via text commands.
 - Auto-advance ("play") through the simulation on a timer.

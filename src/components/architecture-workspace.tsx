@@ -87,7 +87,10 @@ export function ArchitectureWorkspace({
         setLog((entries) => [
             ...entries,
             {
-                id: entries.length === 0 ? 1 : Math.max(...entries.map((e) => e.id)) + 1,
+                id:
+                    entries.length === 0
+                        ? 1
+                        : Math.max(...entries.map((e) => e.id)) + 1,
                 input: text,
                 ok: result.ok,
                 message: result.message,
@@ -105,8 +108,14 @@ export function ArchitectureWorkspace({
                 />
             </div>
             <aside className="flex w-96 flex-col border-l border-black/[.08] dark:border-white/[.145]">
-                <form onSubmit={handleSubmit} className="border-b border-black/[.08] p-3 dark:border-white/[.145]">
-                    <label htmlFor="command-input" className="block text-xs font-medium text-black/60 dark:text-white/60">
+                <form
+                    onSubmit={handleSubmit}
+                    className="border-b border-black/[.08] p-3 dark:border-white/[.145]"
+                >
+                    <label
+                        htmlFor="command-input"
+                        className="block text-xs font-medium text-black/60 dark:text-white/60"
+                    >
                         Command
                     </label>
                     <div className="mt-1 flex gap-2">
@@ -126,7 +135,9 @@ export function ArchitectureWorkspace({
                         </button>
                     </div>
                     <details className="mt-2 text-xs text-black/60 dark:text-white/60">
-                        <summary className="cursor-pointer">Supported commands</summary>
+                        <summary className="cursor-pointer">
+                            Supported commands
+                        </summary>
                         <ul className="mt-1 space-y-0.5 font-mono">
                             {SUPPORTED_COMMANDS.map((command) => (
                                 <li key={command}>{command}</li>
@@ -165,7 +176,13 @@ export function ArchitectureWorkspace({
                             <div className="font-mono text-xs text-black/60 dark:text-white/60">
                                 {entry.input}
                             </div>
-                            <div className={entry.ok ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                            <div
+                                className={
+                                    entry.ok
+                                        ? "text-green-600 dark:text-green-400"
+                                        : "text-red-600 dark:text-red-400"
+                                }
+                            >
                                 {entry.message}
                             </div>
                         </li>

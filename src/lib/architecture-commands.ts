@@ -170,7 +170,10 @@ export function parseCommand(
         };
         return {
             ok: true,
-            architecture: { ...architecture, nodes: [...architecture.nodes, node] },
+            architecture: {
+                ...architecture,
+                nodes: [...architecture.nodes, node],
+            },
             message: `Added node "${label}".`,
         };
     }
@@ -214,7 +217,10 @@ export function parseCommand(
         };
         return {
             ok: true,
-            architecture: { ...architecture, edges: [...architecture.edges, edge] },
+            architecture: {
+                ...architecture,
+                edges: [...architecture.edges, edge],
+            },
             message: `Connected "${source.data.label}" to "${target.data.label}".`,
         };
     }
@@ -231,7 +237,8 @@ export function parseCommand(
             architecture: {
                 nodes: architecture.nodes.filter((n) => n.id !== node.id),
                 edges: architecture.edges.filter(
-                    (edge) => edge.source !== node.id && edge.target !== node.id,
+                    (edge) =>
+                        edge.source !== node.id && edge.target !== node.id,
                 ),
             },
             message: `Removed node "${node.data.label}".`,

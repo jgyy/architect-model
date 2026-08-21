@@ -1,4 +1,8 @@
-import type { Architecture, ArchitectureEdge, ArchitectureNode } from "@/types/architecture";
+import type {
+    Architecture,
+    ArchitectureEdge,
+    ArchitectureNode,
+} from "@/types/architecture";
 
 export type LogEntry = {
     id: number;
@@ -67,7 +71,9 @@ function isPersistedState(value: unknown): value is PersistedState {
     );
 }
 
-export function loadPersistedState(storage: StorageLike): PersistedState | null {
+export function loadPersistedState(
+    storage: StorageLike,
+): PersistedState | null {
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return null;
     try {
