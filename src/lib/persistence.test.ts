@@ -40,6 +40,13 @@ const sampleState: PersistedState = {
             message: 'Added node "Cache".',
         },
     ],
+    trace: [
+        {
+            step: 1,
+            nodeId: "node-cache",
+            description: "Attacker reaches Cache",
+        },
+    ],
 };
 
 describe("loadPersistedState", () => {
@@ -99,6 +106,20 @@ describe("loadPersistedState", () => {
                     edges: [{ id: "edge-1" }],
                 },
                 log: [],
+            }),
+        );
+
+        expect(loadPersistedState(storage)).toBeNull();
+    });
+
+    test("returns null when a persisted trace step is missing required fields", () => {
+        const storage = createFakeStorage();
+        storage.setItem(
+            "architect-model:session",
+            JSON.stringify({
+                architecture: sampleState.architecture,
+                log: [],
+                trace: [{ step: 1, nodeId: "node-cache" }],
             }),
         );
 
