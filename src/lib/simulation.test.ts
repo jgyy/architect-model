@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { clampStepIndex, resolveStepNode } from "@/lib/simulation";
+import {
+    clampStepIndex,
+    getNextPlayIndex,
+    resolveStepNode,
+} from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationStep } from "@/types/simulation";
 
@@ -54,5 +58,19 @@ describe("resolveStepNode", () => {
         };
 
         expect(resolveStepNode(step, architecture)).toBeUndefined();
+    });
+});
+
+describe("getNextPlayIndex", () => {
+    test("returns the following index when not at the last step", () => {
+        expect(getNextPlayIndex(0, 3)).toBe(1);
+    });
+
+    test("returns null when already at the last step", () => {
+        expect(getNextPlayIndex(2, 3)).toBeNull();
+    });
+
+    test("returns null when the trace is empty", () => {
+        expect(getNextPlayIndex(0, 0)).toBeNull();
     });
 });
