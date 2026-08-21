@@ -5,9 +5,10 @@ input and exploring a simulation trace through it.
 
 ## Status
 
-**Step 8 (current):** full brief + Step 7 bonus items (aliases, persisted
+**Step 9 (current):** full brief + Step 7 bonus items (aliases, persisted
 history, validation, canvas auto-fit, editable trace, auto-play), plus an
-inline node-reference autocomplete on the command input.
+inline node-reference autocomplete on the command input that now stays
+correct when you go back and edit an earlier argument.
 
 ## Run locally
 
@@ -84,11 +85,15 @@ seeded example). The "Simulation" panel steps through a trace (seeded from
 - **Suggestion matching splits `"<A> <sep> <B>"` at the last separator**
   while typing — cheaper than the parser's exhaustive search, and matches
   how someone types left-to-right.
+- **The autocomplete tracks cursor position, not just the input value.**
+  For `connect`/`remove edge`, which argument suggestions target (and what
+  span gets replaced) is chosen by comparing the caret offset to the
+  separator, so going back to fix `A` after `B` is already typed suggests
+  for `A` and only overwrites `A` — it no longer always assumes you're
+  typing at the end of the string.
 
 ## What I'd improve with more time
 
-- Suggestion matching for `connect`/`remove edge` breaks if you go back and
-  edit the *first* node reference after already typing the second.
 - An adjustable playback speed for auto-play, instead of a fixed 1.5s tick.
 - Persist the simulation's current step alongside the architecture and log.
 - Sync persisted state across open tabs; insert/reorder steps mid-trace.

@@ -105,6 +105,45 @@ describe("suggestNodeReference", () => {
         expect(suggestion!.replaceFrom).toBe(input.indexOf("Da"));
     });
 
+    test("targets the first argument of 'connect' when the cursor is still inside it", () => {
+        const input = "connect Web Server to Cache";
+        const cursor = input.indexOf("Web");
+        const suggestion = suggestNodeReference(input, architecture, cursor);
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+        expect(suggestion!.replaceFrom).toBe("connect ".length);
+        expect(suggestion!.replaceTo).toBe(input.indexOf(" to "));
+    });
+
+    test("targets the first argument of 'remove edge' when the cursor is still inside it", () => {
+        const input = "remove edge Web Server from Cache";
+        const cursor = input.indexOf("Web");
+        const suggestion = suggestNodeReference(input, architecture, cursor);
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+        expect(suggestion!.replaceFrom).toBe("remove edge ".length);
+        expect(suggestion!.replaceTo).toBe(input.indexOf(" from "));
+    });
+
+    test("treats the cursor sitting right at the separator as still editing the first argument", () => {
+        const input = "connect Web Server to Cache";
+        const cursor = input.indexOf(" to ");
+        const suggestion = suggestNodeReference(input, architecture, cursor);
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+        expect(suggestion!.replaceTo).toBe(cursor);
+    });
+
+    test("still targets the second argument once the cursor is past the separator", () => {
+        const input = "connect Web Server to Cache";
+        const cursor = input.indexOf("Cache") + 1;
+        const suggestion = suggestNodeReference(input, architecture, cursor);
+
+        expect(labels(suggestion!.matches)).toEqual(["Cache"]);
+        expect(suggestion!.replaceFrom).toBe(input.indexOf("Cache"));
+        expect(suggestion!.replaceTo).toBe(input.length);
+    });
+
     test("suggests matching nodes for a partial 'add step' label", () => {
         const suggestion = suggestNodeReference("add step Cac", architecture);
 
@@ -144,7 +183,8 @@ describe("suggestNodeReference", () => {
             edges: [],
         };
 
-        const suggestion = suggestNodeReference("remove node  ", many, 5);
+        const input = "remove node  ";
+        const suggestion = suggestNodeReference(input, many, input.length, 5);
 
         expect(suggestion!.matches).toHaveLength(5);
         expect(labels(suggestion!.matches)).toEqual([
@@ -202,5 +242,20 @@ describe("applyNodeSuggestion", () => {
         expect(result.value).toBe(
             "connect Web Server to Database  and more",
         );
+    });
+
+    test("fixing the first argument after the second is already typed keeps the second argument and lands the cursor before it", () => {
+        const input = "connect Web Server to Cache";
+        const cursor = input.indexOf("Web");
+        const suggestion = suggestNodeReference(input, architecture, cursor)!;
+
+        const result = applyNodeSuggestion(input, suggestion, {
+            id: "node-database",
+            position: { x: 0, y: 0 },
+            data: { label: "Database" },
+        });
+
+        expect(result.value).toBe("connect Database  to Cache");
+        expect(result.cursor).toBe("connect Database ".length);
     });
 });

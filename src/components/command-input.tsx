@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
     applyNodeSuggestion,
@@ -36,6 +36,8 @@ export function CommandInput({
     const [activeIndex, setActiveIndex] = useState(0);
     // suppressed right after a pick, until the user types again
     const [dismissed, setDismissed] = useState(false);
+    // which argument ("connect A|to B" vs "connect A to B|") suggestions target
+    const [cursorPosition, setCursorPosition] = useState(value.length);
     // resets activeIndex during render when the suggestion list changes
     const [lastValue, setLastValue] = useState(value);
     if (value !== lastValue) {
@@ -43,13 +45,33 @@ export function CommandInput({
         setActiveIndex(0);
     }
 
-    const suggestion = suggestNodeReference(value, architecture);
+    // selectSuggestion queues a target here; applied once `value`'s DOM
+    // update has committed, since setSelectionRange needs the new text first
+    const pendingCursorRef = useRef<number | null>(null);
+    useEffect(() => {
+        const pending = pendingCursorRef.current;
+        if (pending === null) return;
+        pendingCursorRef.current = null;
+        inputRef.current?.setSelectionRange(pending, pending);
+        setCursorPosition(pending);
+    }, [value]);
+
+    const suggestion = suggestNodeReference(
+        value,
+        architecture,
+        Math.min(cursorPosition, value.length),
+    );
     const options = dismissed ? [] : (suggestion?.matches ?? []);
+
+    function trackCursor(target: HTMLInputElement) {
+        setCursorPosition(target.selectionStart ?? target.value.length);
+    }
 
     function selectSuggestion(node: ArchitectureNode) {
         if (!suggestion) return;
         const applied = applyNodeSuggestion(value, suggestion, node);
         onChange(applied.value);
+        pendingCursorRef.current = applied.cursor;
         setDismissed(true);
         inputRef.current?.focus();
     }
@@ -96,8 +118,12 @@ export function CommandInput({
                         onChange={(event) => {
                             onChange(event.target.value);
                             setDismissed(false);
+                            trackCursor(event.target);
                         }}
                         onKeyDown={handleKeyDown}
+                        onKeyUp={(event) => trackCursor(event.currentTarget)}
+                        onClick={(event) => trackCursor(event.currentTarget)}
+                        onSelect={(event) => trackCursor(event.currentTarget)}
                         placeholder='e.g. "add node Cache"'
                         autoComplete="off"
                         role="combobox"
