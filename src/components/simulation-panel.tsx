@@ -1,5 +1,6 @@
 "use client";
 
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -48,45 +49,52 @@ export function SimulationPanel({
     const atLastStep = currentStepIndex === trace.length - 1;
 
     return (
-        <div className="border-b border-black/[.08] p-3 dark:border-white/[.145]">
+        <div className="border-b border-border p-3">
             <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-black/60 dark:text-white/60">
+                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Simulation
                 </span>
-                <span className="text-xs text-black/60 dark:text-white/60">
+                <span className="font-mono text-xs text-muted-foreground">
                     Step {currentStepIndex + 1} / {trace.length}
                 </span>
             </div>
-            <p className="mt-1 text-sm">{step.description}</p>
+            <p className="mt-1 text-sm text-foreground">{step.description}</p>
             {!node && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                <p className="mt-1 text-xs text-danger">
                     (node no longer in architecture)
                 </p>
             )}
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex items-center gap-1.5">
                 <button
                     type="button"
                     onClick={() => onStepChange(currentStepIndex - 1)}
                     disabled={currentStepIndex === 0}
-                    className="rounded border border-black/[.15] px-3 py-1 text-sm disabled:opacity-40 dark:border-white/[.2]"
+                    title="Previous step"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground hover:bg-border/40 disabled:opacity-40"
                 >
-                    Prev
+                    <SkipBack size={16} />
                 </button>
                 <button
                     type="button"
                     onClick={() => setIsPlaying((playing) => !playing)}
                     disabled={trace.length <= 1 || (!isPlaying && atLastStep)}
-                    className="rounded border border-black/[.15] px-3 py-1 text-sm disabled:opacity-40 dark:border-white/[.2]"
+                    title={isPlaying ? "Pause" : "Play"}
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground hover:bg-border/40 disabled:opacity-40"
                 >
-                    {isPlaying ? "⏸ Pause" : "▶ Play"}
+                    {isPlaying ? (
+                        <Pause size={16} />
+                    ) : (
+                        <Play size={16} className="ml-0.5" />
+                    )}
                 </button>
                 <button
                     type="button"
                     onClick={() => onStepChange(currentStepIndex + 1)}
                     disabled={atLastStep}
-                    className="rounded border border-black/[.15] px-3 py-1 text-sm disabled:opacity-40 dark:border-white/[.2]"
+                    title="Next step"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground hover:bg-border/40 disabled:opacity-40"
                 >
-                    Next
+                    <SkipForward size={16} />
                 </button>
                 <select
                     aria-label="Playback speed"
@@ -94,7 +102,7 @@ export function SimulationPanel({
                     onChange={(event) =>
                         onSpeedChange(Number(event.target.value))
                     }
-                    className="rounded border border-black/[.15] px-2 py-1 text-sm dark:border-white/[.2] dark:bg-transparent"
+                    className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
                 >
                     {PLAY_SPEEDS.map((speed, index) => (
                         <option key={speed.label} value={index}>

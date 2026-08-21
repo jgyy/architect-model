@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle2, Trash2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
@@ -19,7 +20,11 @@ import {
     clampStepIndex,
     resolveStepNode,
 } from "@/lib/simulation";
-import type { Architecture, ArchitectureNode } from "@/types/architecture";
+import type {
+    Architecture,
+    ArchitectureEdge,
+    ArchitectureNode,
+} from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
 
 type ArchitectureWorkspaceProps = {
@@ -124,6 +129,10 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
+    const handleEdgesChange = useCallback((edges: ArchitectureEdge[]) => {
+        setArchitecture((current) => ({ ...current, edges }));
+    }, []);
+
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const text = input.trim();
@@ -156,9 +165,10 @@ export function ArchitectureWorkspace({
                     architecture={architecture}
                     highlightedNodeId={highlightedNodeId}
                     onNodesChange={handleNodesChange}
+                    onEdgesChange={handleEdgesChange}
                 />
             </div>
-            <aside className="flex w-96 flex-col border-l border-black/[.08] dark:border-white/[.145]">
+            <aside className="flex w-96 flex-col border-l border-border bg-chrome">
                 <CommandInput
                     value={input}
                     onChange={setInput}
@@ -175,37 +185,48 @@ export function ArchitectureWorkspace({
                         onSpeedChange={setSpeedIndex}
                     />
                 )}
-                <div className="flex items-center justify-between border-b border-black/[.08] px-3 py-2 dark:border-white/[.145]">
-                    <span className="text-xs font-medium text-black/60 dark:text-white/60">
+                <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                    <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                         History
                     </span>
                     <button
                         type="button"
                         onClick={handleClearHistory}
-                        className="text-xs text-black/60 underline hover:text-black dark:text-white/60 dark:hover:text-white"
+                        title="Clear history"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
                     >
-                        Clear history
+                        <Trash2 size={14} />
                     </button>
                 </div>
-                <ul className="flex-1 space-y-2 overflow-y-auto p-3 text-sm">
+                <ul className="flex-1 overflow-y-auto text-sm">
                     {log.length === 0 && (
-                        <li className="text-black/40 dark:text-white/40">
+                        <li className="px-3 py-2 text-muted-foreground">
                             No commands run yet.
                         </li>
                     )}
                     {log.map((entry) => (
-                        <li key={entry.id}>
-                            <div className="font-mono text-xs text-black/60 dark:text-white/60">
-                                {entry.input}
-                            </div>
-                            <div
-                                className={
-                                    entry.ok
-                                        ? "text-green-600 dark:text-green-400"
-                                        : "text-red-600 dark:text-red-400"
-                                }
-                            >
-                                {entry.message}
+                        <li
+                            key={entry.id}
+                            className="flex items-start gap-2 px-3 py-2 hover:bg-border/40"
+                        >
+                            {entry.ok ? (
+                                <CheckCircle2
+                                    size={14}
+                                    className="mt-0.5 shrink-0 text-success"
+                                />
+                            ) : (
+                                <XCircle
+                                    size={14}
+                                    className="mt-0.5 shrink-0 text-danger"
+                                />
+                            )}
+                            <div className="min-w-0">
+                                <div className="truncate font-mono text-xs text-muted-foreground">
+                                    {entry.input}
+                                </div>
+                                <div className="text-foreground">
+                                    {entry.message}
+                                </div>
                             </div>
                         </li>
                     ))}
