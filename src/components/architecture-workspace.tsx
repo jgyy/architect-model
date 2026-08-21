@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
+import { CommandInput } from "@/components/command-input";
 import { SimulationPanel } from "@/components/simulation-panel";
 import { parseCommand } from "@/lib/architecture-commands";
 import {
@@ -14,16 +15,6 @@ import {
 import { clampStepIndex, resolveStepNode } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
-
-const SUPPORTED_COMMANDS = [
-    'add node <label>              — e.g. "add node Cache" (aliases: create node, new node, add a node called)',
-    'connect <A> to <B>            — e.g. "connect Web Server to Cache" (aliases: connect A and B, link A to B, link A and B)',
-    'remove node <label>           — e.g. "remove node Cache" (alias: delete node)',
-    'remove edge <A> to <B>        — e.g. "remove edge Web Server to Cache" (aliases: delete edge, disconnect A from B, disconnect A and B)',
-    'add step <label>              — e.g. "add step Cache" (appends a simulation step reaching that node)',
-    'set step <n> description ...  — e.g. "set step 2 description Attacker pivots to Cache"',
-    'remove step <n>               — e.g. "remove step 2"',
-];
 
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
@@ -116,43 +107,12 @@ export function ArchitectureWorkspace({
                 />
             </div>
             <aside className="flex w-96 flex-col border-l border-black/[.08] dark:border-white/[.145]">
-                <form
+                <CommandInput
+                    value={input}
+                    onChange={setInput}
                     onSubmit={handleSubmit}
-                    className="border-b border-black/[.08] p-3 dark:border-white/[.145]"
-                >
-                    <label
-                        htmlFor="command-input"
-                        className="block text-xs font-medium text-black/60 dark:text-white/60"
-                    >
-                        Command
-                    </label>
-                    <div className="mt-1 flex gap-2">
-                        <input
-                            id="command-input"
-                            type="text"
-                            value={input}
-                            onChange={(event) => setInput(event.target.value)}
-                            placeholder='e.g. "add node Cache"'
-                            className="w-full rounded border border-black/[.15] bg-transparent px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/[.2] dark:focus:border-white/40"
-                        />
-                        <button
-                            type="submit"
-                            className="shrink-0 rounded bg-foreground px-3 py-1 text-sm text-background"
-                        >
-                            Run
-                        </button>
-                    </div>
-                    <details className="mt-2 text-xs text-black/60 dark:text-white/60">
-                        <summary className="cursor-pointer">
-                            Supported commands
-                        </summary>
-                        <ul className="mt-1 space-y-0.5 font-mono">
-                            {SUPPORTED_COMMANDS.map((command) => (
-                                <li key={command}>{command}</li>
-                            ))}
-                        </ul>
-                    </details>
-                </form>
+                    architecture={architecture}
+                />
                 {trace.length > 0 && (
                     <SimulationPanel
                         trace={trace}

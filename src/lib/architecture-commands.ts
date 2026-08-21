@@ -1,22 +1,27 @@
+import {
+    ADD_STEP_PATTERNS,
+    CONNECT_PATTERNS,
+    CONNECT_SEPARATORS,
+    DISCONNECT_SEPARATORS,
+    REMOVE_EDGE_PATTERNS,
+    REMOVE_NODE_PATTERNS,
+    matchFirst,
+    normalizeLabel,
+} from "@/lib/node-reference";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type CommandResult =
     | {
-          ok: true;
-          architecture: Architecture;
-          trace: SimulationTrace;
-          message: string;
-      }
+        ok: true;
+        architecture: Architecture;
+        trace: SimulationTrace;
+        message: string;
+    }
     | { ok: false; message: string };
 
 // zero-width space/non-joiner/joiner and byte-order-mark
 const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
-
-// collapses runs of internal whitespace (not just leading/trailing)
-function normalizeLabel(label: string): string {
-    return label.trim().replace(/\s+/g, " ");
-}
 
 // distinct from a plain blank check
 function isBlankLabel(label: string): boolean {
@@ -68,18 +73,7 @@ function findNodeByExactLabel(
     );
 }
 
-function matchFirst(patterns: RegExp[], text: string): RegExpMatchArray | null {
-    for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match) return match;
-    }
-    return null;
-}
-
 // "<A> <sep> <B>" is ambiguous when a label itself contains a separator word
-// (e.g. "Point to Point Link"): try every split point across every separator
-// and prefer the one where both sides resolve to real nodes, falling back to
-// the first split (in separator-list order) for error reporting.
 function splitConnectionArgs(
     rest: string,
     separators: string[],
@@ -108,9 +102,6 @@ type ResolvedEndpoints = {
     target: ArchitectureNode | undefined;
 };
 
-const CONNECT_SEPARATORS = [" to ", " and "];
-const DISCONNECT_SEPARATORS = [" to ", " from ", " and "];
-
 function resolveConnectionEndpoints(
     rest: string,
     architecture: Architecture,
@@ -134,18 +125,6 @@ const ADD_NODE_PATTERNS = [
     /^new node(?:\s+(.*))?$/i,
     /^add a node called(?:\s+(.*))?$/i,
 ];
-
-const CONNECT_PATTERNS = [/^connect (.+)$/i, /^link (.+)$/i];
-
-const REMOVE_NODE_PATTERNS = [/^remove node (.+)$/i, /^delete node (.+)$/i];
-
-const REMOVE_EDGE_PATTERNS = [
-    /^remove edge (.+)$/i,
-    /^delete edge (.+)$/i,
-    /^disconnect (.+)$/i,
-];
-
-const ADD_STEP_PATTERNS = [/^add step(?:\s+(.*))?$/i];
 
 const SET_STEP_DESCRIPTION_PATTERNS = [
     /^set step (\d+) description(?:\s+(.*))?$/i,
