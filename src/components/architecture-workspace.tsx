@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { CommandInput } from "@/components/command-input";
@@ -8,9 +8,11 @@ import { SimulationPanel } from "@/components/simulation-panel";
 import { parseCommand } from "@/lib/architecture-commands";
 import {
     clearPersistedState,
+    interpretStorageEvent,
     loadPersistedState,
     savePersistedState,
     type LogEntry,
+    type PersistedState,
 } from "@/lib/persistence";
 import {
     DEFAULT_SPEED_INDEX,
@@ -36,43 +38,72 @@ export function ArchitectureWorkspace({
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
     const [hydrated, setHydrated] = useState(false);
+    // Tracks the JSON we know is in localStorage
+    const lastPersistedRef = useRef<string | null>(null);
+
+    const applyPersisted = useCallback((state: PersistedState) => {
+        setArchitecture(state.architecture);
+        setLog(state.log);
+        setTrace(state.trace);
+        setCurrentStepIndex(state.stepIndex);
+        setSpeedIndex(state.speedIndex);
+    }, []);
+
+    const resetToInitial = useCallback(() => {
+        setArchitecture(initialArchitecture);
+        setLog([]);
+        setTrace(initialSimulationTrace);
+        setCurrentStepIndex(0);
+        setSpeedIndex(DEFAULT_SPEED_INDEX);
+    }, [initialArchitecture, initialSimulationTrace]);
 
     // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const persisted = loadPersistedState(window.localStorage);
-        if (persisted) {
-            setArchitecture(persisted.architecture);
-            setLog(persisted.log);
-            setTrace(persisted.trace);
-            setCurrentStepIndex(persisted.stepIndex);
-            setSpeedIndex(persisted.speedIndex);
-        }
+        if (persisted) applyPersisted(persisted);
         setHydrated(true);
-    }, []);
+    }, [applyPersisted]);
     /* eslint-enable react-hooks/set-state-in-effect */
+
+    // Reacts to storage changes made by *other* tabs
+    useEffect(() => {
+        function handleStorage(event: StorageEvent) {
+            const change = interpretStorageEvent(event.key, event.newValue);
+            if (change.type === "updated") {
+                lastPersistedRef.current = event.newValue;
+                applyPersisted(change.state);
+            } else if (change.type === "cleared") {
+                lastPersistedRef.current = null;
+                resetToInitial();
+            }
+        }
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
+    }, [applyPersisted, resetToInitial]);
 
     // a remove-step command can shrink the trace out
     const safeStepIndex = clampStepIndex(currentStepIndex, trace.length);
 
     useEffect(() => {
         if (!hydrated) return;
-        savePersistedState(window.localStorage, {
+        const nextState: PersistedState = {
             architecture,
             log,
             trace,
             stepIndex: safeStepIndex,
             speedIndex,
-        });
+        };
+        const raw = JSON.stringify(nextState);
+        if (raw === lastPersistedRef.current) return;
+        savePersistedState(window.localStorage, nextState);
+        lastPersistedRef.current = raw;
     }, [architecture, log, trace, safeStepIndex, speedIndex, hydrated]);
 
     function handleClearHistory() {
         clearPersistedState(window.localStorage);
-        setArchitecture(initialArchitecture);
-        setLog([]);
-        setTrace(initialSimulationTrace);
-        setCurrentStepIndex(0);
-        setSpeedIndex(DEFAULT_SPEED_INDEX);
+        lastPersistedRef.current = null;
+        resetToInitial();
     }
 
     const currentStep = trace[safeStepIndex];
