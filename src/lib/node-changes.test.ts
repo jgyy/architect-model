@@ -5,17 +5,31 @@ import { applyPersistableNodeChanges } from "@/lib/node-changes";
 import type { ArchitectureNode } from "@/types/architecture";
 
 const nodes: ArchitectureNode[] = [
-    { id: "node-web-server", position: { x: 0, y: 0 }, data: { label: "Web Server" } },
-    { id: "node-database", position: { x: 250, y: 0 }, data: { label: "Database" } },
+    {
+        id: "node-web-server",
+        position: { x: 0, y: 0 },
+        data: { label: "Web Server" },
+    },
+    {
+        id: "node-database",
+        position: { x: 250, y: 0 },
+        data: { label: "Database" },
+    },
 ];
 
 describe("applyPersistableNodeChanges", () => {
     test("applies a position change to the matching node", () => {
         const changes: NodeChange<ArchitectureNode>[] = [
-            { type: "position", id: "node-web-server", position: { x: 40, y: 60 } },
+            {
+                type: "position",
+                id: "node-web-server",
+                position: { x: 40, y: 60 },
+            },
         ];
         const result = applyPersistableNodeChanges(changes, nodes);
-        expect(result.find((n) => n.id === "node-web-server")?.position).toEqual({
+        expect(
+            result.find((n) => n.id === "node-web-server")?.position,
+        ).toEqual({
             x: 40,
             y: 60,
         });
@@ -30,7 +44,10 @@ describe("applyPersistableNodeChanges", () => {
             { type: "remove", id: "node-web-server" },
         ];
         const result = applyPersistableNodeChanges(changes, nodes);
-        expect(result.map((n) => n.id)).toEqual(["node-web-server", "node-database"]);
+        expect(result.map((n) => n.id)).toEqual([
+            "node-web-server",
+            "node-database",
+        ]);
     });
 
     test("drops a select change rather than persisting selection state", () => {
@@ -38,7 +55,9 @@ describe("applyPersistableNodeChanges", () => {
             { type: "select", id: "node-web-server", selected: true },
         ];
         const result = applyPersistableNodeChanges(changes, nodes);
-        expect(result.find((n) => n.id === "node-web-server")?.selected).toBeUndefined();
+        expect(
+            result.find((n) => n.id === "node-web-server")?.selected,
+        ).toBeUndefined();
     });
 
     test("leaves nodes untouched when there are no changes", () => {

@@ -19,17 +19,17 @@ case-insensitively and by substring; unrecognized input or a reference to a
 missing node is rejected inline in the log. A dropdown autocompletes node
 names as you type (not for `add node`, since that label is new).
 
-| Command | Aliases | Example | Effect |
-| --- | --- | --- | --- |
-| `add node <label>` | `create node`, `new node`, `add a node called` | `add node Cache` | Adds a node; rejects a blank or duplicate label. |
-| `connect <A> to <B>` | `connect <A> and <B>`, `link <A> to/and <B>` | `connect Web Server to Cache` | Adds an edge; both nodes must exist. |
-| `remove node <label>` | `delete node` | `remove node Cache` | Removes the node and its edges. |
-| `remove edge <A> to <B>` | `delete edge`, `disconnect <A> from/and <B>` | `remove edge Web Server to Cache` | Removes the edge. |
-| `add step <label>` | — | `add step Cache` | Appends a simulation step at that node. |
-| `insert step <n> <label>` | — | `insert step 2 Cache` | Inserts a step at position `n`, shifting later steps down. |
-| `set step <n> description <text>` | — | `set step 2 description ...` | Replaces step `n`'s description. |
-| `remove step <n>` | — | `remove step 2` | Removes step `n`; remaining steps renumber. |
-| `move step <a> to <b>` | — | `move step 3 to 1` | Relocates the step at position `a` to position `b`; remaining steps renumber. |
+| Command                           | Aliases                                        | Example                           | Effect                                                                        |
+| --------------------------------- | ---------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| `add node <label>`                | `create node`, `new node`, `add a node called` | `add node Cache`                  | Adds a node; rejects a blank or duplicate label.                              |
+| `connect <A> to <B>`              | `connect <A> and <B>`, `link <A> to/and <B>`   | `connect Web Server to Cache`     | Adds an edge; both nodes must exist.                                          |
+| `remove node <label>`             | `delete node`                                  | `remove node Cache`               | Removes the node and its edges.                                               |
+| `remove edge <A> to <B>`          | `delete edge`, `disconnect <A> from/and <B>`   | `remove edge Web Server to Cache` | Removes the edge.                                                             |
+| `add step <label>`                | —                                              | `add step Cache`                  | Appends a simulation step at that node.                                       |
+| `insert step <n> <label>`         | —                                              | `insert step 2 Cache`             | Inserts a step at position `n`, shifting later steps down.                    |
+| `set step <n> description <text>` | —                                              | `set step 2 description ...`      | Replaces step `n`'s description.                                              |
+| `remove step <n>`                 | —                                              | `remove step 2`                   | Removes step `n`; remaining steps renumber.                                   |
+| `move step <a> to <b>`            | —                                              | `move step 3 to 1`                | Relocates the step at position `a` to position `b`; remaining steps renumber. |
 
 Nodes are draggable and their positions persist. Removal is text-only —
 Delete/Backspace on the canvas is disabled — so it's always logged and
@@ -64,7 +64,7 @@ if a step's node was removed or the step itself is removed.
 - Speed index is lifted into `ArchitectureWorkspace`; `isPlaying` stays local/unpersisted so a reload never auto-resumes playback.
 - The autocomplete's command patterns live in `lib/node-reference.ts`, shared with the parser, so the two never diverge.
 - `onNodesChange` only applies `"position"` changes; `deleteKeyCode={null}` backs it up, keeping removal text-only.
-- Multi-tab sync relies on `storage` events firing only in *other* tabs; `interpretStorageEvent` (pure, tested) classifies each event, and a ref tracking the last-written JSON stops tabs from re-triggering each other's writes once they converge.
+- Multi-tab sync relies on `storage` events firing only in _other_ tabs; `interpretStorageEvent` (pure, tested) classifies each event, and a ref tracking the last-written JSON stops tabs from re-triggering each other's writes once they converge.
 - `insert step`/`move step` both splice the trace array and renumber through the same `renumberSteps` helper `remove step` uses, so `step` always mirrors array position.
 
 ## What I'd improve with more time

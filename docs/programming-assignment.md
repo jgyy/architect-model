@@ -16,9 +16,9 @@ You may use any reasonable approach to interpret user input.
 - Backend: optional
 - Visual rendering of nodes/edges is optional
 - Architecture data must be compatible with React Flow's Node and Edge formats
-  - References:
-    - https://reactflow.dev/docs/api/nodes/
-    - https://reactflow.dev/docs/api/edges/
+    - References:
+        - https://reactflow.dev/docs/api/nodes/
+        - https://reactflow.dev/docs/api/edges/
 
 ## Architecture model (example only)
 
@@ -27,35 +27,35 @@ You are free to design your own structure as long as it remains compatible with 
 
 ```json
 {
-  "nodes": [
-    {
-      "id": "node_11111111-1111-1111-1111-111111111111",
-      "position": { "x": 0, "y": 0 },
-      "data": { "label": "Internet" }
-    },
-    {
-      "id": "node_22222222-2222-2222-2222-222222222222",
-      "position": { "x": 250, "y": 0 },
-      "data": { "label": "Web Server" }
-    },
-    {
-      "id": "node_33333333-3333-3333-3333-333333333333",
-      "position": { "x": 500, "y": 0 },
-      "data": { "label": "Database" }
-    }
-  ],
-  "edges": [
-    {
-      "id": "edge_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      "source": "node_11111111-1111-1111-1111-111111111111",
-      "target": "node_22222222-2222-2222-2222-222222222222"
-    },
-    {
-      "id": "edge_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-      "source": "node_22222222-2222-2222-2222-222222222222",
-      "target": "node_33333333-3333-3333-3333-333333333333"
-    }
-  ]
+    "nodes": [
+        {
+            "id": "node_11111111-1111-1111-1111-111111111111",
+            "position": { "x": 0, "y": 0 },
+            "data": { "label": "Internet" }
+        },
+        {
+            "id": "node_22222222-2222-2222-2222-222222222222",
+            "position": { "x": 250, "y": 0 },
+            "data": { "label": "Web Server" }
+        },
+        {
+            "id": "node_33333333-3333-3333-3333-333333333333",
+            "position": { "x": 500, "y": 0 },
+            "data": { "label": "Database" }
+        }
+    ],
+    "edges": [
+        {
+            "id": "edge_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "source": "node_11111111-1111-1111-1111-111111111111",
+            "target": "node_22222222-2222-2222-2222-222222222222"
+        },
+        {
+            "id": "edge_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "source": "node_22222222-2222-2222-2222-222222222222",
+            "target": "node_33333333-3333-3333-3333-333333333333"
+        }
+    ]
 }
 ```
 
@@ -63,21 +63,21 @@ You are free to design your own structure as long as it remains compatible with 
 
 ```json
 [
-  {
-    "step": 1,
-    "nodeId": "node_11111111-1111-1111-1111-111111111111",
-    "description": "Attacker starts from Internet"
-  },
-  {
-    "step": 2,
-    "nodeId": "node_22222222-2222-2222-2222-222222222222",
-    "description": "Attacker reaches Web Server"
-  },
-  {
-    "step": 3,
-    "nodeId": "node_33333333-3333-3333-3333-333333333333",
-    "description": "Attacker accesses Database"
-  }
+    {
+        "step": 1,
+        "nodeId": "node_11111111-1111-1111-1111-111111111111",
+        "description": "Attacker starts from Internet"
+    },
+    {
+        "step": 2,
+        "nodeId": "node_22222222-2222-2222-2222-222222222222",
+        "description": "Attacker reaches Web Server"
+    },
+    {
+        "step": 3,
+        "nodeId": "node_33333333-3333-3333-3333-333333333333",
+        "description": "Attacker accesses Database"
+    }
 ]
 ```
 
@@ -162,8 +162,8 @@ Provide one:
 
 - A short screen recording (30–90 seconds), or
 - 3–5 screenshots demonstrating:
-  - Architecture before and after a text-based update
-  - (Optional) Simulation step highlighting
+    - Architecture before and after a text-based update
+    - (Optional) Simulation step highlighting
 
 ## Bonus (optional)
 

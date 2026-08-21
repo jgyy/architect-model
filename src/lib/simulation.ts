@@ -20,10 +20,7 @@ export function resolveStepNode(
     return architecture.nodes.find((node) => node.id === step.nodeId);
 }
 
-export function getNextPlayIndex(
-    index: number,
-    length: number,
-): number | null {
+export function getNextPlayIndex(index: number, length: number): number | null {
     const next = index + 1;
     return next < length ? next : null;
 }

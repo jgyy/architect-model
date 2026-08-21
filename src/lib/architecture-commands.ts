@@ -14,11 +14,11 @@ import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type CommandResult =
     | {
-        ok: true;
-        architecture: Architecture;
-        trace: SimulationTrace;
-        message: string;
-    }
+          ok: true;
+          architecture: Architecture;
+          trace: SimulationTrace;
+          message: string;
+      }
     | { ok: false; message: string };
 
 // zero-width space/non-joiner/joiner and byte-order-mark
@@ -37,39 +37,32 @@ function slugify(label: string): string {
         .replace(/(^-|-$)/g, "");
 }
 
-function uniqueNodeId(slug: string, architecture: Architecture): string {
+// Also avoids ids still referenced by orphaned trace steps
+function uniqueNodeId(
+    slug: string,
+    architecture: Architecture,
+    trace: SimulationTrace,
+): string {
+    const usedIds = new Set<string>([
+        ...architecture.nodes.map((node) => node.id),
+        ...trace.map((step) => step.nodeId),
+    ]);
     let id = `node-${slug}`;
     let suffix = 2;
-    while (architecture.nodes.some((node) => node.id === id)) {
+    while (usedIds.has(id)) {
         id = `node-${slug}-${suffix}`;
         suffix += 1;
     }
     return id;
 }
 
-// case-insensitive: prefer an exact label match, fall back to substring
-function findNodeByLabel(
-    label: string,
-    architecture: Architecture,
-): ArchitectureNode | undefined {
-    const needle = normalizeLabel(label).toLowerCase();
-    const exact = architecture.nodes.find(
-        (node) => node.data.label.toLowerCase() === needle,
-    );
-    return (
-        exact ??
-        architecture.nodes.find((node) =>
-            node.data.label.toLowerCase().includes(needle),
-        )
-    );
-}
-
-// null = no match, undefined = ambiguous (multiple substring matches, no exact one)
+// null = no match, array = ambiguous (multiple substring matches, no exact one)
 function findNodeOrAmbiguity(
     label: string,
     architecture: Architecture,
 ): ArchitectureNode | ArchitectureNode[] | null {
     const needle = normalizeLabel(label).toLowerCase();
+    if (needle.length === 0) return null;
     const exact = architecture.nodes.find(
         (node) => node.data.label.toLowerCase() === needle,
     );
@@ -82,7 +75,10 @@ function findNodeOrAmbiguity(
     return matches;
 }
 
-function ambiguousLabelMessage(label: string, matches: ArchitectureNode[]): string {
+function ambiguousLabelMessage(
+    label: string,
+    matches: ArchitectureNode[],
+): string {
     const names = matches.map((node) => `"${node.data.label}"`).join(", ");
     return `"${label}" matches multiple nodes: ${names}. Be more specific.`;
 }
@@ -119,12 +115,18 @@ function splitConnectionArgs(
     return splits;
 }
 
+type EndpointMatch = ArchitectureNode | ArchitectureNode[] | null;
+
 type ResolvedEndpoints = {
     sourceLabel: string;
     targetLabel: string;
-    source: ArchitectureNode | undefined;
-    target: ArchitectureNode | undefined;
+    source: EndpointMatch;
+    target: EndpointMatch;
 };
+
+function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
+    return match !== null && !Array.isArray(match);
+}
 
 function resolveConnectionEndpoints(
     rest: string,
@@ -136,11 +138,15 @@ function resolveConnectionEndpoints(
 
     const resolved = splits.map((split) => ({
         ...split,
-        source: findNodeByLabel(split.sourceLabel, architecture),
-        target: findNodeByLabel(split.targetLabel, architecture),
+        source: findNodeOrAmbiguity(split.sourceLabel, architecture),
+        target: findNodeOrAmbiguity(split.targetLabel, architecture),
     }));
 
-    return resolved.find((r) => r.source && r.target) ?? resolved[0];
+    return (
+        resolved.find(
+            (r) => isSingleNode(r.source) && isSingleNode(r.target),
+        ) ?? resolved[0]
+    );
 }
 
 const ADD_NODE_PATTERNS = [
@@ -183,7 +189,7 @@ export function parseCommand(
             };
         }
         const node: ArchitectureNode = {
-            id: uniqueNodeId(slugify(label), architecture),
+            id: uniqueNodeId(slugify(label), architecture, trace),
             position: { x: architecture.nodes.length * 250, y: 0 },
             data: { label },
         };
@@ -212,11 +218,23 @@ export function parseCommand(
             };
         }
         const { source, target, sourceLabel, targetLabel } = resolved;
-        if (!source) {
+        if (source === null) {
             return { ok: false, message: `No node named "${sourceLabel}".` };
         }
-        if (!target) {
+        if (Array.isArray(source)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(sourceLabel, source),
+            };
+        }
+        if (target === null) {
             return { ok: false, message: `No node named "${targetLabel}".` };
+        }
+        if (Array.isArray(target)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(targetLabel, target),
+            };
         }
         if (source.id === target.id) {
             return {
@@ -257,7 +275,10 @@ export function parseCommand(
             return { ok: false, message: `No node named "${label}".` };
         }
         if (Array.isArray(resolved)) {
-            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(label, resolved),
+            };
         }
         const node = resolved;
         return {
@@ -288,11 +309,23 @@ export function parseCommand(
             };
         }
         const { source, target, sourceLabel, targetLabel } = resolved;
-        if (!source) {
+        if (source === null) {
             return { ok: false, message: `No node named "${sourceLabel}".` };
         }
-        if (!target) {
+        if (Array.isArray(source)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(sourceLabel, source),
+            };
+        }
+        if (target === null) {
             return { ok: false, message: `No node named "${targetLabel}".` };
+        }
+        if (Array.isArray(target)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(targetLabel, target),
+            };
         }
         const edge = architecture.edges.find(
             (e) => e.source === source.id && e.target === target.id,
@@ -325,7 +358,10 @@ export function parseCommand(
             return { ok: false, message: `No node named "${label}".` };
         }
         if (Array.isArray(resolved)) {
-            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(label, resolved),
+            };
         }
         const node = resolved;
         const step: SimulationStep = {
@@ -353,7 +389,10 @@ export function parseCommand(
             return { ok: false, message: `No node named "${label}".` };
         }
         if (Array.isArray(resolved)) {
-            return { ok: false, message: ambiguousLabelMessage(label, resolved) };
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(label, resolved),
+            };
         }
         const node = resolved;
         const maxPosition = trace.length + 1;

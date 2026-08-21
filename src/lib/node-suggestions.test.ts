@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
     applyNodeSuggestion,
     suggestNodeReference,
+    suggestionIsCompleteMatch,
 } from "@/lib/node-suggestions";
 import type { Architecture } from "@/types/architecture";
 
@@ -70,7 +71,11 @@ describe("suggestNodeReference", () => {
         const withWeb: Architecture = {
             nodes: [
                 ...architecture.nodes,
-                { id: "node-web", position: { x: 0, y: 0 }, data: { label: "Web" } },
+                {
+                    id: "node-web",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web" },
+                },
             ],
             edges: [],
         };
@@ -81,7 +86,10 @@ describe("suggestNodeReference", () => {
     });
 
     test("suggests the source node while typing the first argument of 'connect'", () => {
-        const suggestion = suggestNodeReference("connect Web Ser", architecture);
+        const suggestion = suggestNodeReference(
+            "connect Web Ser",
+            architecture,
+        );
 
         expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
         expect(suggestion!.replaceFrom).toBe("connect ".length);
@@ -164,7 +172,10 @@ describe("suggestNodeReference", () => {
     });
 
     test("suggests matching nodes for a partial 'insert step <n>' label", () => {
-        const suggestion = suggestNodeReference("insert step 2 Cac", architecture);
+        const suggestion = suggestNodeReference(
+            "insert step 2 Cac",
+            architecture,
+        );
 
         expect(labels(suggestion!.matches)).toEqual(["Cache"]);
     });
@@ -186,6 +197,31 @@ describe("suggestNodeReference", () => {
         const suggestion = suggestNodeReference("insert step", architecture);
 
         expect(suggestion).toBeNull();
+    });
+
+    test("does not split inside a node label that itself contains a separator word", () => {
+        const withLoadToBalance: Architecture = {
+            nodes: [
+                {
+                    id: "node-api",
+                    position: { x: 0, y: 0 },
+                    data: { label: "API" },
+                },
+                {
+                    id: "node-load-to-balance",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Load to Balance" },
+                },
+            ],
+            edges: [],
+        };
+
+        const input = "connect API to Load to Bal";
+        const suggestion = suggestNodeReference(input, withLoadToBalance);
+
+        expect(labels(suggestion!.matches)).toEqual(["Load to Balance"]);
+        expect(suggestion!.replaceFrom).toBe(input.indexOf("Load to Bal"));
+        expect(suggestion!.replaceTo).toBe(input.length);
     });
 
     test("caps suggestions at the given limit", () => {
@@ -264,9 +300,36 @@ describe("applyNodeSuggestion", () => {
             data: { label: "Database" },
         });
 
-        expect(result.value).toBe(
-            "connect Web Server to Database  and more",
-        );
+        expect(result.value).toBe("connect Web Server to Database  and more");
+    });
+
+    test("does not duplicate text when completing an argument whose match label contains a separator word", () => {
+        const withLoadToBalance: Architecture = {
+            nodes: [
+                {
+                    id: "node-api",
+                    position: { x: 0, y: 0 },
+                    data: { label: "API" },
+                },
+                {
+                    id: "node-load-to-balance",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Load to Balance" },
+                },
+            ],
+            edges: [],
+        };
+
+        const input = "connect API to Load to Bal";
+        const suggestion = suggestNodeReference(input, withLoadToBalance)!;
+
+        const result = applyNodeSuggestion(input, suggestion, {
+            id: "node-load-to-balance",
+            position: { x: 250, y: 0 },
+            data: { label: "Load to Balance" },
+        });
+
+        expect(result.value).toBe("connect API to Load to Balance ");
     });
 
     test("fixing the first argument after the second is already typed keeps the second argument and lands the cursor before it", () => {
@@ -282,5 +345,39 @@ describe("applyNodeSuggestion", () => {
 
         expect(result.value).toBe("connect Database  to Cache");
         expect(result.cursor).toBe("connect Database ".length);
+    });
+});
+
+describe("suggestionIsCompleteMatch", () => {
+    test("is true when the typed argument already exactly matches the single suggested node", () => {
+        const input = "remove node Web Server";
+        const suggestion = suggestNodeReference(input, architecture)!;
+
+        expect(suggestionIsCompleteMatch(input, suggestion)).toBe(true);
+    });
+
+    test("is false while the typed argument is still a partial match", () => {
+        const input = "remove node Da";
+        const suggestion = suggestNodeReference(input, architecture)!;
+
+        expect(suggestionIsCompleteMatch(input, suggestion)).toBe(false);
+    });
+
+    test("is false when the argument matches more than one node", () => {
+        const withWeb: Architecture = {
+            nodes: [
+                ...architecture.nodes,
+                {
+                    id: "node-web",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web" },
+                },
+            ],
+            edges: [],
+        };
+        const input = "remove node Web";
+        const suggestion = suggestNodeReference(input, withWeb)!;
+
+        expect(suggestionIsCompleteMatch(input, suggestion)).toBe(false);
     });
 });
