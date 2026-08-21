@@ -1,3 +1,4 @@
+import { DEFAULT_SPEED_INDEX } from "@/lib/simulation";
 import type {
     Architecture,
     ArchitectureEdge,
@@ -70,32 +71,73 @@ function isSimulationStep(value: unknown): value is SimulationStep {
     );
 }
 
-function isPersistedState(value: unknown): value is PersistedState {
-    if (!isRecord(value)) return false;
-    const architecture = value.architecture;
+function isValidArchitecture(value: unknown): value is Architecture {
     return (
-        isRecord(architecture) &&
-        Array.isArray(architecture.nodes) &&
-        architecture.nodes.every(isArchitectureNode) &&
-        Array.isArray(architecture.edges) &&
-        architecture.edges.every(isArchitectureEdge) &&
-        Array.isArray(value.log) &&
-        value.log.every(isLogEntry) &&
-        Array.isArray(value.trace) &&
-        value.trace.every(isSimulationStep) &&
-        typeof value.stepIndex === "number" &&
-        typeof value.speedIndex === "number"
+        isRecord(value) &&
+        Array.isArray(value.nodes) &&
+        value.nodes.every(isArchitectureNode) &&
+        Array.isArray(value.edges) &&
+        value.edges.every(isArchitectureEdge)
     );
+}
+
+// Sessions saved before trace/stepIndex/speedIndex existed have none of those
+// three fields at all; treat that (and only that) as the older schema and
+// default them, instead of discarding an otherwise-intact architecture + log.
+// Any other shape (e.g. only one of the three present, or one of the wrong
+// type) is genuinely corrupted data and is still rejected.
+function parsePersistedState(value: unknown): PersistedState | null {
+    if (!isRecord(value)) return null;
+    if (!isValidArchitecture(value.architecture)) return null;
+    if (!Array.isArray(value.log) || !value.log.every(isLogEntry)) {
+        return null;
+    }
+
+    const isLegacySession =
+        value.trace === undefined &&
+        value.stepIndex === undefined &&
+        value.speedIndex === undefined;
+    if (isLegacySession) {
+        return {
+            architecture: value.architecture,
+            log: value.log,
+            trace: [],
+            stepIndex: 0,
+            speedIndex: DEFAULT_SPEED_INDEX,
+        };
+    }
+
+    if (
+        !Array.isArray(value.trace) ||
+        !value.trace.every(isSimulationStep) ||
+        typeof value.stepIndex !== "number" ||
+        typeof value.speedIndex !== "number"
+    ) {
+        return null;
+    }
+
+    return {
+        architecture: value.architecture,
+        log: value.log,
+        trace: value.trace,
+        stepIndex: value.stepIndex,
+        speedIndex: value.speedIndex,
+    };
 }
 
 export function loadPersistedState(
     storage: StorageLike,
 ): PersistedState | null {
-    const raw = storage.getItem(STORAGE_KEY);
+    let raw: string | null;
+    try {
+        raw = storage.getItem(STORAGE_KEY);
+    } catch {
+        return null;
+    }
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw);
-        return isPersistedState(parsed) ? parsed : null;
+        return parsePersistedState(parsed);
     } catch {
         return null;
     }
@@ -105,11 +147,20 @@ export function savePersistedState(
     storage: StorageLike,
     state: PersistedState,
 ): void {
-    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+        storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+        // best-effort persistence: a full quota or a storage-restricted
+        // context (e.g. private browsing) shouldn't crash the app
+    }
 }
 
 export function clearPersistedState(storage: StorageLike): void {
-    storage.removeItem(STORAGE_KEY);
+    try {
+        storage.removeItem(STORAGE_KEY);
+    } catch {
+        // see savePersistedState
+    }
 }
 
 export type PersistedStateChange =
@@ -127,9 +178,8 @@ export function interpretStorageEvent(
     if (newValue === null) return { type: "cleared" };
     try {
         const parsed = JSON.parse(newValue);
-        return isPersistedState(parsed)
-            ? { type: "updated", state: parsed }
-            : { type: "invalid" };
+        const state = parsePersistedState(parsed);
+        return state ? { type: "updated", state } : { type: "invalid" };
     } catch {
         return { type: "invalid" };
     }

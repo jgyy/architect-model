@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
     applyNodeSuggestion,
     suggestNodeReference,
+    suggestionIsCompleteMatch,
 } from "@/lib/node-suggestions";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
@@ -40,12 +41,6 @@ export function CommandInput({
     const [dismissed, setDismissed] = useState(false);
     // which argument ("connect A|to B" vs "connect A to B|") suggestions target
     const [cursorPosition, setCursorPosition] = useState(value.length);
-    // resets activeIndex during render when the suggestion list changes
-    const [lastValue, setLastValue] = useState(value);
-    if (value !== lastValue) {
-        setLastValue(value);
-        setActiveIndex(0);
-    }
 
     // selectSuggestion queues a target here; applied once `value`'s DOM
     const pendingCursorRef = useRef<number | null>(null);
@@ -64,12 +59,29 @@ export function CommandInput({
     );
     const options = dismissed ? [] : (suggestion?.matches ?? []);
 
+    // Resets activeIndex during render whenever the suggested argument slot
+    // changes — not just when the text changes, since moving the cursor to a
+    // different argument (with no typing) changes which slot is suggested
+    // without changing `value`, and a stale index could point past the end
+    // of a now-shorter options array.
+    const suggestionSignature = suggestion
+        ? JSON.stringify([value, suggestion.replaceFrom, suggestion.replaceTo])
+        : value;
+    const [lastSuggestionSignature, setLastSuggestionSignature] =
+        useState(suggestionSignature);
+    if (suggestionSignature !== lastSuggestionSignature) {
+        setLastSuggestionSignature(suggestionSignature);
+        setActiveIndex(0);
+    }
+    const activeOptionIndex =
+        options.length === 0 ? 0 : Math.min(activeIndex, options.length - 1);
+
     function trackCursor(target: HTMLInputElement) {
         setCursorPosition(target.selectionStart ?? target.value.length);
     }
 
-    function selectSuggestion(node: ArchitectureNode) {
-        if (!suggestion) return;
+    function selectSuggestion(node: ArchitectureNode | undefined) {
+        if (!suggestion || !node) return;
         const applied = applyNodeSuggestion(value, suggestion, node);
         onChange(applied.value);
         pendingCursorRef.current = applied.cursor;
@@ -86,11 +98,21 @@ export function CommandInput({
                 break;
             case "ArrowUp":
                 event.preventDefault();
-                setActiveIndex((i) => (i - 1 + options.length) % options.length);
+                setActiveIndex(
+                    (i) => (i - 1 + options.length) % options.length,
+                );
                 break;
             case "Enter":
+                // an already-complete, unambiguous reference should submit
+                // the command, not be swallowed by the autocomplete
+                if (
+                    suggestion &&
+                    suggestionIsCompleteMatch(value, suggestion)
+                ) {
+                    break;
+                }
                 event.preventDefault();
-                selectSuggestion(options[activeIndex]);
+                selectSuggestion(options[activeOptionIndex]);
                 break;
             case "Escape":
                 setDismissed(true);
@@ -139,15 +161,22 @@ export function CommandInput({
                             className="absolute top-full left-0 z-10 mt-1 max-h-40 w-full overflow-y-auto rounded border border-black/[.15] bg-background shadow-md dark:border-white/[.2]"
                         >
                             {options.map((node, index) => (
-                                <li key={node.id} role="option" aria-selected={index === activeIndex}>
+                                <li
+                                    key={node.id}
+                                    role="option"
+                                    aria-selected={index === activeOptionIndex}
+                                >
                                     <button
                                         type="button"
-                                        onMouseDown={(event) => event.preventDefault()}
+                                        onMouseDown={(event) =>
+                                            event.preventDefault()
+                                        }
                                         onClick={() => selectSuggestion(node)}
-                                        className={`block w-full px-2 py-1 text-left text-sm ${index === activeIndex
-                                            ? "bg-black/[.06] dark:bg-white/[.1]"
-                                            : ""
-                                            }`}
+                                        className={`block w-full px-2 py-1 text-left text-sm ${
+                                            index === activeOptionIndex
+                                                ? "bg-black/[.06] dark:bg-white/[.1]"
+                                                : ""
+                                        }`}
                                     >
                                         {node.data.label}
                                     </button>

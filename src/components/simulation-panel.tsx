@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { PLAY_SPEEDS, getNextPlayIndex, resolveStepNode } from "@/lib/simulation";
+import {
+    PLAY_SPEEDS,
+    getNextPlayIndex,
+    resolveStepNode,
+} from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
 

@@ -17,7 +17,10 @@ export function normalizeLabel(label: string): string {
 
 export const CONNECT_PATTERNS = [/^connect (.+)$/i, /^link (.+)$/i];
 
-export const REMOVE_NODE_PATTERNS = [/^remove node (.+)$/i, /^delete node (.+)$/i];
+export const REMOVE_NODE_PATTERNS = [
+    /^remove node (.+)$/i,
+    /^delete node (.+)$/i,
+];
 
 export const REMOVE_EDGE_PATTERNS = [
     /^remove edge (.+)$/i,

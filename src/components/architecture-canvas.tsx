@@ -48,10 +48,10 @@ export function ArchitectureCanvas({
 }: ArchitectureCanvasProps) {
     const nodes = highlightedNodeId
         ? architecture.nodes.map((node) =>
-            node.id === highlightedNodeId
-                ? { ...node, style: { ...node.style, ...HIGHLIGHT_STYLE } }
-                : node,
-        )
+              node.id === highlightedNodeId
+                  ? { ...node, style: { ...node.style, ...HIGHLIGHT_STYLE } }
+                  : node,
+          )
         : architecture.nodes;
 
     const nodeIds = architecture.nodes.map((node) => node.id).join(",");

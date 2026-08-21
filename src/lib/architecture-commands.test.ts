@@ -29,6 +29,49 @@ describe("parseCommand", () => {
         expect(new Set(ids).size).toBe(2);
     });
 
+    test("does not reuse a removed node's id for a newly added node while a trace step still references the old id", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+        const trace: SimulationTrace = [
+            {
+                step: 1,
+                nodeId: "node-web-server",
+                description: "Reaches Web Server.",
+            },
+        ];
+
+        const removed = parseCommand(
+            "remove node Web Server",
+            architecture,
+            trace,
+        );
+        if (!removed.ok) throw new Error("expected remove node to succeed");
+
+        const added = parseCommand(
+            "add node Web Server",
+            removed.architecture,
+            removed.trace,
+        );
+
+        expect(added.ok).toBe(true);
+        if (!added.ok) return;
+        expect(added.architecture.nodes[0].id).not.toBe("node-web-server");
+        // the orphaned step still points at the removed node's old id, so the
+        // new node must not silently inherit it
+        expect(removed.trace[0].nodeId).toBe("node-web-server");
+        expect(
+            added.architecture.nodes.some((n) => n.id === "node-web-server"),
+        ).toBe(false);
+    });
+
     test("connects two existing nodes by label", () => {
         const architecture: Architecture = {
             nodes: [
@@ -354,9 +397,104 @@ describe("parseCommand", () => {
         const result = parseCommand("connect Web Server", emptyArchitecture);
 
         expect(result.ok).toBe(false);
-        if (result.ok)
-            throw new Error("expected a missing-separator failure");
+        if (result.ok) throw new Error("expected a missing-separator failure");
         expect(result.message).toContain("separator");
+    });
+
+    test("rejects a connect with a blank source label instead of silently picking an arbitrary node", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [],
+        };
+
+        // a double space between "connect" and "to" leaves the source blank
+        const result = parseCommand("connect  to Database", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected a blank-source failure");
+        expect(result.message).toBe('No node named "".');
+    });
+
+    test("reports an ambiguous label instead of silently connecting the wrong node when a connect reference matches multiple nodes", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-app-server",
+                    position: { x: 250, y: 0 },
+                    data: { label: "App Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 500, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("connect Server to Database", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("Web Server");
+        expect(result.message).toContain("App Server");
+        expect(result.message).toContain("multiple nodes");
+        expect(architecture.edges).toHaveLength(0);
+    });
+
+    test("reports an ambiguous label instead of falsely claiming no edge exists when a remove-edge reference matches multiple nodes", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-app-server",
+                    position: { x: 250, y: 0 },
+                    data: { label: "App Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 500, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [
+                {
+                    id: "edge-app-server-database",
+                    source: "node-app-server",
+                    target: "node-database",
+                },
+            ],
+        };
+
+        const result = parseCommand(
+            "remove edge Server to Database",
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("multiple nodes");
+        expect(architecture.edges).toHaveLength(1);
     });
 
     test("reports an ambiguous label when removing a node whose reference matches multiple nodes", () => {
@@ -864,11 +1002,7 @@ describe("parseCommand", () => {
             { step: 2, nodeId: "node-b", description: "second" },
         ];
 
-        const result = parseCommand(
-            "insert step 2 Cache",
-            architecture,
-            trace,
-        );
+        const result = parseCommand("insert step 2 Cache", architecture, trace);
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -898,11 +1032,7 @@ describe("parseCommand", () => {
             { step: 1, nodeId: "node-a", description: "first" },
         ];
 
-        const result = parseCommand(
-            "insert step 1 Cache",
-            architecture,
-            trace,
-        );
+        const result = parseCommand("insert step 1 Cache", architecture, trace);
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -927,11 +1057,7 @@ describe("parseCommand", () => {
             { step: 1, nodeId: "node-a", description: "first" },
         ];
 
-        const result = parseCommand(
-            "insert step 2 Cache",
-            architecture,
-            trace,
-        );
+        const result = parseCommand("insert step 2 Cache", architecture, trace);
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -956,11 +1082,7 @@ describe("parseCommand", () => {
             { step: 1, nodeId: "node-a", description: "first" },
         ];
 
-        const result = parseCommand(
-            "insert step 4 Cache",
-            architecture,
-            trace,
-        );
+        const result = parseCommand("insert step 4 Cache", architecture, trace);
 
         expect(result.ok).toBe(false);
         if (result.ok) throw new Error("expected out-of-range insert to fail");
@@ -1006,11 +1128,7 @@ describe("parseCommand", () => {
             edges: [],
         };
 
-        const result = parseCommand(
-            "insert step 1 Server",
-            architecture,
-            [],
-        );
+        const result = parseCommand("insert step 1 Server", architecture, []);
 
         expect(result.ok).toBe(false);
         if (result.ok) throw new Error("expected an ambiguous-label failure");

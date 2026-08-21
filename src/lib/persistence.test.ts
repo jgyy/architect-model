@@ -148,6 +148,25 @@ describe("loadPersistedState", () => {
         expect(loadPersistedState(storage)).toBeNull();
     });
 
+    test("salvages a pre-trace session that has only architecture and log, defaulting the newer fields", () => {
+        const storage = createFakeStorage();
+        storage.setItem(
+            "architect-model:session",
+            JSON.stringify({
+                architecture: sampleState.architecture,
+                log: sampleState.log,
+            }),
+        );
+
+        expect(loadPersistedState(storage)).toEqual({
+            architecture: sampleState.architecture,
+            log: sampleState.log,
+            trace: [],
+            stepIndex: 0,
+            speedIndex: 1,
+        });
+    });
+
     test("returns null when stepIndex is missing", () => {
         const storage = createFakeStorage();
         storage.setItem(
@@ -180,6 +199,38 @@ describe("loadPersistedState", () => {
     });
 });
 
+describe("storage errors", () => {
+    function createThrowingStorage(): StorageLike {
+        return {
+            getItem: () => {
+                throw new Error("SecurityError");
+            },
+            setItem: () => {
+                throw new Error("QuotaExceededError");
+            },
+            removeItem: () => {
+                throw new Error("SecurityError");
+            },
+        };
+    }
+
+    test("loadPersistedState returns null instead of throwing when storage.getItem throws", () => {
+        expect(loadPersistedState(createThrowingStorage())).toBeNull();
+    });
+
+    test("savePersistedState does not throw when storage.setItem throws", () => {
+        expect(() =>
+            savePersistedState(createThrowingStorage(), sampleState),
+        ).not.toThrow();
+    });
+
+    test("clearPersistedState does not throw when storage.removeItem throws", () => {
+        expect(() =>
+            clearPersistedState(createThrowingStorage()),
+        ).not.toThrow();
+    });
+});
+
 describe("clearPersistedState", () => {
     test("removes a previously saved state", () => {
         const storage = createFakeStorage();
@@ -194,7 +245,10 @@ describe("clearPersistedState", () => {
 describe("interpretStorageEvent", () => {
     test("ignores a change to an unrelated storage key", () => {
         expect(
-            interpretStorageEvent("some-other-key", JSON.stringify(sampleState)),
+            interpretStorageEvent(
+                "some-other-key",
+                JSON.stringify(sampleState),
+            ),
         ).toEqual({ type: "irrelevant" });
     });
 

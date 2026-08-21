@@ -29,7 +29,14 @@ function rankMatches(
     return nodes
         .map((node) => {
             const label = node.data.label.toLowerCase();
-            const rank = label === needle ? 0 : label.startsWith(needle) ? 1 : label.includes(needle) ? 2 : -1;
+            const rank =
+                label === needle
+                    ? 0
+                    : label.startsWith(needle)
+                      ? 1
+                      : label.includes(needle)
+                        ? 2
+                        : -1;
             return { node, rank };
         })
         .filter((entry) => entry.rank >= 0)
@@ -57,19 +64,61 @@ function singleSlotSuggestion(
     };
 }
 
-function lastSeparatorSplit(
+function isCompleteNodeLabel(
+    text: string,
+    architecture: Architecture,
+): boolean {
+    const needle = normalizeLabel(text).toLowerCase();
+    if (needle.length === 0) return false;
+    return architecture.nodes.some(
+        (node) => node.data.label.toLowerCase() === needle,
+    );
+}
+
+// every occurrence of every separator word, left to right within each word
+function candidateSeparatorSplits(
     rest: string,
     separators: string[],
-): { index: number; length: number } | null {
+): { index: number; length: number }[] {
     const lower = rest.toLowerCase();
-    let best: { index: number; length: number } | null = null;
+    const splits: { index: number; length: number }[] = [];
     for (const separator of separators) {
-        const idx = lower.lastIndexOf(separator);
-        if (idx !== -1 && (best === null || idx > best.index)) {
-            best = { index: idx, length: separator.length };
+        let from = 0;
+        while (true) {
+            const idx = lower.indexOf(separator, from);
+            if (idx === -1) break;
+            splits.push({ index: idx, length: separator.length });
+            from = idx + 1;
         }
     }
-    return best;
+    return splits;
+}
+
+// Prefers the split whose non-edited side is a real, complete node label, so
+// a label that itself contains a separator word (e.g. "Load to Balance")
+// isn't mistaken for a second argument. Falls back to the right-most
+// occurrence, matching plain "A <sep> B" input with no such ambiguity.
+function bestSeparatorSplit(
+    rest: string,
+    separators: string[],
+    architecture: Architecture,
+    cursorInRest: number,
+): { index: number; length: number } | null {
+    const splits = candidateSeparatorSplits(rest, separators);
+    if (splits.length === 0) return null;
+
+    const anchored = splits.find((split) => {
+        const cursorInSource = cursorInRest <= split.index;
+        const fixedLabel = cursorInSource
+            ? rest.slice(split.index + split.length).trim()
+            : rest.slice(0, split.index).trim();
+        return isCompleteNodeLabel(fixedLabel, architecture);
+    });
+    if (anchored) return anchored;
+
+    return splits.reduce((best, split) =>
+        split.index > best.index ? split : best,
+    );
 }
 
 function twoSlotSuggestion(
@@ -81,7 +130,12 @@ function twoSlotSuggestion(
     cursor: number,
 ): NodeSuggestion {
     const restStart = input.length - rest.length;
-    const split = lastSeparatorSplit(rest, separators);
+    const split = bestSeparatorSplit(
+        rest,
+        separators,
+        architecture,
+        cursor - restStart,
+    );
     if (!split) {
         return {
             replaceFrom: restStart,
@@ -108,7 +162,11 @@ function twoSlotSuggestion(
     return {
         replaceFrom: separatorEnd,
         replaceTo: input.length,
-        matches: rankMatches(input.slice(separatorEnd), architecture.nodes, limit),
+        matches: rankMatches(
+            input.slice(separatorEnd),
+            architecture.nodes,
+            limit,
+        ),
     };
 }
 
@@ -155,7 +213,12 @@ export function suggestNodeReference(
 
     const addStepMatch = matchFirst(ADD_STEP_PATTERNS, input);
     if (addStepMatch) {
-        return singleSlotSuggestion(input, addStepMatch[1], architecture, limit);
+        return singleSlotSuggestion(
+            input,
+            addStepMatch[1],
+            architecture,
+            limit,
+        );
     }
 
     const insertStepMatch = matchFirst(INSERT_STEP_PATTERNS, input);
@@ -169,6 +232,20 @@ export function suggestNodeReference(
     }
 
     return null;
+}
+
+// True when the argument span is already an exact, complete node reference —
+// selecting the suggestion would be a no-op, so Enter should submit instead
+// of being swallowed by the autocomplete dropdown.
+export function suggestionIsCompleteMatch(
+    input: string,
+    suggestion: NodeSuggestion,
+): boolean {
+    if (suggestion.matches.length !== 1) return false;
+    const typed = normalizeLabel(
+        input.slice(suggestion.replaceFrom, suggestion.replaceTo),
+    ).toLowerCase();
+    return typed === suggestion.matches[0].data.label.toLowerCase();
 }
 
 // Splices a chosen node's label into the input at the suggestion's span
