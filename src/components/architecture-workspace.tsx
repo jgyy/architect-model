@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { SimulationPanel } from "@/components/simulation-panel";
@@ -74,9 +74,13 @@ export function ArchitectureWorkspace({
         ? resolveStepNode(currentStep, architecture)?.id
         : undefined;
 
-    function handleStepChange(index: number) {
-        setCurrentStepIndex(clampStepIndex(index, trace.length));
-    }
+    // Stable across unrelated re-renders (e.g. every command-input keystroke)
+    const handleStepChange = useCallback(
+        (index: number) => {
+            setCurrentStepIndex(clampStepIndex(index, trace.length));
+        },
+        [trace.length],
+    );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();

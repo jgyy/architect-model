@@ -1,8 +1,12 @@
 "use client";
 
-import { resolveStepNode } from "@/lib/simulation";
+import { useEffect, useState } from "react";
+
+import { getNextPlayIndex, resolveStepNode } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
+
+const PLAY_INTERVAL_MS = 1500;
 
 type SimulationPanelProps = {
     trace: SimulationTrace;
@@ -17,10 +21,25 @@ export function SimulationPanel({
     currentStepIndex,
     onStepChange,
 }: SimulationPanelProps) {
+    const [isPlaying, setIsPlaying] = useState(false);
+
+    // Recursive setTimeout, not setInterval
+    useEffect(() => {
+        if (!isPlaying) return;
+
+        const next = getNextPlayIndex(currentStepIndex, trace.length);
+        const timer = setTimeout(
+            () => (next === null ? setIsPlaying(false) : onStepChange(next)),
+            next === null ? 0 : PLAY_INTERVAL_MS,
+        );
+        return () => clearTimeout(timer);
+    }, [isPlaying, currentStepIndex, trace.length, onStepChange]);
+
     if (trace.length === 0) return null;
 
     const step = trace[currentStepIndex];
     const node = resolveStepNode(step, architecture);
+    const atLastStep = currentStepIndex === trace.length - 1;
 
     return (
         <div className="border-b border-black/[.08] p-3 dark:border-white/[.145]">
@@ -49,8 +68,16 @@ export function SimulationPanel({
                 </button>
                 <button
                     type="button"
+                    onClick={() => setIsPlaying((playing) => !playing)}
+                    disabled={trace.length <= 1 || (!isPlaying && atLastStep)}
+                    className="rounded border border-black/[.15] px-3 py-1 text-sm disabled:opacity-40 dark:border-white/[.2]"
+                >
+                    {isPlaying ? "⏸ Pause" : "▶ Play"}
+                </button>
+                <button
+                    type="button"
                     onClick={() => onStepChange(currentStepIndex + 1)}
-                    disabled={currentStepIndex === trace.length - 1}
+                    disabled={atLastStep}
                     className="rounded border border-black/[.15] px-3 py-1 text-sm disabled:opacity-40 dark:border-white/[.2]"
                 >
                     Next
