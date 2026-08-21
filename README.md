@@ -5,10 +5,9 @@ input and exploring a simulation trace through it.
 
 ## Status
 
-**Step 9 (current):** full brief + Step 7 bonus items (aliases, persisted
-history, validation, canvas auto-fit, editable trace, auto-play), plus an
-inline node-reference autocomplete on the command input that now stays
-correct when you go back and edit an earlier argument.
+**Step 10 (current):** full brief + Step 7-9 bonus items (aliases, persisted
+history, validation, canvas auto-fit, editable trace, auto-play, node-ref
+autocomplete), plus an adjustable auto-play speed for the simulation.
 
 ## Run locally
 
@@ -34,9 +33,8 @@ Typed into the "Command" box in the sidebar, one at a time:
 | `set step <n> description <text>` | — | `set step 2 description Attacker pivots to Cache` | Replaces step `n`'s description (1-indexed). |
 | `remove step <n>` | — | `remove step 2` | Removes step `n`; remaining steps renumber from 1. |
 
-Node references match case-insensitively and by substring. Anything
-unrecognized, or referencing a missing node, is rejected inline in the
-command log rather than doing nothing silently.
+Node references match case-insensitively and by substring; anything
+unrecognized, or referencing a missing node, is rejected inline in the log.
 
 While typing a node argument (for `connect`, `remove node`, `remove edge`,
 or `add step`), a dropdown suggests matching existing node labels, ranked
@@ -51,8 +49,9 @@ after every change and restore on reload (**Clear history** resets to the
 seeded example). The "Simulation" panel steps through a trace (seeded from
 `src/data/example-simulation.ts`, editable via the step commands above):
 
-- **Prev**/**Next** move through the trace; **Play**/**Pause** auto-advances
-  one step every 1.5s, stopping at the last step instead of looping.
+- **Prev**/**Next** step through the trace; **Play**/**Pause** auto-advances,
+  stopping at the last step. The speed selector (0.5x-4x, default 1x =
+  1.5s/step) sets the tick interval and applies immediately, even mid-play.
 - Degrades gracefully: shows "(node no longer in architecture)" if a step's
   node was removed, and re-clamps if you remove the step you're viewing.
 
@@ -62,10 +61,9 @@ seeded example). The "Simulation" panel steps through a trace (seeded from
   LLM used or required, per the brief.
 - **Pure, tested logic in `lib/`; the UI just calls it**, including the new
   `lib/node-suggestions.ts` autocomplete matcher.
-- **Node matching is case-insensitive substring** (exact preferred) —
-  forgiving of typos, at the cost of possible ambiguity.
-- **Duplicate-label rejection is exact-match**, so `add node Web` isn't
-  blocked just because "Web Server" already exists.
+- **Node matching is case-insensitive substring** (exact preferred, forgiving
+  of typos); **duplicate-label rejection is exact-match**, so `add node Web`
+  isn't blocked just because "Web Server" already exists.
 - **The command log is the validation UI**: every command is appended with
   its outcome; `connect` also rejects self-loops/duplicates.
 - **The trace is editable but decoupled from the architecture** —
@@ -78,7 +76,10 @@ seeded example). The "Simulation" panel steps through a trace (seeded from
 - **The canvas re-fits via `fitView()` imperatively** on node-id changes,
   since the `fitView` prop only runs once, on mount.
 - **Auto-play schedules one `setTimeout` per tick, not `setInterval`**, so
-  it can't drift and auto-stops at the last step.
+  it can't drift and auto-stops at the last step; a plain index into a
+  static speed list (kept local to `SimulationPanel`, not `lib/`, since
+  there's no branching logic worth testing) sets the interval, so changing
+  it mid-play just reschedules the pending tick for free.
 - **The autocomplete's command patterns live in `lib/node-reference.ts`**,
   shared with the parser, so the two can never recognize different
   command shapes as they evolve.
@@ -86,14 +87,13 @@ seeded example). The "Simulation" panel steps through a trace (seeded from
   while typing — cheaper than the parser's exhaustive search, and matches
   how someone types left-to-right.
 - **The autocomplete tracks cursor position, not just the input value.**
-  For `connect`/`remove edge`, which argument suggestions target (and what
+  For `connect`/`remove edge`, which argument gets suggestions (and what
   span gets replaced) is chosen by comparing the caret offset to the
-  separator, so going back to fix `A` after `B` is already typed suggests
-  for `A` and only overwrites `A` — it no longer always assumes you're
-  typing at the end of the string.
+  separator, so fixing `A` after `B` is typed suggests only for `A`.
 
 ## What I'd improve with more time
 
-- An adjustable playback speed for auto-play, instead of a fixed 1.5s tick.
-- Persist the simulation's current step alongside the architecture and log.
+- Persist the simulation's current step (and chosen playback speed)
+  alongside the architecture and log, so a reload resumes exactly where
+  you left off instead of resetting to step 1 / 1x.
 - Sync persisted state across open tabs; insert/reorder steps mid-trace.
