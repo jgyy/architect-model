@@ -3,8 +3,11 @@
 import { useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
+import { SimulationPanel } from "@/components/simulation-panel";
 import { parseCommand } from "@/lib/architecture-commands";
+import { clampStepIndex, resolveStepNode } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
+import type { SimulationTrace } from "@/types/simulation";
 
 type LogEntry = {
   id: number;
@@ -22,15 +25,27 @@ const SUPPORTED_COMMANDS = [
 
 type ArchitectureWorkspaceProps = {
   initialArchitecture: Architecture;
+  simulationTrace?: SimulationTrace;
 };
 
 export function ArchitectureWorkspace({
   initialArchitecture,
+  simulationTrace = [],
 }: ArchitectureWorkspaceProps) {
   const [architecture, setArchitecture] = useState(initialArchitecture);
   const [input, setInput] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const nextLogId = useRef(1);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
+  const currentStep = simulationTrace[currentStepIndex];
+  const highlightedNodeId = currentStep
+    ? resolveStepNode(currentStep, architecture)?.id
+    : undefined;
+
+  function handleStepChange(index: number) {
+    setCurrentStepIndex(clampStepIndex(index, simulationTrace.length));
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +66,10 @@ export function ArchitectureWorkspace({
   return (
     <div className="flex h-full w-full">
       <div className="min-w-0 flex-1">
-        <ArchitectureCanvas architecture={architecture} />
+        <ArchitectureCanvas
+          architecture={architecture}
+          highlightedNodeId={highlightedNodeId}
+        />
       </div>
       <aside className="flex w-96 flex-col border-l border-black/[.08] dark:border-white/[.145]">
         <form onSubmit={handleSubmit} className="border-b border-black/[.08] p-3 dark:border-white/[.145]">
@@ -83,6 +101,14 @@ export function ArchitectureWorkspace({
             </ul>
           </details>
         </form>
+        {simulationTrace.length > 0 && (
+          <SimulationPanel
+            trace={simulationTrace}
+            architecture={architecture}
+            currentStepIndex={currentStepIndex}
+            onStepChange={handleStepChange}
+          />
+        )}
         <ul className="flex-1 space-y-2 overflow-y-auto p-3 text-sm">
           {log.length === 0 && (
             <li className="text-black/40 dark:text-white/40">

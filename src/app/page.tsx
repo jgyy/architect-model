@@ -1,5 +1,6 @@
 import { ArchitectureWorkspace } from "@/components/architecture-workspace";
 import { exampleArchitecture } from "@/data/example-architecture";
+import { exampleSimulationTrace } from "@/data/example-simulation";
 
 export default function Home() {
   return (
@@ -8,7 +9,10 @@ export default function Home() {
         <h1 className="text-xl font-semibold">Architecture Model</h1>
       </header>
       <div className="min-h-0 flex-1">
-        <ArchitectureWorkspace initialArchitecture={exampleArchitecture} />
+        <ArchitectureWorkspace
+          initialArchitecture={exampleArchitecture}
+          simulationTrace={exampleSimulationTrace}
+        />
       </div>
     </div>
   );
