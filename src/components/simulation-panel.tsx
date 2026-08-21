@@ -6,7 +6,13 @@ import { getNextPlayIndex, resolveStepNode } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
 
-const PLAY_INTERVAL_MS = 1500;
+const PLAY_SPEEDS = [
+    { label: "0.5x", intervalMs: 3000 },
+    { label: "1x", intervalMs: 1500 },
+    { label: "2x", intervalMs: 750 },
+    { label: "4x", intervalMs: 375 },
+];
+const DEFAULT_SPEED_INDEX = 1;
 
 type SimulationPanelProps = {
     trace: SimulationTrace;
@@ -22,6 +28,7 @@ export function SimulationPanel({
     onStepChange,
 }: SimulationPanelProps) {
     const [isPlaying, setIsPlaying] = useState(false);
+    const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
 
     // Recursive setTimeout, not setInterval
     useEffect(() => {
@@ -30,10 +37,10 @@ export function SimulationPanel({
         const next = getNextPlayIndex(currentStepIndex, trace.length);
         const timer = setTimeout(
             () => (next === null ? setIsPlaying(false) : onStepChange(next)),
-            next === null ? 0 : PLAY_INTERVAL_MS,
+            next === null ? 0 : PLAY_SPEEDS[speedIndex].intervalMs,
         );
         return () => clearTimeout(timer);
-    }, [isPlaying, currentStepIndex, trace.length, onStepChange]);
+    }, [isPlaying, currentStepIndex, trace.length, onStepChange, speedIndex]);
 
     if (trace.length === 0) return null;
 
@@ -82,6 +89,20 @@ export function SimulationPanel({
                 >
                     Next
                 </button>
+                <select
+                    aria-label="Playback speed"
+                    value={speedIndex}
+                    onChange={(event) =>
+                        setSpeedIndex(Number(event.target.value))
+                    }
+                    className="rounded border border-black/[.15] px-2 py-1 text-sm dark:border-white/[.2] dark:bg-transparent"
+                >
+                    {PLAY_SPEEDS.map((speed, index) => (
+                        <option key={speed.label} value={index}>
+                            {speed.label}
+                        </option>
+                    ))}
+                </select>
             </div>
         </div>
     );
