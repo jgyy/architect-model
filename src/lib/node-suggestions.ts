@@ -77,15 +77,37 @@ function twoSlotSuggestion(
     separators: string[],
     architecture: Architecture,
     limit: number,
+    cursor: number,
 ): NodeSuggestion {
     const restStart = input.length - rest.length;
     const split = lastSeparatorSplit(rest, separators);
-    const partial = split ? rest.slice(split.index + split.length) : rest;
-    const from = split ? restStart + split.index + split.length : restStart;
+    if (!split) {
+        return {
+            replaceFrom: restStart,
+            replaceTo: input.length,
+            matches: rankMatches(rest, architecture.nodes, limit),
+        };
+    }
+
+    // cursor at/before the separator: still editing the first argument
+    const separatorStart = restStart + split.index;
+    const separatorEnd = separatorStart + split.length;
+    if (cursor <= separatorStart) {
+        return {
+            replaceFrom: restStart,
+            replaceTo: separatorStart,
+            matches: rankMatches(
+                input.slice(restStart, separatorStart),
+                architecture.nodes,
+                limit,
+            ),
+        };
+    }
+
     return {
-        replaceFrom: from,
+        replaceFrom: separatorEnd,
         replaceTo: input.length,
-        matches: rankMatches(partial, architecture.nodes, limit),
+        matches: rankMatches(input.slice(separatorEnd), architecture.nodes, limit),
     };
 }
 
@@ -93,6 +115,7 @@ function twoSlotSuggestion(
 export function suggestNodeReference(
     input: string,
     architecture: Architecture,
+    cursor: number = input.length,
     limit: number = DEFAULT_LIMIT,
 ): NodeSuggestion | null {
     const connectMatch = matchFirst(CONNECT_PATTERNS, input);
@@ -103,6 +126,7 @@ export function suggestNodeReference(
             CONNECT_SEPARATORS,
             architecture,
             limit,
+            cursor,
         );
     }
 
@@ -114,6 +138,7 @@ export function suggestNodeReference(
             DISCONNECT_SEPARATORS,
             architecture,
             limit,
+            cursor,
         );
     }
 
