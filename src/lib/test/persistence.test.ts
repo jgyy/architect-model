@@ -28,7 +28,7 @@ const sampleState: PersistedState = {
             {
                 id: "node-cache",
                 position: { x: 0, y: 0 },
-                data: { label: "Cache" },
+                data: { label: "Cache", description: "Attacker reaches Cache" },
             },
         ],
         edges: [],
@@ -39,13 +39,6 @@ const sampleState: PersistedState = {
             input: "add node Cache",
             ok: true,
             message: 'Added node "Cache".',
-        },
-    ],
-    trace: [
-        {
-            step: 1,
-            nodeId: "node-cache",
-            description: "Attacker reaches Cache",
         },
     ],
     stepIndex: 0,
@@ -115,7 +108,7 @@ describe("loadPersistedState", () => {
         expect(loadPersistedState(storage)).toBeNull();
     });
 
-    test("returns null when a persisted trace step is missing required fields", () => {
+    test("ignores a leftover legacy `trace` array instead of validating it", () => {
         const storage = createFakeStorage();
         storage.setItem(
             "architect-model:session",
@@ -123,10 +116,43 @@ describe("loadPersistedState", () => {
                 architecture: sampleState.architecture,
                 log: [],
                 trace: [{ step: 1, nodeId: "node-cache" }],
+                stepIndex: 0,
+                speedIndex: 1,
             }),
         );
 
-        expect(loadPersistedState(storage)).toBeNull();
+        expect(loadPersistedState(storage)).toEqual({
+            architecture: sampleState.architecture,
+            log: [],
+            stepIndex: 0,
+            speedIndex: 1,
+        });
+    });
+
+    test("accepts a node without a description, for architectures saved before descriptions existed", () => {
+        const storage = createFakeStorage();
+        storage.setItem(
+            "architect-model:session",
+            JSON.stringify({
+                architecture: {
+                    nodes: [
+                        {
+                            id: "node-cache",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Cache" },
+                        },
+                    ],
+                    edges: [],
+                },
+                log: [],
+                stepIndex: 0,
+                speedIndex: 1,
+            }),
+        );
+
+        expect(loadPersistedState(storage)?.architecture.nodes[0].data).toEqual(
+            { label: "Cache" },
+        );
     });
 
     test("returns null when a persisted log entry is missing a numeric id", () => {
@@ -148,7 +174,7 @@ describe("loadPersistedState", () => {
         expect(loadPersistedState(storage)).toBeNull();
     });
 
-    test("salvages a pre-trace session that has only architecture and log, defaulting the newer fields", () => {
+    test("salvages a legacy session that has only architecture and log, defaulting the newer fields", () => {
         const storage = createFakeStorage();
         storage.setItem(
             "architect-model:session",
@@ -161,20 +187,18 @@ describe("loadPersistedState", () => {
         expect(loadPersistedState(storage)).toEqual({
             architecture: sampleState.architecture,
             log: sampleState.log,
-            trace: [],
             stepIndex: 0,
             speedIndex: 1,
         });
     });
 
-    test("returns null when stepIndex is missing", () => {
+    test("returns null when stepIndex is missing but speedIndex is present", () => {
         const storage = createFakeStorage();
         storage.setItem(
             "architect-model:session",
             JSON.stringify({
                 architecture: sampleState.architecture,
                 log: [],
-                trace: [],
                 speedIndex: 1,
             }),
         );
@@ -189,7 +213,6 @@ describe("loadPersistedState", () => {
             JSON.stringify({
                 architecture: sampleState.architecture,
                 log: [],
-                trace: [],
                 stepIndex: 0,
                 speedIndex: "1x",
             }),

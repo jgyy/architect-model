@@ -19,7 +19,6 @@ import {
     DEFAULT_SPEED_INDEX,
     clampStepIndex,
     getTraversedPath,
-    resolveStepNode,
 } from "@/lib/simulation";
 import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
 import type {
@@ -27,7 +26,6 @@ import type {
     ArchitectureEdge,
     ArchitectureNode,
 } from "@/types/architecture";
-import type { SimulationTrace } from "@/types/simulation";
 
 const HELP_MESSAGE = SUPPORTED_COMMANDS.join("\n");
 
@@ -37,15 +35,12 @@ function nextLogId(entries: LogEntry[]): number {
 
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
-    initialSimulationTrace?: SimulationTrace;
 };
 
 export function ArchitectureWorkspace({
     initialArchitecture,
-    initialSimulationTrace = [],
 }: ArchitectureWorkspaceProps) {
     const [architecture, setArchitecture] = useState(initialArchitecture);
-    const [trace, setTrace] = useState(initialSimulationTrace);
     const [input, setInput] = useState("");
     const [log, setLog] = useState<LogEntry[]>([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -57,7 +52,6 @@ export function ArchitectureWorkspace({
     const applyPersisted = useCallback((state: PersistedState) => {
         setArchitecture(state.architecture);
         setLog(state.log);
-        setTrace(state.trace);
         setCurrentStepIndex(state.stepIndex);
         setSpeedIndex(state.speedIndex);
     }, []);
@@ -65,10 +59,9 @@ export function ArchitectureWorkspace({
     const resetToInitial = useCallback(() => {
         setArchitecture(initialArchitecture);
         setLog([]);
-        setTrace(initialSimulationTrace);
         setCurrentStepIndex(0);
         setSpeedIndex(DEFAULT_SPEED_INDEX);
-    }, [initialArchitecture, initialSimulationTrace]);
+    }, [initialArchitecture]);
 
     // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -95,15 +88,17 @@ export function ArchitectureWorkspace({
         return () => window.removeEventListener("storage", handleStorage);
     }, [applyPersisted, resetToInitial]);
 
-    // a remove-step command can shrink the trace out
-    const safeStepIndex = clampStepIndex(currentStepIndex, trace.length);
+    // a remove-node command can shrink the simulation trace out from under it
+    const safeStepIndex = clampStepIndex(
+        currentStepIndex,
+        architecture.nodes.length,
+    );
 
     useEffect(() => {
         if (!hydrated) return;
         const nextState: PersistedState = {
             architecture,
             log,
-            trace,
             stepIndex: safeStepIndex,
             speedIndex,
         };
@@ -111,7 +106,7 @@ export function ArchitectureWorkspace({
         if (raw === lastPersistedRef.current) return;
         savePersistedState(window.localStorage, nextState);
         lastPersistedRef.current = raw;
-    }, [architecture, log, trace, safeStepIndex, speedIndex, hydrated]);
+    }, [architecture, log, safeStepIndex, speedIndex, hydrated]);
 
     function handleClearHistory() {
         clearPersistedState(window.localStorage);
@@ -119,21 +114,20 @@ export function ArchitectureWorkspace({
         resetToInitial();
     }
 
-    const currentStep = trace[safeStepIndex];
-    const highlightedNodeId = currentStep
-        ? resolveStepNode(currentStep, architecture)?.id
-        : undefined;
+    const highlightedNodeId = architecture.nodes[safeStepIndex]?.id;
     const traversedPath = useMemo(
-        () => getTraversedPath(trace, architecture, safeStepIndex),
-        [trace, architecture, safeStepIndex],
+        () => getTraversedPath(architecture, safeStepIndex),
+        [architecture, safeStepIndex],
     );
 
     // Stable across unrelated re-renders (e.g. every command-input keystroke)
     const handleStepChange = useCallback(
         (index: number) => {
-            setCurrentStepIndex(clampStepIndex(index, trace.length));
+            setCurrentStepIndex(
+                clampStepIndex(index, architecture.nodes.length),
+            );
         },
-        [trace.length],
+        [architecture.nodes.length],
     );
 
     // Stable across unrelated re-renders, same reason as handleStepChange
@@ -164,10 +158,9 @@ export function ArchitectureWorkspace({
                 return;
             }
 
-            const result = parseCommand(trimmed, architecture, trace);
+            const result = parseCommand(trimmed, architecture);
             if (result.ok) {
                 setArchitecture(result.architecture);
-                setTrace(result.trace);
             }
             setLog((entries) => [
                 ...entries,
@@ -179,7 +172,7 @@ export function ArchitectureWorkspace({
                 },
             ]);
         },
-        [architecture, trace],
+        [architecture],
     );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -211,9 +204,8 @@ export function ArchitectureWorkspace({
                 />
             </div>
             <aside className="flex w-fit shrink-0 flex-col border-l border-border bg-chrome">
-                {trace.length > 0 && (
+                {architecture.nodes.length > 0 && (
                     <SimulationPanel
-                        trace={trace}
                         architecture={architecture}
                         currentStepIndex={safeStepIndex}
                         onStepChange={handleStepChange}

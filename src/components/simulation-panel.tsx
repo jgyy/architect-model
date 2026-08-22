@@ -7,13 +7,11 @@ import { SimulationTimeline } from "@/components/simulation-timeline";
 import {
     PLAY_SPEEDS,
     getNextPlayIndex,
-    resolveStepNode,
+    stepDescription,
 } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
-import type { SimulationTrace } from "@/types/simulation";
 
 type SimulationPanelProps = {
-    trace: SimulationTrace;
     architecture: Architecture;
     currentStepIndex: number;
     onStepChange: (index: number) => void;
@@ -22,7 +20,6 @@ type SimulationPanelProps = {
 };
 
 export function SimulationPanel({
-    trace,
     architecture,
     currentStepIndex,
     onStepChange,
@@ -30,24 +27,24 @@ export function SimulationPanel({
     onSpeedChange,
 }: SimulationPanelProps) {
     const [isPlaying, setIsPlaying] = useState(false);
+    const stepCount = architecture.nodes.length;
 
     // Recursive setTimeout, not setInterval
     useEffect(() => {
         if (!isPlaying) return;
 
-        const next = getNextPlayIndex(currentStepIndex, trace.length);
+        const next = getNextPlayIndex(currentStepIndex, stepCount);
         const timer = setTimeout(
             () => (next === null ? setIsPlaying(false) : onStepChange(next)),
             next === null ? 0 : PLAY_SPEEDS[speedIndex].intervalMs,
         );
         return () => clearTimeout(timer);
-    }, [isPlaying, currentStepIndex, trace.length, onStepChange, speedIndex]);
+    }, [isPlaying, currentStepIndex, stepCount, onStepChange, speedIndex]);
 
-    if (trace.length === 0) return null;
+    if (stepCount === 0) return null;
 
-    const step = trace[currentStepIndex];
-    const node = resolveStepNode(step, architecture);
-    const atLastStep = currentStepIndex === trace.length - 1;
+    const node = architecture.nodes[currentStepIndex];
+    const atLastStep = currentStepIndex === stepCount - 1;
 
     return (
         <div className="border-b border-border p-3">
@@ -56,15 +53,12 @@ export function SimulationPanel({
                     Simulation
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">
-                    Step {currentStepIndex + 1} / {trace.length}
+                    Step {currentStepIndex + 1} / {stepCount}
                 </span>
             </div>
-            <p className="mt-1 text-sm text-foreground">{step.description}</p>
-            {!node && (
-                <p className="mt-1 text-xs text-danger">
-                    (node no longer in architecture)
-                </p>
-            )}
+            <p className="mt-1 text-sm text-foreground">
+                {stepDescription(node)}
+            </p>
             <div className="mt-2 flex items-center gap-1.5">
                 <button
                     type="button"
@@ -78,7 +72,7 @@ export function SimulationPanel({
                 <button
                     type="button"
                     onClick={() => setIsPlaying((playing) => !playing)}
-                    disabled={trace.length <= 1 || (!isPlaying && atLastStep)}
+                    disabled={stepCount <= 1 || (!isPlaying && atLastStep)}
                     title={isPlaying ? "Pause" : "Play"}
                     className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground hover:bg-border/40 disabled:opacity-40"
                 >
@@ -123,7 +117,6 @@ export function SimulationPanel({
                 </span>
             </div>
             <SimulationTimeline
-                trace={trace}
                 architecture={architecture}
                 currentStepIndex={currentStepIndex}
                 onStepChange={onStepChange}

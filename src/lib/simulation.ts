@@ -1,5 +1,4 @@
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
-import type { SimulationStep } from "@/types/simulation";
 
 export const PLAY_SPEEDS = [
     { label: "0.5x", intervalMs: 3000 },
@@ -9,15 +8,13 @@ export const PLAY_SPEEDS = [
 ];
 export const DEFAULT_SPEED_INDEX = 1;
 
-export function clampStepIndex(index: number, length: number): number {
-    return Math.min(Math.max(index, 0), Math.max(length - 1, 0));
+// Falls back for nodes persisted before descriptions existed on node data
+export function stepDescription(node: ArchitectureNode): string {
+    return node.data.description ?? `Reaches "${node.data.label}".`;
 }
 
-export function resolveStepNode(
-    step: SimulationStep,
-    architecture: Architecture,
-): ArchitectureNode | undefined {
-    return architecture.nodes.find((node) => node.id === step.nodeId);
+export function clampStepIndex(index: number, length: number): number {
+    return Math.min(Math.max(index, 0), Math.max(length - 1, 0));
 }
 
 export function getNextPlayIndex(index: number, length: number): number | null {
@@ -30,23 +27,25 @@ export type TraversedPath = {
     edgeIds: Set<string>;
 };
 
-// The route an attacker has already crossed, from step 0 through currentStepIndex
+// The route an attacker has already crossed, from step 0 through currentStepIndex.
+// A node's step is simply its position in `architecture.nodes`, so this can
+// never point at a node that no longer exists.
 export function getTraversedPath(
-    trace: SimulationStep[],
     architecture: Architecture,
     currentStepIndex: number,
 ): TraversedPath {
+    const nodes = architecture.nodes;
     const nodeIds = new Set<string>();
     const edgeIds = new Set<string>();
-    const lastIndex = Math.min(currentStepIndex, trace.length - 1);
+    const lastIndex = Math.min(currentStepIndex, nodes.length - 1);
 
     for (let i = 0; i <= lastIndex; i++) {
-        nodeIds.add(trace[i].nodeId);
+        nodeIds.add(nodes[i].id);
         if (i === 0) continue;
         const edge = architecture.edges.find(
             (candidate) =>
-                candidate.source === trace[i - 1].nodeId &&
-                candidate.target === trace[i].nodeId,
+                candidate.source === nodes[i - 1].id &&
+                candidate.target === nodes[i].id,
         );
         if (edge) edgeIds.add(edge.id);
     }

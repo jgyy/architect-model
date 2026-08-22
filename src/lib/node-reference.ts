@@ -39,9 +39,5 @@ export const REMOVE_EDGE_PATTERNS = [
     /^disconnect (.+)$/i,
 ];
 
-export const ADD_STEP_PATTERNS = [/^add step(?:\s+(.*))?$/i];
-
-export const INSERT_STEP_PATTERNS = [/^insert step (\d+)(?:\s+(.*))?$/i];
-
 export const CONNECT_SEPARATORS = [" to ", " and "];
 export const DISCONNECT_SEPARATORS = [" to ", " from ", " and "];

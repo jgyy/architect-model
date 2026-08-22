@@ -6,10 +6,9 @@ import {
     clampStepIndex,
     getNextPlayIndex,
     getTraversedPath,
-    resolveStepNode,
+    stepDescription,
 } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
-import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 describe("clampStepIndex", () => {
     test("returns the index unchanged when already in bounds", () => {
@@ -29,38 +28,28 @@ describe("clampStepIndex", () => {
     });
 });
 
-describe("resolveStepNode", () => {
-    const architecture: Architecture = {
-        nodes: [
-            {
-                id: "node-web-server",
-                position: { x: 0, y: 0 },
-                data: { label: "Web Server" },
+describe("stepDescription", () => {
+    test("returns the node's own description when present", () => {
+        const node = {
+            id: "node-web-server",
+            position: { x: 0, y: 0 },
+            data: {
+                label: "Web Server",
+                description: "Attacker reaches Web Server",
             },
-        ],
-        edges: [],
-    };
-
-    test("returns the node the step points to when it exists", () => {
-        const step: SimulationStep = {
-            step: 1,
-            nodeId: "node-web-server",
-            description: "Attacker reaches Web Server",
         };
 
-        expect(resolveStepNode(step, architecture)?.data.label).toBe(
-            "Web Server",
-        );
+        expect(stepDescription(node)).toBe("Attacker reaches Web Server");
     });
 
-    test("returns undefined when the step's node was removed from the architecture", () => {
-        const step: SimulationStep = {
-            step: 2,
-            nodeId: "node-database",
-            description: "Attacker accesses Database",
+    test("falls back to a generated description when the node has none", () => {
+        const node = {
+            id: "node-web-server",
+            position: { x: 0, y: 0 },
+            data: { label: "Web Server" },
         };
 
-        expect(resolveStepNode(step, architecture)).toBeUndefined();
+        expect(stepDescription(node)).toBe('Reaches "Web Server".');
     });
 });
 
@@ -78,35 +67,42 @@ describe("PLAY_SPEEDS", () => {
 describe("getTraversedPath", () => {
     const architecture: Architecture = {
         nodes: [
-            { id: "node-a", position: { x: 0, y: 0 }, data: { label: "A" } },
-            { id: "node-b", position: { x: 0, y: 0 }, data: { label: "B" } },
-            { id: "node-c", position: { x: 0, y: 0 }, data: { label: "C" } },
+            {
+                id: "node-a",
+                position: { x: 0, y: 0 },
+                data: { label: "A", description: "Starts at A" },
+            },
+            {
+                id: "node-b",
+                position: { x: 0, y: 0 },
+                data: { label: "B", description: "Reaches B" },
+            },
+            {
+                id: "node-c",
+                position: { x: 0, y: 0 },
+                data: { label: "C", description: "Reaches C" },
+            },
         ],
         edges: [
             { id: "edge-ab", source: "node-a", target: "node-b" },
             { id: "edge-bc", source: "node-b", target: "node-c" },
         ],
     };
-    const trace: SimulationTrace = [
-        { step: 1, nodeId: "node-a", description: "Starts at A" },
-        { step: 2, nodeId: "node-b", description: "Reaches B" },
-        { step: 3, nodeId: "node-c", description: "Reaches C" },
-    ];
 
     test("at the first step, only that step's node is traversed and no edges", () => {
-        const result = getTraversedPath(trace, architecture, 0);
+        const result = getTraversedPath(architecture, 0);
         expect(result.nodeIds).toEqual(new Set(["node-a"]));
         expect(result.edgeIds).toEqual(new Set());
     });
 
     test("includes every node and connecting edge up to the current step", () => {
-        const result = getTraversedPath(trace, architecture, 1);
+        const result = getTraversedPath(architecture, 1);
         expect(result.nodeIds).toEqual(new Set(["node-a", "node-b"]));
         expect(result.edgeIds).toEqual(new Set(["edge-ab"]));
     });
 
     test("at the last step, the full path is traversed", () => {
-        const result = getTraversedPath(trace, architecture, 2);
+        const result = getTraversedPath(architecture, 2);
         expect(result.nodeIds).toEqual(new Set(["node-a", "node-b", "node-c"]));
         expect(result.edgeIds).toEqual(new Set(["edge-ab", "edge-bc"]));
     });
@@ -116,13 +112,13 @@ describe("getTraversedPath", () => {
             nodes: architecture.nodes,
             edges: [{ id: "edge-ab", source: "node-a", target: "node-b" }],
         };
-        const result = getTraversedPath(trace, brokenArchitecture, 2);
+        const result = getTraversedPath(brokenArchitecture, 2);
         expect(result.nodeIds).toEqual(new Set(["node-a", "node-b", "node-c"]));
         expect(result.edgeIds).toEqual(new Set(["edge-ab"]));
     });
 
-    test("returns empty sets for an empty trace", () => {
-        const result = getTraversedPath([], architecture, 0);
+    test("returns empty sets for an architecture with no nodes", () => {
+        const result = getTraversedPath({ nodes: [], edges: [] }, 0);
         expect(result.nodeIds).toEqual(new Set());
         expect(result.edgeIds).toEqual(new Set());
     });

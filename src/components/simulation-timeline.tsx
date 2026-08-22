@@ -1,11 +1,9 @@
 "use client";
 
-import { resolveStepNode } from "@/lib/simulation";
+import { stepDescription } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
-import type { SimulationTrace } from "@/types/simulation";
 
 type SimulationTimelineProps = {
-    trace: SimulationTrace;
     architecture: Architecture;
     currentStepIndex: number;
     onStepChange: (index: number) => void;
@@ -13,19 +11,17 @@ type SimulationTimelineProps = {
 
 // All steps at a glance — click any to jump straight to it
 export function SimulationTimeline({
-    trace,
     architecture,
     currentStepIndex,
     onStepChange,
 }: SimulationTimelineProps) {
     return (
         <ol className="max-h-40 overflow-y-auto border-t border-border">
-            {trace.map((step, index) => {
+            {architecture.nodes.map((node, index) => {
                 const isCurrent = index === currentStepIndex;
                 const isTraversed = !isCurrent && index < currentStepIndex;
-                const node = resolveStepNode(step, architecture);
                 return (
-                    <li key={step.step}>
+                    <li key={node.id}>
                         <button
                             type="button"
                             onClick={() => onStepChange(index)}
@@ -43,21 +39,14 @@ export function SimulationTimeline({
                                           : "bg-border-strong"
                                 }`}
                             />
-                            <span className="min-w-0 flex-1">
-                                <span
-                                    className={`block truncate font-mono ${
-                                        isCurrent
-                                            ? "text-accent"
-                                            : "text-foreground"
-                                    }`}
-                                >
-                                    {index + 1}. {step.description}
-                                </span>
-                                {!node && (
-                                    <span className="block text-danger">
-                                        (node no longer in architecture)
-                                    </span>
-                                )}
+                            <span
+                                className={`min-w-0 flex-1 truncate font-mono ${
+                                    isCurrent
+                                        ? "text-accent"
+                                        : "text-foreground"
+                                }`}
+                            >
+                                {index + 1}. {stepDescription(node)}
                             </span>
                         </button>
                     </li>

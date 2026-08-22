@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 
 import { parseCommand } from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
-import type { SimulationTrace } from "@/types/simulation";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
 
@@ -29,7 +28,7 @@ describe("parseCommand — node commands", () => {
         expect(new Set(ids).size).toBe(2);
     });
 
-    test("does not reuse a removed node's id for a newly added node while a trace step still references the old id", () => {
+    test("reuses a removed node's id when a node with the same label is re-added, since nothing else references the old id", () => {
         const architecture: Architecture = {
             nodes: [
                 {
@@ -40,35 +39,15 @@ describe("parseCommand — node commands", () => {
             ],
             edges: [],
         };
-        const trace: SimulationTrace = [
-            {
-                step: 1,
-                nodeId: "node-web-server",
-                description: "Reaches Web Server.",
-            },
-        ];
 
-        const removed = parseCommand(
-            "remove node Web Server",
-            architecture,
-            trace,
-        );
+        const removed = parseCommand("remove node Web Server", architecture);
         if (!removed.ok) throw new Error("expected remove node to succeed");
 
-        const added = parseCommand(
-            "add node Web Server",
-            removed.architecture,
-            removed.trace,
-        );
+        const added = parseCommand("add node Web Server", removed.architecture);
 
         expect(added.ok).toBe(true);
         if (!added.ok) return;
-        expect(added.architecture.nodes[0].id).not.toBe("node-web-server");
-        // the orphaned step still points at the removed node's old id
-        expect(removed.trace[0].nodeId).toBe("node-web-server");
-        expect(
-            added.architecture.nodes.some((n) => n.id === "node-web-server"),
-        ).toBe(false);
+        expect(added.architecture.nodes[0].id).toBe("node-web-server");
     });
 
     test("removes a node and any edges connected to it", () => {
@@ -132,7 +111,9 @@ describe("parseCommand — node commands", () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.message).toBe('Removed node "Cache".');
+        expect(result.message).toBe(
+            'Removed node "Cache" and its simulation step.',
+        );
         expect(result.architecture.nodes).toHaveLength(1);
         expect(result.architecture.nodes[0].data.label).toBe("Redis Cache");
     });

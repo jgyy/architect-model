@@ -152,53 +152,6 @@ describe("suggestNodeReference", () => {
         expect(suggestion!.replaceTo).toBe(input.length);
     });
 
-    test("suggests matching nodes for a partial 'add step' label", () => {
-        const suggestion = suggestNodeReference("add step Cac", architecture);
-
-        expect(labels(suggestion!.matches)).toEqual(["Cache"]);
-    });
-
-    test("suggests every node right after 'add step' with no argument typed yet", () => {
-        const suggestion = suggestNodeReference("add step", architecture);
-
-        expect(suggestion).not.toBeNull();
-        expect(labels(suggestion!.matches)).toEqual([
-            "Cache",
-            "Database",
-            "Web Server",
-        ]);
-        expect(suggestion!.replaceFrom).toBe("add step".length);
-        expect(suggestion!.replaceTo).toBe("add step".length);
-    });
-
-    test("suggests matching nodes for a partial 'insert step <n>' label", () => {
-        const suggestion = suggestNodeReference(
-            "insert step 2 Cac",
-            architecture,
-        );
-
-        expect(labels(suggestion!.matches)).toEqual(["Cache"]);
-    });
-
-    test("suggests every node right after 'insert step <n>' with no argument typed yet", () => {
-        const suggestion = suggestNodeReference("insert step 2", architecture);
-
-        expect(suggestion).not.toBeNull();
-        expect(labels(suggestion!.matches)).toEqual([
-            "Cache",
-            "Database",
-            "Web Server",
-        ]);
-        expect(suggestion!.replaceFrom).toBe("insert step 2".length);
-        expect(suggestion!.replaceTo).toBe("insert step 2".length);
-    });
-
-    test("returns null for 'insert step' before a position number is typed", () => {
-        const suggestion = suggestNodeReference("insert step", architecture);
-
-        expect(suggestion).toBeNull();
-    });
-
     test("does not split inside a node label that itself contains a separator word", () => {
         const withLoadToBalance: Architecture = {
             nodes: [
@@ -307,8 +260,12 @@ describe("applyNodeSuggestion", () => {
     });
 
     test("adds a leading space when the replaced span sits at the end with no separating space yet", () => {
-        const input = "add step";
-        const suggestion = suggestNodeReference(input, architecture)!;
+        const input = "remove node";
+        const suggestion: ReturnType<typeof suggestNodeReference> = {
+            replaceFrom: input.length,
+            replaceTo: input.length,
+            matches: [],
+        };
 
         const result = applyNodeSuggestion(input, suggestion, {
             id: "node-cache",
@@ -316,7 +273,7 @@ describe("applyNodeSuggestion", () => {
             data: { label: "Cache" },
         });
 
-        expect(result.value).toBe("add step Cache ");
+        expect(result.value).toBe("remove node Cache ");
     });
 
     test("preserves text after the replaced span", () => {

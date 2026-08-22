@@ -1,9 +1,7 @@
 import {
-    ADD_STEP_PATTERNS,
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
-    INSERT_STEP_PATTERNS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
     matchFirst,
@@ -203,26 +201,6 @@ export function suggestNodeReference(
         return singleSlotSuggestion(
             input,
             removeNodeMatch[1],
-            architecture,
-            limit,
-        );
-    }
-
-    const addStepMatch = matchFirst(ADD_STEP_PATTERNS, input);
-    if (addStepMatch) {
-        return singleSlotSuggestion(
-            input,
-            addStepMatch[1],
-            architecture,
-            limit,
-        );
-    }
-
-    const insertStepMatch = matchFirst(INSERT_STEP_PATTERNS, input);
-    if (insertStepMatch) {
-        return singleSlotSuggestion(
-            input,
-            insertStepMatch[2],
             architecture,
             limit,
         );
