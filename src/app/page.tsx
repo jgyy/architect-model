@@ -6,7 +6,7 @@ export default function Home() {
         <div className="flex h-screen w-full flex-col">
             <header className="flex shrink-0 items-center border-b border-border bg-chrome px-6 py-2">
                 <h1 className="truncate text-sm font-semibold tracking-wide">
-                    Architecture Model
+                    Blast Radius
                 </h1>
             </header>
             <div className="min-h-0 flex-1">
