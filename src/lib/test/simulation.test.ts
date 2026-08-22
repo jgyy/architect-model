@@ -122,6 +122,52 @@ describe("getTraversedPath", () => {
         expect(result.nodeIds).toEqual(new Set());
         expect(result.edgeIds).toEqual(new Set());
     });
+
+    test("a one-to-many fan-out highlights every branch reached so far, not just the previous step", () => {
+        // A branches directly to both B (step 1) and C (step 2); B and C
+        // are not connected to each other at all.
+        const fanOut: Architecture = {
+            nodes: architecture.nodes,
+            edges: [
+                { id: "edge-ab", source: "node-a", target: "node-b" },
+                { id: "edge-ac", source: "node-a", target: "node-c" },
+            ],
+        };
+
+        const result = getTraversedPath(fanOut, 2);
+        expect(result.nodeIds).toEqual(new Set(["node-a", "node-b", "node-c"]));
+        expect(result.edgeIds).toEqual(new Set(["edge-ab", "edge-ac"]));
+    });
+
+    test("a many-to-one fan-in highlights every incoming edge once its target is reached", () => {
+        // Both A (step 0) and B (step 1) feed directly into C (step 2).
+        const fanIn: Architecture = {
+            nodes: architecture.nodes,
+            edges: [
+                { id: "edge-ac", source: "node-a", target: "node-c" },
+                { id: "edge-bc", source: "node-b", target: "node-c" },
+            ],
+        };
+
+        const result = getTraversedPath(fanIn, 2);
+        expect(result.nodeIds).toEqual(new Set(["node-a", "node-b", "node-c"]));
+        expect(result.edgeIds).toEqual(new Set(["edge-ac", "edge-bc"]));
+    });
+
+    test("a fan-in edge only lights up once both of its endpoints have been reached", () => {
+        const fanIn: Architecture = {
+            nodes: architecture.nodes,
+            edges: [
+                { id: "edge-ac", source: "node-a", target: "node-c" },
+                { id: "edge-bc", source: "node-b", target: "node-c" },
+            ],
+        };
+
+        // C (step 2) hasn't been reached yet, so neither incoming edge has
+        const result = getTraversedPath(fanIn, 1);
+        expect(result.nodeIds).toEqual(new Set(["node-a", "node-b"]));
+        expect(result.edgeIds).toEqual(new Set());
+    });
 });
 
 describe("getNextPlayIndex", () => {

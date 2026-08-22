@@ -9,7 +9,14 @@ import {
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
+import { COMMAND_USAGE } from "@/lib/supported-commands";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
+
+// One usage line per row instead of a semicolon-joined run-on sentence, so
+// it stays scannable when it wraps inside the console's 80-column width.
+const UNRECOGNIZED_COMMAND_USAGE = COMMAND_USAGE.map(
+    (usage) => `  ${usage}`,
+).join("\n");
 
 export type CommandResult =
     | {
@@ -452,6 +459,6 @@ export function parseCommand(
 
     return {
         ok: false,
-        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; rename node <A> to <B>.`,
+        message: `Unrecognized command: "${trimmed}".\n\nTry:\n${UNRECOGNIZED_COMMAND_USAGE}\n\nType "help" for details.`,
     };
 }

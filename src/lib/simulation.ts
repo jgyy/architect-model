@@ -28,26 +28,23 @@ export type TraversedPath = {
 };
 
 // The route an attacker has already crossed, from step 0 through currentStepIndex.
-// A node's step is simply its position in `architecture.nodes`, so this can
-// never point at a node that no longer exists.
 export function getTraversedPath(
     architecture: Architecture,
     currentStepIndex: number,
 ): TraversedPath {
     const nodes = architecture.nodes;
-    const nodeIds = new Set<string>();
-    const edgeIds = new Set<string>();
     const lastIndex = Math.min(currentStepIndex, nodes.length - 1);
 
+    const nodeIds = new Set<string>();
     for (let i = 0; i <= lastIndex; i++) {
         nodeIds.add(nodes[i].id);
-        if (i === 0) continue;
-        const edge = architecture.edges.find(
-            (candidate) =>
-                candidate.source === nodes[i - 1].id &&
-                candidate.target === nodes[i].id,
-        );
-        if (edge) edgeIds.add(edge.id);
+    }
+
+    const edgeIds = new Set<string>();
+    for (const edge of architecture.edges) {
+        if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+            edgeIds.add(edge.id);
+        }
     }
 
     return { nodeIds, edgeIds };
