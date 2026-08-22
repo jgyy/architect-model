@@ -199,10 +199,10 @@ export function ArchitectureCanvas({
             architecture.edges.map((edge) =>
                 traversedEdgeIds.has(edge.id)
                     ? {
-                        ...edge,
-                        style: TRAVERSED_EDGE_STYLE,
-                        markerEnd: TRAVERSED_EDGE_MARKER,
-                    }
+                          ...edge,
+                          style: TRAVERSED_EDGE_STYLE,
+                          markerEnd: TRAVERSED_EDGE_MARKER,
+                      }
                     : edge,
             ),
         [architecture.edges, traversedEdgeIds],
