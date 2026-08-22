@@ -13,9 +13,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Architecture Model",
+    title: "Blast Radius",
     description:
-        "Update a system architecture via text input and explore its simulation trace.",
+        "Sketch a system architecture in plain text, then step through a simulated attacker's path across it.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

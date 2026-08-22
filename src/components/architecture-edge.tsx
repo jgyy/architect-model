@@ -13,7 +13,7 @@ import type { ArchitectureEdge as ArchitectureEdgeType } from "@/types/architect
 
 // Invoked with an edge's id to remove it — wired up by ArchitectureCanvas
 export const EdgeDeleteContext = createContext<(edgeId: string) => void>(
-    () => { },
+    () => {},
 );
 
 const SELF_LOOP_CONTROL_OFFSET_X = 40;
@@ -50,13 +50,13 @@ export function ArchitectureEdge({
         source === target
             ? getSelfLoopPath(sourceX, sourceY, targetX, targetY)
             : getBezierPath({
-                sourceX,
-                sourceY,
-                sourcePosition,
-                targetX,
-                targetY,
-                targetPosition,
-            });
+                  sourceX,
+                  sourceY,
+                  sourcePosition,
+                  targetX,
+                  targetY,
+                  targetPosition,
+              });
 
     return (
         <>
@@ -90,8 +90,9 @@ export function ArchitectureEdge({
                         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
                         pointerEvents: hovered ? "all" : "none",
                     }}
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border border-danger bg-chrome text-danger shadow-sm transition-opacity ${hovered ? "opacity-100" : "opacity-0"
-                        }`}
+                    className={`flex h-5 w-5 items-center justify-center rounded-full border border-danger bg-chrome text-danger shadow-sm transition-opacity ${
+                        hovered ? "opacity-100" : "opacity-0"
+                    }`}
                 >
                     <X size={12} />
                 </button>
