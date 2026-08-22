@@ -4,6 +4,8 @@ import {
     DISCONNECT_SEPARATORS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
+    RENAME_NODE_PATTERNS,
+    RENAME_SEPARATORS,
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
@@ -138,6 +140,30 @@ function resolveConnectionEndpoints(
     );
 }
 
+type ResolvedRenameArgs = {
+    sourceLabel: string;
+    newLabel: string;
+    source: EndpointMatch;
+};
+
+// Unlike resolveConnectionEndpoints, only the left side is a node reference
+function resolveRenameArgs(
+    rest: string,
+    architecture: Architecture,
+    separators: string[],
+): ResolvedRenameArgs | null {
+    const splits = splitConnectionArgs(rest, separators);
+    if (splits.length === 0) return null;
+
+    const resolved = splits.map((split) => ({
+        sourceLabel: split.sourceLabel,
+        newLabel: split.targetLabel,
+        source: findNodeOrAmbiguity(split.sourceLabel, architecture),
+    }));
+
+    return resolved.find((r) => isSingleNode(r.source)) ?? resolved[0];
+}
+
 const ADD_NODE_PATTERNS = [
     /^add node(?:\s+(.*))?$/i,
     /^create node(?:\s+(.*))?$/i,
@@ -145,9 +171,16 @@ const ADD_NODE_PATTERNS = [
     /^add a node called(?:\s+(.*))?$/i,
 ];
 
+export type ParseCommandOptions = {
+    // Where a canvas-created node lands; typed "add node" ignores this and
+    // uses the default formula below
+    position?: { x: number; y: number };
+};
+
 export function parseCommand(
     input: string,
     architecture: Architecture,
+    options: ParseCommandOptions = {},
 ): CommandResult {
     const trimmed = input.trim();
 
@@ -166,7 +199,10 @@ export function parseCommand(
         }
         const node: ArchitectureNode = {
             id: uniqueNodeId(slugify(label), architecture),
-            position: { x: architecture.nodes.length * 250, y: 0 },
+            position: options.position ?? {
+                x: architecture.nodes.length * 250,
+                y: 0,
+            },
             data: { label, description: `Reaches "${label}".` },
         };
         return {
@@ -209,12 +245,6 @@ export function parseCommand(
             return {
                 ok: false,
                 message: ambiguousLabelMessage(targetLabel, target),
-            };
-        }
-        if (source.id === target.id) {
-            return {
-                ok: false,
-                message: `Cannot connect "${source.data.label}" to itself.`,
             };
         }
         const alreadyConnected = architecture.edges.some(
@@ -319,8 +349,70 @@ export function parseCommand(
         };
     }
 
+    const renameNodeMatch = matchFirst(RENAME_NODE_PATTERNS, trimmed);
+    if (renameNodeMatch) {
+        const resolved = resolveRenameArgs(
+            renameNodeMatch[1],
+            architecture,
+            RENAME_SEPARATORS,
+        );
+        if (!resolved) {
+            return {
+                ok: false,
+                message: `Couldn't find a "to" separator in "${renameNodeMatch[1]}". Try: rename node <A> to <B>.`,
+            };
+        }
+        const { source, sourceLabel, newLabel } = resolved;
+        if (source === null) {
+            return { ok: false, message: `No node named "${sourceLabel}".` };
+        }
+        if (Array.isArray(source)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(sourceLabel, source),
+            };
+        }
+        const normalizedNewLabel = normalizeLabel(newLabel);
+        if (isBlankLabel(normalizedNewLabel)) {
+            return { ok: false, message: "A node label cannot be blank." };
+        }
+        if (foldLabel(normalizedNewLabel) === foldLabel(source.data.label)) {
+            return {
+                ok: false,
+                message: `"${source.data.label}" is already named that.`,
+            };
+        }
+        const duplicate = findNodeByExactLabel(
+            normalizedNewLabel,
+            architecture,
+        );
+        if (duplicate) {
+            return {
+                ok: false,
+                message: `A node named "${duplicate.data.label}" already exists.`,
+            };
+        }
+        const renamedNodes = architecture.nodes.map((node) =>
+            node.id === source.id
+                ? {
+                      ...node,
+                      data: {
+                          ...node.data,
+                          label: normalizedNewLabel,
+                          description: `Reaches "${normalizedNewLabel}".`,
+                      },
+                  }
+                : node,
+        );
+        return {
+            ok: true,
+            architecture: { ...architecture, nodes: renamedNodes },
+            message: `Renamed "${source.data.label}" to "${normalizedNewLabel}".`,
+        };
+    }
+
     return {
         ok: false,
-        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>.`,
+        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; rename node <A> to <B>.`,
     };
 }

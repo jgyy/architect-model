@@ -39,5 +39,11 @@ export const REMOVE_EDGE_PATTERNS = [
     /^disconnect (.+)$/i,
 ];
 
+export const RENAME_NODE_PATTERNS = [
+    /^rename node (.+)$/i,
+    /^relabel node (.+)$/i,
+];
+
 export const CONNECT_SEPARATORS = [" to ", " and "];
 export const DISCONNECT_SEPARATORS = [" to ", " from ", " and "];
+export const RENAME_SEPARATORS = [" to "];

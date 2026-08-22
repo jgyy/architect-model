@@ -7,6 +7,7 @@ import {
     useRef,
     useState,
     type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
     applyNodeChanges,
@@ -19,6 +20,7 @@ import {
     useReactFlow,
     type Connection,
     type NodeChange,
+    type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -29,11 +31,11 @@ import {
 import {
     ArchitectureNode as ArchitectureNodeCard,
     HighlightedNodeContext,
+    NodeActionsContext,
+    type NodeActions,
 } from "@/components/architecture-node";
-import {
-    applyPersistableNodeChanges,
-    createEdgeFromConnection,
-} from "@/lib/node-changes";
+import { isDoubleClick, type ClickPoint } from "@/lib/canvas-commands";
+import { applyPersistableNodeChanges } from "@/lib/node-changes";
 import type {
     Architecture,
     ArchitectureEdge,
@@ -46,7 +48,10 @@ type ArchitectureCanvasProps = {
     traversedNodeIds?: Set<string>;
     traversedEdgeIds?: Set<string>;
     onNodesChange: (nodes: ArchitectureNode[]) => void;
-    onEdgesChange: (edges: ArchitectureEdge[]) => void;
+    onNodeCreate: (position: { x: number; y: number }) => string | null;
+    onNodeRename: (nodeId: string, newLabel: string) => void;
+    onNodeDelete: (nodeId: string) => void;
+    onEdgeCreate: (sourceId: string, targetId: string) => void;
     onEdgeDelete: (edgeId: string) => void;
 };
 
@@ -108,7 +113,10 @@ export function ArchitectureCanvas({
     traversedNodeIds = EMPTY_ID_SET,
     traversedEdgeIds = EMPTY_ID_SET,
     onNodesChange,
-    onEdgesChange,
+    onNodeCreate,
+    onNodeRename,
+    onNodeDelete,
+    onEdgeCreate,
     onEdgeDelete,
 }: ArchitectureCanvasProps) {
     // https://react.dev/learn/you-might-not-need-an-effect
@@ -141,10 +149,49 @@ export function ArchitectureCanvas({
 
     const handleConnect = useCallback(
         (connection: Connection) => {
-            const edge = createEdgeFromConnection(connection, architecture);
-            if (edge) onEdgesChange([...architecture.edges, edge]);
+            onEdgeCreate(connection.source, connection.target);
         },
-        [architecture, onEdgesChange],
+        [onEdgeCreate],
+    );
+
+    // Detects a double-click on the empty pane
+    const reactFlowInstanceRef = useRef<ReactFlowInstance<
+        ArchitectureNode,
+        ArchitectureEdge
+    > | null>(null);
+    const lastPaneClickRef = useRef<ClickPoint | null>(null);
+    const [autoEditNodeId, setAutoEditNodeId] = useState<string | null>(null);
+
+    const handlePaneClick = useCallback(
+        (event: ReactMouseEvent) => {
+            const current: ClickPoint = {
+                x: event.clientX,
+                y: event.clientY,
+                time: Date.now(),
+            };
+            const previous = lastPaneClickRef.current;
+            if (!isDoubleClick(current, previous)) {
+                lastPaneClickRef.current = current;
+                return;
+            }
+            lastPaneClickRef.current = null;
+            const position = reactFlowInstanceRef.current?.screenToFlowPosition(
+                { x: current.x, y: current.y },
+            );
+            if (!position) return;
+            setAutoEditNodeId(onNodeCreate(position));
+        },
+        [onNodeCreate],
+    );
+
+    const nodeActions = useMemo<NodeActions>(
+        () => ({
+            onRename: onNodeRename,
+            onDelete: onNodeDelete,
+            autoEditNodeId,
+            onAutoEditConsumed: () => setAutoEditNodeId(null),
+        }),
+        [onNodeRename, onNodeDelete, autoEditNodeId],
     );
 
     const renderEdges = useMemo(
@@ -152,10 +199,10 @@ export function ArchitectureCanvas({
             architecture.edges.map((edge) =>
                 traversedEdgeIds.has(edge.id)
                     ? {
-                          ...edge,
-                          style: TRAVERSED_EDGE_STYLE,
-                          markerEnd: TRAVERSED_EDGE_MARKER,
-                      }
+                        ...edge,
+                        style: TRAVERSED_EDGE_STYLE,
+                        markerEnd: TRAVERSED_EDGE_MARKER,
+                    }
                     : edge,
             ),
         [architecture.edges, traversedEdgeIds],
@@ -168,30 +215,36 @@ export function ArchitectureCanvas({
 
     return (
         <HighlightedNodeContext.Provider value={highlight}>
-            <EdgeDeleteContext.Provider value={onEdgeDelete}>
-                <ReactFlow
-                    nodes={renderNodes}
-                    edges={renderEdges}
-                    nodeTypes={NODE_TYPES}
-                    edgeTypes={EDGE_TYPES}
-                    defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
-                    connectionLineStyle={{
-                        stroke: "var(--accent)",
-                        strokeWidth: 2,
-                    }}
-                    colorMode="system"
-                    style={REACT_FLOW_THEME_VARS as CSSProperties}
-                    onNodesChange={handleNodesChange}
-                    onConnect={handleConnect}
-                    deleteKeyCode={null}
-                    fitView
-                >
-                    <Background variant={BackgroundVariant.Dots} gap={20} />
-                    <Controls />
-                    <MiniMap pannable zoomable />
-                    <FitViewOnNodesChange nodeIds={nodeIds} />
-                </ReactFlow>
-            </EdgeDeleteContext.Provider>
+            <NodeActionsContext.Provider value={nodeActions}>
+                <EdgeDeleteContext.Provider value={onEdgeDelete}>
+                    <ReactFlow
+                        nodes={renderNodes}
+                        edges={renderEdges}
+                        nodeTypes={NODE_TYPES}
+                        edgeTypes={EDGE_TYPES}
+                        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+                        connectionLineStyle={{
+                            stroke: "var(--accent)",
+                            strokeWidth: 2,
+                        }}
+                        colorMode="system"
+                        style={REACT_FLOW_THEME_VARS as CSSProperties}
+                        onInit={(instance) => {
+                            reactFlowInstanceRef.current = instance;
+                        }}
+                        onNodesChange={handleNodesChange}
+                        onConnect={handleConnect}
+                        onPaneClick={handlePaneClick}
+                        deleteKeyCode={null}
+                        fitView
+                    >
+                        <Background variant={BackgroundVariant.Dots} gap={20} />
+                        <Controls />
+                        <MiniMap pannable zoomable />
+                        <FitViewOnNodesChange nodeIds={nodeIds} />
+                    </ReactFlow>
+                </EdgeDeleteContext.Provider>
+            </NodeActionsContext.Provider>
         </HighlightedNodeContext.Provider>
     );
 }

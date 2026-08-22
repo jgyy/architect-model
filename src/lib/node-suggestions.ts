@@ -4,6 +4,8 @@ import {
     DISCONNECT_SEPARATORS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
+    RENAME_NODE_PATTERNS,
+    RENAME_SEPARATORS,
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
@@ -165,6 +167,40 @@ function twoSlotSuggestion(
     };
 }
 
+// "rename node <A> to <B>" has only one node reference (A) — B is a new
+// label, not something to look up, so it never gets suggestions (like add node)
+function renameNodeSuggestion(
+    input: string,
+    rest: string,
+    separators: string[],
+    architecture: Architecture,
+    limit: number,
+    cursor: number,
+): NodeSuggestion | null {
+    const restStart = input.length - rest.length;
+    const split = bestSeparatorSplit(
+        rest,
+        separators,
+        architecture,
+        cursor - restStart,
+    );
+    if (!split) {
+        return singleSlotSuggestion(input, rest, architecture, limit);
+    }
+
+    const separatorStart = restStart + split.index;
+    if (cursor > separatorStart) return null;
+    return {
+        replaceFrom: restStart,
+        replaceTo: separatorStart,
+        matches: rankMatches(
+            input.slice(restStart, separatorStart),
+            architecture.nodes,
+            limit,
+        ),
+    };
+}
+
 // Live-typing completion hint for the node-reference argument(s) of a command
 export function suggestNodeReference(
     input: string,
@@ -203,6 +239,18 @@ export function suggestNodeReference(
             removeNodeMatch[1],
             architecture,
             limit,
+        );
+    }
+
+    const renameNodeMatch = matchFirst(RENAME_NODE_PATTERNS, input);
+    if (renameNodeMatch) {
+        return renameNodeSuggestion(
+            input,
+            renameNodeMatch[1],
+            RENAME_SEPARATORS,
+            architecture,
+            limit,
+            cursor,
         );
     }
 
