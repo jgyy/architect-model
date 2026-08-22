@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Trash2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { CommandInput } from "@/components/command-input";
@@ -18,6 +18,7 @@ import {
 import {
     DEFAULT_SPEED_INDEX,
     clampStepIndex,
+    getTraversedPath,
     resolveStepNode,
 } from "@/lib/simulation";
 import type {
@@ -115,6 +116,10 @@ export function ArchitectureWorkspace({
     const highlightedNodeId = currentStep
         ? resolveStepNode(currentStep, architecture)?.id
         : undefined;
+    const traversedPath = useMemo(
+        () => getTraversedPath(trace, architecture, safeStepIndex),
+        [trace, architecture, safeStepIndex],
+    );
 
     // Stable across unrelated re-renders (e.g. every command-input keystroke)
     const handleStepChange = useCallback(
@@ -164,6 +169,8 @@ export function ArchitectureWorkspace({
                 <ArchitectureCanvas
                     architecture={architecture}
                     highlightedNodeId={highlightedNodeId}
+                    traversedNodeIds={traversedPath.nodeIds}
+                    traversedEdgeIds={traversedPath.edgeIds}
                     onNodesChange={handleNodesChange}
                     onEdgesChange={handleEdgesChange}
                 />
