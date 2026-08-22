@@ -17,7 +17,6 @@ type ConsolePanelProps = {
 };
 
 // A REPL-style console: scrolling command/output history with a live prompt
-// pinned at the bottom, replacing the old split input-box + history-list
 export function ConsolePanel({
     log,
     onClear,
@@ -33,8 +32,8 @@ export function ConsolePanel({
     }, [log.length]);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <div className="flex min-h-0 flex-1 flex-col font-mono text-sm">
+            <div className="flex w-fit items-center justify-between gap-6 border-b border-border px-3 py-2">
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Console
                 </span>
@@ -47,9 +46,9 @@ export function ConsolePanel({
                     <Trash2 size={14} />
                 </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto font-mono text-xs">
+            <div className="min-h-0 flex-1 overflow-y-auto">
                 {log.length === 0 ? (
-                    <p className="px-3 py-2 text-muted-foreground">
+                    <p className="w-[80ch] break-words px-3 py-2 text-muted-foreground">
                         Architecture Model console — type{" "}
                         <span className="text-foreground">help</span> for a list
                         of commands.
@@ -58,7 +57,7 @@ export function ConsolePanel({
                     log.map((entry) => (
                         <div
                             key={entry.id}
-                            className="flex items-start gap-2 px-3 py-1.5 hover:bg-border/40"
+                            className="flex w-fit items-start gap-2 px-3 py-1.5 hover:bg-border/40"
                         >
                             {entry.ok ? (
                                 <CheckCircle2
@@ -71,7 +70,7 @@ export function ConsolePanel({
                                     className="mt-0.5 shrink-0 text-danger"
                                 />
                             )}
-                            <div className="min-w-0 flex-1">
+                            <div className="w-[80ch] break-words">
                                 <div className="text-accent">
                                     <span className="text-muted-foreground">
                                         &gt;

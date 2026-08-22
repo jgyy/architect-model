@@ -25,8 +25,7 @@ type CommandInputProps = {
     commands: string[];
 };
 
-// Terminal-style prompt line with inline node-reference autocomplete and
-// shell-style Up/Down command-history recall
+// Terminal-style prompt line with inline node-reference autocomplete
 export function CommandInput({
     value,
     onChange,
@@ -53,9 +52,7 @@ export function CommandInput({
         setCursorPosition(pending);
     }, [value]);
 
-    // A submitted command clears the field from outside (not via the typing
-    // handler below, which already resets on every keystroke) — recall
-    // should start fresh next time either way.
+    // A submitted command clears the field from outside
     if (value === "" && historyState.index !== null) {
         setHistoryState(IDLE_HISTORY);
     }
@@ -67,11 +64,7 @@ export function CommandInput({
     );
     const options = dismissed ? [] : (suggestion?.matches ?? []);
 
-    // Resets activeIndex during render whenever the suggested argument slot
-    // changes — not just when the text changes, since moving the cursor to a
-    // different argument (with no typing) changes which slot is suggested
-    // without changing `value`, and a stale index could point past the end
-    // of a now-shorter options array.
+    // Resets activeIndex during render whenever the suggested argument slot changes
     const suggestionSignature = suggestion
         ? JSON.stringify([value, suggestion.replaceFrom, suggestion.replaceTo])
         : value;
@@ -124,8 +117,7 @@ export function CommandInput({
                     );
                     return;
                 case "Enter":
-                    // an already-complete, unambiguous reference should submit
-                    // the command, not be swallowed by the autocomplete
+                    // an already-complete, unambiguous reference should submit command
                     if (
                         suggestion &&
                         suggestionIsCompleteMatch(value, suggestion)
@@ -155,15 +147,15 @@ export function CommandInput({
     }
 
     return (
-        <form onSubmit={onSubmit} className="border-t border-border p-2">
-            <div className="relative flex items-center gap-1.5">
+        <form onSubmit={onSubmit} className="w-fit border-t border-border p-2">
+            <div className="relative flex w-fit items-center gap-1.5">
                 <span
                     className="shrink-0 font-mono text-sm text-accent"
                     aria-hidden="true"
                 >
                     &gt;
                 </span>
-                <div className="relative flex-1">
+                <div className="relative w-[80ch]">
                     <input
                         id="command-input"
                         ref={inputRef}
@@ -206,7 +198,7 @@ export function CommandInput({
                                             event.preventDefault()
                                         }
                                         onClick={() => selectSuggestion(node)}
-                                        className={`block w-full px-2.5 py-1.5 text-left text-sm ${
+                                        className={`block w-full truncate px-2.5 py-1.5 text-left font-mono text-sm ${
                                             index === activeOptionIndex
                                                 ? "bg-accent/10 text-accent"
                                                 : "text-foreground"

@@ -46,8 +46,7 @@ export function ArchitectureEdge({
                 style={style}
                 markerEnd={markerEnd}
             />
-            {/* Wider invisible path so hovering near (not just exactly on) the
-                thin edge line reveals the delete button */}
+            {/* Wider invisible path so hovering near thin edge line */}
             <path
                 d={edgePath}
                 fill="none"

@@ -21,12 +21,10 @@ export type CommandResult =
       }
     | { ok: false; message: string };
 
-// zero-width space/non-joiner/joiner and byte-order-mark
-const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
-
-// distinct from a plain blank check
+// callers always pass a normalizeLabel()'d string, which already strips
+// invisible characters and trims whitespace
 function isBlankLabel(label: string): boolean {
-    return label.replace(INVISIBLE_CHARS_PATTERN, "").trim().length === 0;
+    return label.length === 0;
 }
 
 function slugify(label: string): string {
@@ -57,6 +55,13 @@ function uniqueNodeId(
 }
 
 // null = no match, array = ambiguous (multiple substring matches, no exact one)
+// Unicode-folds a stored label the same way normalizeLabel() folds typed
+// input, so a label loaded from persisted state (which may predate this
+// normalization, or come from outside the app) still compares correctly.
+function foldLabel(label: string): string {
+    return label.normalize("NFC").toLowerCase();
+}
+
 function findNodeOrAmbiguity(
     label: string,
     architecture: Architecture,
@@ -64,11 +69,11 @@ function findNodeOrAmbiguity(
     const needle = normalizeLabel(label).toLowerCase();
     if (needle.length === 0) return null;
     const exact = architecture.nodes.find(
-        (node) => node.data.label.toLowerCase() === needle,
+        (node) => foldLabel(node.data.label) === needle,
     );
     if (exact) return exact;
     const matches = architecture.nodes.filter((node) =>
-        node.data.label.toLowerCase().includes(needle),
+        foldLabel(node.data.label).includes(needle),
     );
     if (matches.length === 0) return null;
     if (matches.length === 1) return matches[0];
@@ -89,7 +94,7 @@ function findNodeByExactLabel(
 ): ArchitectureNode | undefined {
     const needle = normalizeLabel(label).toLowerCase();
     return architecture.nodes.find(
-        (node) => node.data.label.toLowerCase() === needle,
+        (node) => foldLabel(node.data.label) === needle,
     );
 }
 
@@ -379,7 +384,8 @@ export function parseCommand(
 
     const insertStepMatch = matchFirst(INSERT_STEP_PATTERNS, trimmed);
     if (insertStepMatch) {
-        const position = Number(insertStepMatch[1]);
+        const rawPosition = insertStepMatch[1];
+        const position = Number(rawPosition);
         const label = normalizeLabel(insertStepMatch[2] ?? "");
         if (isBlankLabel(label)) {
             return { ok: false, message: "A step must reference a node." };
@@ -399,7 +405,10 @@ export function parseCommand(
         if (position < 1 || position > maxPosition) {
             return {
                 ok: false,
-                message: `No position numbered ${position}; valid positions are 1-${maxPosition}.`,
+                // echoes the digits as typed — Number() loses precision or
+                // switches to scientific notation well before it can reach
+                // a valid position, so it must not be used for display here
+                message: `No position numbered ${rawPosition}; valid positions are 1-${maxPosition}.`,
             };
         }
         const index = position - 1;
@@ -417,7 +426,7 @@ export function parseCommand(
             ok: true,
             architecture,
             trace: renumberSteps(nextTrace),
-            message: `Inserted step ${position}: reaches "${node.data.label}".`,
+            message: `Inserted step ${rawPosition}: reaches "${node.data.label}".`,
         };
     }
 
@@ -426,7 +435,8 @@ export function parseCommand(
         trimmed,
     );
     if (setStepDescriptionMatch) {
-        const stepNumber = Number(setStepDescriptionMatch[1]);
+        const rawStepNumber = setStepDescriptionMatch[1];
+        const stepNumber = Number(rawStepNumber);
         const description = normalizeLabel(setStepDescriptionMatch[2] ?? "");
         if (isBlankLabel(description)) {
             return {
@@ -436,7 +446,10 @@ export function parseCommand(
         }
         const index = stepNumber - 1;
         if (index < 0 || index >= trace.length) {
-            return { ok: false, message: `No step numbered ${stepNumber}.` };
+            return {
+                ok: false,
+                message: `No step numbered ${rawStepNumber}.`,
+            };
         }
         return {
             ok: true,
@@ -444,43 +457,49 @@ export function parseCommand(
             trace: trace.map((step, i) =>
                 i === index ? { ...step, description } : step,
             ),
-            message: `Updated step ${stepNumber}'s description.`,
+            message: `Updated step ${rawStepNumber}'s description.`,
         };
     }
 
     const removeStepMatch = matchFirst(REMOVE_STEP_PATTERNS, trimmed);
     if (removeStepMatch) {
-        const stepNumber = Number(removeStepMatch[1]);
+        const rawStepNumber = removeStepMatch[1];
+        const stepNumber = Number(rawStepNumber);
         const index = stepNumber - 1;
         if (index < 0 || index >= trace.length) {
-            return { ok: false, message: `No step numbered ${stepNumber}.` };
+            return {
+                ok: false,
+                message: `No step numbered ${rawStepNumber}.`,
+            };
         }
         return {
             ok: true,
             architecture,
             trace: renumberSteps(trace.filter((_, i) => i !== index)),
-            message: `Removed step ${stepNumber}.`,
+            message: `Removed step ${rawStepNumber}.`,
         };
     }
 
     const moveStepMatch = matchFirst(MOVE_STEP_PATTERNS, trimmed);
     if (moveStepMatch) {
-        const from = Number(moveStepMatch[1]);
-        const to = Number(moveStepMatch[2]);
+        const rawFrom = moveStepMatch[1];
+        const rawTo = moveStepMatch[2];
+        const from = Number(rawFrom);
+        const to = Number(rawTo);
         const fromIndex = from - 1;
         if (fromIndex < 0 || fromIndex >= trace.length) {
-            return { ok: false, message: `No step numbered ${from}.` };
+            return { ok: false, message: `No step numbered ${rawFrom}.` };
         }
         const toIndex = to - 1;
         if (toIndex < 0 || toIndex >= trace.length) {
-            return { ok: false, message: `No step numbered ${to}.` };
+            return { ok: false, message: `No step numbered ${rawTo}.` };
         }
         if (from === to) {
             return {
                 ok: true,
                 architecture,
                 trace,
-                message: `Step ${from} is already at position ${to}.`,
+                message: `Step ${rawFrom} is already at position ${rawTo}.`,
             };
         }
         const step = trace[fromIndex];
@@ -494,7 +513,7 @@ export function parseCommand(
             ok: true,
             architecture,
             trace: renumberSteps(nextTrace),
-            message: `Moved step ${from} to position ${to}.`,
+            message: `Moved step ${rawFrom} to position ${rawTo}.`,
         };
     }
 
