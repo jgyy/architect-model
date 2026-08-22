@@ -4,7 +4,6 @@ import type {
     ArchitectureEdge,
     ArchitectureNode,
 } from "@/types/architecture";
-import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type LogEntry = {
     id: number;
@@ -16,7 +15,6 @@ export type LogEntry = {
 export type PersistedState = {
     architecture: Architecture;
     log: LogEntry[];
-    trace: SimulationTrace;
     stepIndex: number;
     speedIndex: number;
 };
@@ -39,7 +37,8 @@ function isArchitectureNode(value: unknown): value is ArchitectureNode {
         typeof position.x === "number" &&
         typeof position.y === "number" &&
         isRecord(data) &&
-        typeof data.label === "string"
+        typeof data.label === "string" &&
+        (data.description === undefined || typeof data.description === "string")
     );
 }
 
@@ -62,15 +61,6 @@ function isLogEntry(value: unknown): value is LogEntry {
     );
 }
 
-function isSimulationStep(value: unknown): value is SimulationStep {
-    if (!isRecord(value)) return false;
-    return (
-        typeof value.step === "number" &&
-        typeof value.nodeId === "string" &&
-        typeof value.description === "string"
-    );
-}
-
 function isValidArchitecture(value: unknown): value is Architecture {
     return (
         isRecord(value) &&
@@ -81,11 +71,13 @@ function isValidArchitecture(value: unknown): value is Architecture {
     );
 }
 
-// Sessions saved before trace/stepIndex/speedIndex existed have none of those
-// three fields at all; treat that (and only that) as the older schema and
-// default them, instead of discarding an otherwise-intact architecture + log.
-// Any other shape (e.g. only one of the three present, or one of the wrong
-// type) is genuinely corrupted data and is still rejected.
+// Sessions saved before stepIndex/speedIndex existed have neither field at
+// all; treat that (and only that) as the older schema and default them,
+// instead of discarding an otherwise-intact architecture + log. Any other
+// shape (e.g. only one of the two present, or one of the wrong type) is
+// genuinely corrupted data and is still rejected. A leftover top-level
+// `trace` array — from before simulation steps moved onto node data — is
+// simply not read here, so its presence or shape no longer matters.
 function parsePersistedState(value: unknown): PersistedState | null {
     if (!isRecord(value)) return null;
     if (!isValidArchitecture(value.architecture)) return null;
@@ -94,22 +86,17 @@ function parsePersistedState(value: unknown): PersistedState | null {
     }
 
     const isLegacySession =
-        value.trace === undefined &&
-        value.stepIndex === undefined &&
-        value.speedIndex === undefined;
+        value.stepIndex === undefined && value.speedIndex === undefined;
     if (isLegacySession) {
         return {
             architecture: value.architecture,
             log: value.log,
-            trace: [],
             stepIndex: 0,
             speedIndex: DEFAULT_SPEED_INDEX,
         };
     }
 
     if (
-        !Array.isArray(value.trace) ||
-        !value.trace.every(isSimulationStep) ||
         typeof value.stepIndex !== "number" ||
         typeof value.speedIndex !== "number"
     ) {
@@ -119,7 +106,6 @@ function parsePersistedState(value: unknown): PersistedState | null {
     return {
         architecture: value.architecture,
         log: value.log,
-        trace: value.trace,
         stepIndex: value.stepIndex,
         speedIndex: value.speedIndex,
     };

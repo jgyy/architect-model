@@ -1,6 +1,5 @@
 import { ArchitectureWorkspace } from "@/components/architecture-workspace";
 import { exampleArchitecture } from "@/data/example-architecture";
-import { exampleSimulationTrace } from "@/data/example-simulation";
 
 export default function Home() {
     return (
@@ -17,7 +16,6 @@ export default function Home() {
             <div className="min-h-0 flex-1">
                 <ArchitectureWorkspace
                     initialArchitecture={exampleArchitecture}
-                    initialSimulationTrace={exampleSimulationTrace}
                 />
             </div>
         </div>

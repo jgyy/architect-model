@@ -5,17 +5,26 @@ export const exampleArchitecture: Architecture = {
         {
             id: "node-internet",
             position: { x: 0, y: 0 },
-            data: { label: "Internet" },
+            data: {
+                label: "Internet",
+                description: "Attacker starts from Internet",
+            },
         },
         {
             id: "node-web-server",
             position: { x: 250, y: 0 },
-            data: { label: "Web Server" },
+            data: {
+                label: "Web Server",
+                description: "Attacker reaches Web Server",
+            },
         },
         {
             id: "node-database",
             position: { x: 500, y: 0 },
-            data: { label: "Database" },
+            data: {
+                label: "Database",
+                description: "Attacker accesses Database",
+            },
         },
     ],
     edges: [

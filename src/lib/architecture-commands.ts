@@ -1,28 +1,23 @@
 import {
-    ADD_STEP_PATTERNS,
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
-    INSERT_STEP_PATTERNS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
-import type { SimulationStep, SimulationTrace } from "@/types/simulation";
 
 export type CommandResult =
     | {
-          ok: true;
-          architecture: Architecture;
-          trace: SimulationTrace;
-          message: string;
-      }
+        ok: true;
+        architecture: Architecture;
+        message: string;
+    }
     | { ok: false; message: string };
 
-// callers always pass a normalizeLabel()'d string, which already strips
-// invisible characters and trims whitespace
+// callers always pass a normalizeLabel()'d string
 function isBlankLabel(label: string): boolean {
     return label.length === 0;
 }
@@ -35,16 +30,8 @@ function slugify(label: string): string {
         .replace(/(^-|-$)/g, "");
 }
 
-// Also avoids ids still referenced by orphaned trace steps
-function uniqueNodeId(
-    slug: string,
-    architecture: Architecture,
-    trace: SimulationTrace,
-): string {
-    const usedIds = new Set<string>([
-        ...architecture.nodes.map((node) => node.id),
-        ...trace.map((step) => step.nodeId),
-    ]);
+function uniqueNodeId(slug: string, architecture: Architecture): string {
+    const usedIds = new Set(architecture.nodes.map((node) => node.id));
     let id = `node-${slug}`;
     let suffix = 2;
     while (usedIds.has(id)) {
@@ -55,9 +42,6 @@ function uniqueNodeId(
 }
 
 // null = no match, array = ambiguous (multiple substring matches, no exact one)
-// Unicode-folds a stored label the same way normalizeLabel() folds typed
-// input, so a label loaded from persisted state (which may predate this
-// normalization, or come from outside the app) still compares correctly.
 function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
@@ -161,22 +145,9 @@ const ADD_NODE_PATTERNS = [
     /^add a node called(?:\s+(.*))?$/i,
 ];
 
-const SET_STEP_DESCRIPTION_PATTERNS = [
-    /^set step (\d+) description(?:\s+(.*))?$/i,
-];
-
-const REMOVE_STEP_PATTERNS = [/^remove step (\d+)$/i];
-
-const MOVE_STEP_PATTERNS = [/^move step (\d+) to (\d+)$/i];
-
-function renumberSteps(trace: SimulationTrace): SimulationTrace {
-    return trace.map((step, index) => ({ ...step, step: index + 1 }));
-}
-
 export function parseCommand(
     input: string,
     architecture: Architecture,
-    trace: SimulationTrace = [],
 ): CommandResult {
     const trimmed = input.trim();
 
@@ -194,9 +165,9 @@ export function parseCommand(
             };
         }
         const node: ArchitectureNode = {
-            id: uniqueNodeId(slugify(label), architecture, trace),
+            id: uniqueNodeId(slugify(label), architecture),
             position: { x: architecture.nodes.length * 250, y: 0 },
-            data: { label },
+            data: { label, description: `Reaches "${label}".` },
         };
         return {
             ok: true,
@@ -204,8 +175,7 @@ export function parseCommand(
                 ...architecture,
                 nodes: [...architecture.nodes, node],
             },
-            trace,
-            message: `Added node "${label}".`,
+            message: `Added node "${label}" as simulation step ${architecture.nodes.length + 1}.`,
         };
     }
 
@@ -267,7 +237,6 @@ export function parseCommand(
                 ...architecture,
                 edges: [...architecture.edges, edge],
             },
-            trace,
             message: `Connected "${source.data.label}" to "${target.data.label}".`,
         };
     }
@@ -295,8 +264,7 @@ export function parseCommand(
                         edge.source !== node.id && edge.target !== node.id,
                 ),
             },
-            trace,
-            message: `Removed node "${node.data.label}".`,
+            message: `Removed node "${node.data.label}" and its simulation step.`,
         };
     }
 
@@ -347,178 +315,12 @@ export function parseCommand(
                 ...architecture,
                 edges: architecture.edges.filter((e) => e.id !== edge.id),
             },
-            trace,
             message: `Removed edge from "${source.data.label}" to "${target.data.label}".`,
-        };
-    }
-
-    const addStepMatch = matchFirst(ADD_STEP_PATTERNS, trimmed);
-    if (addStepMatch) {
-        const label = normalizeLabel(addStepMatch[1] ?? "");
-        if (isBlankLabel(label)) {
-            return { ok: false, message: "A step must reference a node." };
-        }
-        const resolved = findNodeOrAmbiguity(label, architecture);
-        if (resolved === null) {
-            return { ok: false, message: `No node named "${label}".` };
-        }
-        if (Array.isArray(resolved)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(label, resolved),
-            };
-        }
-        const node = resolved;
-        const step: SimulationStep = {
-            step: trace.length + 1,
-            nodeId: node.id,
-            description: `Reaches "${node.data.label}".`,
-        };
-        return {
-            ok: true,
-            architecture,
-            trace: [...trace, step],
-            message: `Added step ${step.step}: reaches "${node.data.label}".`,
-        };
-    }
-
-    const insertStepMatch = matchFirst(INSERT_STEP_PATTERNS, trimmed);
-    if (insertStepMatch) {
-        const rawPosition = insertStepMatch[1];
-        const position = Number(rawPosition);
-        const label = normalizeLabel(insertStepMatch[2] ?? "");
-        if (isBlankLabel(label)) {
-            return { ok: false, message: "A step must reference a node." };
-        }
-        const resolved = findNodeOrAmbiguity(label, architecture);
-        if (resolved === null) {
-            return { ok: false, message: `No node named "${label}".` };
-        }
-        if (Array.isArray(resolved)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(label, resolved),
-            };
-        }
-        const node = resolved;
-        const maxPosition = trace.length + 1;
-        if (position < 1 || position > maxPosition) {
-            return {
-                ok: false,
-                // echoes the digits as typed — Number() loses precision or
-                // switches to scientific notation well before it can reach
-                // a valid position, so it must not be used for display here
-                message: `No position numbered ${rawPosition}; valid positions are 1-${maxPosition}.`,
-            };
-        }
-        const index = position - 1;
-        const step: SimulationStep = {
-            step: position,
-            nodeId: node.id,
-            description: `Reaches "${node.data.label}".`,
-        };
-        const nextTrace = [
-            ...trace.slice(0, index),
-            step,
-            ...trace.slice(index),
-        ];
-        return {
-            ok: true,
-            architecture,
-            trace: renumberSteps(nextTrace),
-            message: `Inserted step ${rawPosition}: reaches "${node.data.label}".`,
-        };
-    }
-
-    const setStepDescriptionMatch = matchFirst(
-        SET_STEP_DESCRIPTION_PATTERNS,
-        trimmed,
-    );
-    if (setStepDescriptionMatch) {
-        const rawStepNumber = setStepDescriptionMatch[1];
-        const stepNumber = Number(rawStepNumber);
-        const description = normalizeLabel(setStepDescriptionMatch[2] ?? "");
-        if (isBlankLabel(description)) {
-            return {
-                ok: false,
-                message: "A step description cannot be blank.",
-            };
-        }
-        const index = stepNumber - 1;
-        if (index < 0 || index >= trace.length) {
-            return {
-                ok: false,
-                message: `No step numbered ${rawStepNumber}.`,
-            };
-        }
-        return {
-            ok: true,
-            architecture,
-            trace: trace.map((step, i) =>
-                i === index ? { ...step, description } : step,
-            ),
-            message: `Updated step ${rawStepNumber}'s description.`,
-        };
-    }
-
-    const removeStepMatch = matchFirst(REMOVE_STEP_PATTERNS, trimmed);
-    if (removeStepMatch) {
-        const rawStepNumber = removeStepMatch[1];
-        const stepNumber = Number(rawStepNumber);
-        const index = stepNumber - 1;
-        if (index < 0 || index >= trace.length) {
-            return {
-                ok: false,
-                message: `No step numbered ${rawStepNumber}.`,
-            };
-        }
-        return {
-            ok: true,
-            architecture,
-            trace: renumberSteps(trace.filter((_, i) => i !== index)),
-            message: `Removed step ${rawStepNumber}.`,
-        };
-    }
-
-    const moveStepMatch = matchFirst(MOVE_STEP_PATTERNS, trimmed);
-    if (moveStepMatch) {
-        const rawFrom = moveStepMatch[1];
-        const rawTo = moveStepMatch[2];
-        const from = Number(rawFrom);
-        const to = Number(rawTo);
-        const fromIndex = from - 1;
-        if (fromIndex < 0 || fromIndex >= trace.length) {
-            return { ok: false, message: `No step numbered ${rawFrom}.` };
-        }
-        const toIndex = to - 1;
-        if (toIndex < 0 || toIndex >= trace.length) {
-            return { ok: false, message: `No step numbered ${rawTo}.` };
-        }
-        if (from === to) {
-            return {
-                ok: true,
-                architecture,
-                trace,
-                message: `Step ${rawFrom} is already at position ${rawTo}.`,
-            };
-        }
-        const step = trace[fromIndex];
-        const remaining = trace.filter((_, i) => i !== fromIndex);
-        const nextTrace = [
-            ...remaining.slice(0, toIndex),
-            step,
-            ...remaining.slice(toIndex),
-        ];
-        return {
-            ok: true,
-            architecture,
-            trace: renumberSteps(nextTrace),
-            message: `Moved step ${rawFrom} to position ${rawTo}.`,
         };
     }
 
     return {
         ok: false,
-        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>; add step <label>; insert step <n> <label>; set step <n> description <text>; remove step <n>; move step <a> to <b>.`,
+        message: `Unrecognized command: "${trimmed}". Try: add node <label>; connect <A> to <B>; remove node <label>; remove edge <A> to <B>.`,
     };
 }
