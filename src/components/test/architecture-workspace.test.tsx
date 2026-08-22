@@ -21,14 +21,7 @@ import { loadPersistedState, type PersistedState } from "@/lib/persistence";
 import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
 import type { Architecture } from "@/types/architecture";
 
-// Node 22+'s own global `localStorage` getter (gated behind an unset
-// --localstorage-file, so it silently resolves to undefined) already exists
-// on globalThis before vitest's jsdom environment populates its globals, so
-// jsdom's real, working `window.localStorage` never gets mirrored over it —
-// `window.localStorage` here (and inside the component under test, which
-// reads that same global) would otherwise be undefined. Point it at
-// jsdom's real implementation, reachable via the JSDOM instance vitest
-// keeps at `globalThis.jsdom`, and restore the original afterwards.
+// Node 22+'s own global `localStorage` getter
 const jsdomWindow = (globalThis as { jsdom?: { window: Window } }).jsdom
     ?.window;
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(
@@ -89,7 +82,6 @@ function emptyFixture(): Architecture {
 
 async function waitForHydration() {
     // ReactFlow's onInit and the workspace's localStorage-hydration effect
-    // both settle asynchronously; give both a real tick before interacting.
     await new Promise((resolve) => setTimeout(resolve, 10));
 }
 
@@ -130,8 +122,6 @@ describe("ArchitectureWorkspace", () => {
 
         const expectedMessage = SUPPORTED_COMMANDS.join("\n");
         // testing-library's getByText normalizes (collapses whitespace in)
-        // the rendered node's text before comparing, but not the query
-        // string itself, so a multi-line query must be pre-collapsed too.
         const normalizedMessage = expectedMessage.replace(/\s+/g, " ").trim();
         expect(await screen.findByText(normalizedMessage)).toBeInTheDocument();
 
@@ -200,11 +190,7 @@ describe("ArchitectureWorkspace", () => {
         expect(screen.getByText("Web Server")).toBeInTheDocument();
         expect(screen.getByText("Database")).toBeInTheDocument();
 
-        // handleClearHistory removes the persisted session, but the
-        // workspace's own persistence effect (architecture/log changed,
-        // hydrated is true) immediately re-saves the just-reset state — so
-        // localStorage settles on initialArchitecture with an empty log
-        // rather than staying cleared.
+        // handleClearHistory removes the persisted session
         await waitFor(() => {
             const persisted = loadPersistedState(window.localStorage);
             expect(persisted?.log).toEqual([]);

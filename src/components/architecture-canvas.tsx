@@ -90,6 +90,9 @@ const EDGE_TYPES = { default: ArchitectureEdgeCard };
 const DEFAULT_EDGE_OPTIONS = {
     markerEnd: { type: MarkerType.ArrowClosed },
 };
+// Above this many nodes the minimap's per-mutation redraw cost dominates
+// command latency, and the overview itself is too dense to read anyway
+const MINIMAP_NODE_LIMIT = 300;
 
 // The `fitView` prop on <ReactFlow> only runs once, on mount
 function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
@@ -101,7 +104,11 @@ function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
             isFirstRun.current = false;
             return;
         }
-        fitView({ duration: 300 });
+        // Coalesces a burst of rapid mutations (e.g. many console commands
+        // submitted back to back) into a single fit once they settle,
+        // instead of animating the viewport on every single one
+        const timer = setTimeout(() => fitView({ duration: 300 }), 300);
+        return () => clearTimeout(timer);
     }, [nodeIds, fitView]);
 
     return null;
@@ -126,14 +133,19 @@ export function ArchitectureCanvas({
         setSyncedFrom(architecture.nodes);
         setRenderNodes((current) => {
             const byId = new Map(current.map((node) => [node.id, node]));
-            return architecture.nodes.map((node) => ({
-                ...byId.get(node.id),
-                ...node,
-            }));
+            // Reuse the existing object when nothing changed instead of
+            // reallocating every node on every mutation
+            return architecture.nodes.map((node) => {
+                const existing = byId.get(node.id);
+                return existing === node ? node : { ...existing, ...node };
+            });
         });
     }
 
-    const nodeIds = architecture.nodes.map((node) => node.id).join(",");
+    const nodeIds = useMemo(
+        () => architecture.nodes.map((node) => node.id).join(","),
+        [architecture.nodes],
+    );
 
     const handleNodesChange = useCallback(
         (changes: NodeChange<ArchitectureNode>[]) => {
@@ -237,10 +249,20 @@ export function ArchitectureCanvas({
                         onPaneClick={handlePaneClick}
                         deleteKeyCode={null}
                         fitView
+                        onlyRenderVisibleElements
                     >
                         <Background variant={BackgroundVariant.Dots} gap={20} />
                         <Controls />
-                        <MiniMap pannable zoomable />
+                        {/* The minimap redraws every node's position on every
+                            single mutation and (unlike the canvas) never
+                            skips off-screen nodes, so it's the single most
+                            expensive thing on the page once a graph gets
+                            large — and by then it's just a gray smear of
+                            overlapping dots anyway, so hiding it costs
+                            nothing real. */}
+                        {architecture.nodes.length <= MINIMAP_NODE_LIMIT && (
+                            <MiniMap pannable zoomable />
+                        )}
                         <FitViewOnNodesChange nodeIds={nodeIds} />
                     </ReactFlow>
                 </EdgeDeleteContext.Provider>

@@ -25,10 +25,14 @@ export function ConsolePanel({
     onSubmit,
     architecture,
 }: ConsolePanelProps) {
-    const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ block: "nearest" });
+        // scrollIntoView on a sentinel forces a full geometry computation of
+        // the whole (unbounded) log list on every single command; setting
+        // scrollTop directly is far cheaper and has the same effect here
+        const container = scrollRef.current;
+        if (container) container.scrollTop = container.scrollHeight;
     }, [log.length]);
 
     return (
@@ -46,7 +50,7 @@ export function ConsolePanel({
                     <Trash2 size={14} />
                 </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
                 {log.length === 0 ? (
                     <p className="max-w-[80ch] break-words px-3 py-2 text-muted-foreground">
                         Blast Radius console — type{" "}
@@ -84,7 +88,6 @@ export function ConsolePanel({
                         </div>
                     ))
                 )}
-                <div ref={bottomRef} />
             </div>
             <CommandInput
                 value={input}

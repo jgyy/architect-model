@@ -1,13 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
-// jsdom implements neither ResizeObserver, scrollIntoView, nor
-// DOMMatrixReadOnly. @xyflow/react measures nodes with the first (and reads
-// the viewport's CSS transform via the third to derive zoom); console-panel
-// autoscrolls with the second.
-//
-// The observer stub fires once per observed target (async, like the real
-// thing) so @xyflow/react considers nodes "measured" — without that, handle
-// bounds stay undefined and connection-drag gestures silently no-op.
+// jsdom implements neither ResizeObserver, scrollIntoView
 class ResizeObserverStub {
     #callback: ResizeObserverCallback;
 
@@ -33,8 +26,7 @@ class ResizeObserverStub {
     disconnect() {}
 }
 
-// Only the zoom factor (m22, from a `matrix(a, b, c, d, e, f)` transform) is
-// read by @xyflow/react — a full CSS matrix implementation isn't needed.
+// Only the zoom factor (m22, from a `matrix(a, b, c, d, e, f)` transform)
 class DOMMatrixReadOnlyStub {
     m22 = 1;
 
@@ -51,20 +43,27 @@ if (typeof window !== "undefined") {
         DOMMatrixReadOnlyStub as unknown as typeof DOMMatrixReadOnly;
     Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 
-    // jsdom does no layout, so getBoundingClientRect/offsetWidth/offsetHeight
-    // always report zero. @xyflow/react treats a zero-size node as "not yet
-    // measured" (it reads offsetWidth/Height) and skips computing its handle
-    // bounds entirely, which would make every connection-drag gesture
-    // silently no-op in tests. A fixed non-zero size is enough for the
-    // library to consider nodes measured.
+    // jsdom does no layout. Nodes get a small fixed size so @xyflow/react
+    // considers them measured; `.react-flow__renderer` (the element it
+    // measures for the viewport's own size, via useResizeHandler) needs a
+    // much larger size instead — with `onlyRenderVisibleElements` on, a
+    // container only a little bigger than the node fixtures makes fitView's
+    // natural fit scale hit its default maxZoom (2x) and clip the
+    // farthest-out node out of the "visible" viewport entirely.
+    function isViewportContainer(element: Element): boolean {
+        return element.classList?.contains("react-flow__renderer") ?? false;
+    }
+
     Element.prototype.getBoundingClientRect = function getBoundingClientRect() {
+        const width = isViewportContainer(this) ? 4000 : 150;
+        const height = isViewportContainer(this) ? 3000 : 40;
         return {
-            width: 150,
-            height: 40,
+            width,
+            height,
             top: 0,
             left: 0,
-            right: 150,
-            bottom: 40,
+            right: width,
+            bottom: height,
             x: 0,
             y: 0,
             toJSON() {},
@@ -72,11 +71,15 @@ if (typeof window !== "undefined") {
     };
     Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
         configurable: true,
-        get: () => 150,
+        get(this: HTMLElement) {
+            return isViewportContainer(this) ? 4000 : 150;
+        },
     });
     Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
         configurable: true,
-        get: () => 40,
+        get(this: HTMLElement) {
+            return isViewportContainer(this) ? 3000 : 40;
+        },
     });
 
     window.matchMedia ??= function matchMedia(query: string) {
