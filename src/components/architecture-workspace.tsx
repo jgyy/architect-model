@@ -1,12 +1,12 @@
 "use client";
 
-import { CheckCircle2, Trash2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
-import { CommandInput } from "@/components/command-input";
+import { ConsolePanel } from "@/components/console-panel";
 import { SimulationPanel } from "@/components/simulation-panel";
 import { parseCommand } from "@/lib/architecture-commands";
+import { buildRemoveEdgeCommand } from "@/lib/edge-delete";
 import {
     clearPersistedState,
     interpretStorageEvent,
@@ -21,12 +21,19 @@ import {
     getTraversedPath,
     resolveStepNode,
 } from "@/lib/simulation";
+import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
 import type {
     Architecture,
     ArchitectureEdge,
     ArchitectureNode,
 } from "@/types/architecture";
 import type { SimulationTrace } from "@/types/simulation";
+
+const HELP_MESSAGE = SUPPORTED_COMMANDS.join("\n");
+
+function nextLogId(entries: LogEntry[]): number {
+    return entries.length === 0 ? 1 : Math.max(...entries.map((e) => e.id)) + 1;
+}
 
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
@@ -138,30 +145,59 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, edges }));
     }, []);
 
+    // Runs a command line exactly the same way whether it was typed at the
+    // prompt or synthesized by a mouse gesture (e.g. deleting an edge), so
+    // both stay logged and in sync through one code path.
+    const runCommand = useCallback(
+        (text: string) => {
+            const trimmed = text.trim();
+            if (!trimmed) return;
+
+            if (trimmed.toLowerCase() === "help" || trimmed === "?") {
+                setLog((entries) => [
+                    ...entries,
+                    {
+                        id: nextLogId(entries),
+                        input: trimmed,
+                        ok: true,
+                        message: HELP_MESSAGE,
+                    },
+                ]);
+                return;
+            }
+
+            const result = parseCommand(trimmed, architecture, trace);
+            if (result.ok) {
+                setArchitecture(result.architecture);
+                setTrace(result.trace);
+            }
+            setLog((entries) => [
+                ...entries,
+                {
+                    id: nextLogId(entries),
+                    input: trimmed,
+                    ok: result.ok,
+                    message: result.message,
+                },
+            ]);
+        },
+        [architecture, trace],
+    );
+
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const text = input.trim();
-        if (!text) return;
-
-        const result = parseCommand(text, architecture, trace);
-        if (result.ok) {
-            setArchitecture(result.architecture);
-            setTrace(result.trace);
-        }
-        setLog((entries) => [
-            ...entries,
-            {
-                id:
-                    entries.length === 0
-                        ? 1
-                        : Math.max(...entries.map((e) => e.id)) + 1,
-                input: text,
-                ok: result.ok,
-                message: result.message,
-            },
-        ]);
+        if (!input.trim()) return;
+        runCommand(input);
         setInput("");
     }
+
+    const handleEdgeDelete = useCallback(
+        (edgeId: string) => {
+            const command = buildRemoveEdgeCommand(edgeId, architecture);
+            if (command) runCommand(command);
+        },
+        [architecture, runCommand],
+    );
 
     return (
         <div className="flex h-full w-full">
@@ -173,15 +209,10 @@ export function ArchitectureWorkspace({
                     traversedEdgeIds={traversedPath.edgeIds}
                     onNodesChange={handleNodesChange}
                     onEdgesChange={handleEdgesChange}
+                    onEdgeDelete={handleEdgeDelete}
                 />
             </div>
             <aside className="flex w-96 flex-col border-l border-border bg-chrome">
-                <CommandInput
-                    value={input}
-                    onChange={setInput}
-                    onSubmit={handleSubmit}
-                    architecture={architecture}
-                />
                 {trace.length > 0 && (
                     <SimulationPanel
                         trace={trace}
@@ -192,52 +223,14 @@ export function ArchitectureWorkspace({
                         onSpeedChange={setSpeedIndex}
                     />
                 )}
-                <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                    <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        History
-                    </span>
-                    <button
-                        type="button"
-                        onClick={handleClearHistory}
-                        title="Clear history"
-                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                </div>
-                <ul className="flex-1 overflow-y-auto text-sm">
-                    {log.length === 0 && (
-                        <li className="px-3 py-2 text-muted-foreground">
-                            No commands run yet.
-                        </li>
-                    )}
-                    {log.map((entry) => (
-                        <li
-                            key={entry.id}
-                            className="flex items-start gap-2 px-3 py-2 hover:bg-border/40"
-                        >
-                            {entry.ok ? (
-                                <CheckCircle2
-                                    size={14}
-                                    className="mt-0.5 shrink-0 text-success"
-                                />
-                            ) : (
-                                <XCircle
-                                    size={14}
-                                    className="mt-0.5 shrink-0 text-danger"
-                                />
-                            )}
-                            <div className="min-w-0">
-                                <div className="truncate font-mono text-xs text-muted-foreground">
-                                    {entry.input}
-                                </div>
-                                <div className="text-foreground">
-                                    {entry.message}
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                <ConsolePanel
+                    log={log}
+                    onClear={handleClearHistory}
+                    input={input}
+                    onInputChange={setInput}
+                    onSubmit={handleSubmit}
+                    architecture={architecture}
+                />
             </aside>
         </div>
     );

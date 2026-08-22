@@ -23,6 +23,10 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import {
+    ArchitectureEdge as ArchitectureEdgeCard,
+    EdgeDeleteContext,
+} from "@/components/architecture-edge";
+import {
     ArchitectureNode as ArchitectureNodeCard,
     HighlightedNodeContext,
 } from "@/components/architecture-node";
@@ -43,6 +47,7 @@ type ArchitectureCanvasProps = {
     traversedEdgeIds?: Set<string>;
     onNodesChange: (nodes: ArchitectureNode[]) => void;
     onEdgesChange: (edges: ArchitectureEdge[]) => void;
+    onEdgeDelete: (edgeId: string) => void;
 };
 
 const EMPTY_ID_SET = new Set<string>();
@@ -76,6 +81,7 @@ const REACT_FLOW_THEME_VARS: Record<string, string> = {
 };
 
 const NODE_TYPES = { default: ArchitectureNodeCard };
+const EDGE_TYPES = { default: ArchitectureEdgeCard };
 const DEFAULT_EDGE_OPTIONS = {
     markerEnd: { type: MarkerType.ArrowClosed },
 };
@@ -103,6 +109,7 @@ export function ArchitectureCanvas({
     traversedEdgeIds = EMPTY_ID_SET,
     onNodesChange,
     onEdgesChange,
+    onEdgeDelete,
 }: ArchitectureCanvasProps) {
     // https://react.dev/learn/you-might-not-need-an-effect
     const [renderNodes, setRenderNodes] = useState(architecture.nodes);
@@ -161,27 +168,30 @@ export function ArchitectureCanvas({
 
     return (
         <HighlightedNodeContext.Provider value={highlight}>
-            <ReactFlow
-                nodes={renderNodes}
-                edges={renderEdges}
-                nodeTypes={NODE_TYPES}
-                defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
-                connectionLineStyle={{
-                    stroke: "var(--accent)",
-                    strokeWidth: 2,
-                }}
-                colorMode="system"
-                style={REACT_FLOW_THEME_VARS as CSSProperties}
-                onNodesChange={handleNodesChange}
-                onConnect={handleConnect}
-                deleteKeyCode={null}
-                fitView
-            >
-                <Background variant={BackgroundVariant.Dots} gap={20} />
-                <Controls />
-                <MiniMap pannable zoomable />
-                <FitViewOnNodesChange nodeIds={nodeIds} />
-            </ReactFlow>
+            <EdgeDeleteContext.Provider value={onEdgeDelete}>
+                <ReactFlow
+                    nodes={renderNodes}
+                    edges={renderEdges}
+                    nodeTypes={NODE_TYPES}
+                    edgeTypes={EDGE_TYPES}
+                    defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+                    connectionLineStyle={{
+                        stroke: "var(--accent)",
+                        strokeWidth: 2,
+                    }}
+                    colorMode="system"
+                    style={REACT_FLOW_THEME_VARS as CSSProperties}
+                    onNodesChange={handleNodesChange}
+                    onConnect={handleConnect}
+                    deleteKeyCode={null}
+                    fitView
+                >
+                    <Background variant={BackgroundVariant.Dots} gap={20} />
+                    <Controls />
+                    <MiniMap pannable zoomable />
+                    <FitViewOnNodesChange nodeIds={nodeIds} />
+                </ReactFlow>
+            </EdgeDeleteContext.Provider>
         </HighlightedNodeContext.Provider>
     );
 }
