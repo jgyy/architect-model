@@ -147,15 +147,15 @@ export function CommandInput({
     }
 
     return (
-        <form onSubmit={onSubmit} className="w-fit border-t border-border p-2">
-            <div className="relative flex w-fit items-center gap-1.5">
+        <form onSubmit={onSubmit} className="w-full border-t border-border p-2">
+            <div className="relative flex w-full items-center gap-1.5">
                 <span
                     className="shrink-0 font-mono text-sm text-accent"
                     aria-hidden="true"
                 >
                     &gt;
                 </span>
-                <div className="relative w-[80ch]">
+                <div className="relative min-w-0 max-w-[80ch] flex-1">
                     <input
                         id="command-input"
                         ref={inputRef}

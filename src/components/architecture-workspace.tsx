@@ -203,7 +203,7 @@ export function ArchitectureWorkspace({
                     onEdgeDelete={handleEdgeDelete}
                 />
             </div>
-            <aside className="flex w-fit shrink-0 flex-col border-l border-border bg-chrome">
+            <aside className="flex w-[80ch] max-w-[min(80ch,70vw)] shrink-0 flex-col border-l border-border bg-chrome font-mono text-sm">
                 {architecture.nodes.length > 0 && (
                     <SimulationPanel
                         architecture={architecture}

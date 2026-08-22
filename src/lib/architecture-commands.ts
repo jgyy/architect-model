@@ -11,10 +11,10 @@ import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 export type CommandResult =
     | {
-        ok: true;
-        architecture: Architecture;
-        message: string;
-    }
+          ok: true;
+          architecture: Architecture;
+          message: string;
+      }
     | { ok: false; message: string };
 
 // callers always pass a normalizeLabel()'d string

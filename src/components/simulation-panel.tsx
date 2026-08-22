@@ -47,7 +47,7 @@ export function SimulationPanel({
     const atLastStep = currentStepIndex === stepCount - 1;
 
     return (
-        <div className="border-b border-border p-3">
+        <div className="border-b border-border p-3 font-sans">
             <div className="flex items-center justify-between">
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Simulation
