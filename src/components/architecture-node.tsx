@@ -29,7 +29,7 @@ export function ArchitectureNode({
 
     return (
         <div
-            className={`rounded-lg border bg-chrome px-3 py-2 text-sm font-medium text-chrome-foreground shadow-sm transition-shadow hover:shadow-md ${
+            className={`max-w-64 rounded-lg border bg-chrome px-3 py-2 text-sm font-medium break-words text-chrome-foreground shadow-sm transition-shadow hover:shadow-md ${
                 current
                     ? "border-accent ring-2 ring-accent/30"
                     : traversed

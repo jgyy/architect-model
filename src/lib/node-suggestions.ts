@@ -28,7 +28,7 @@ function rankMatches(
     const needle = normalizeLabel(partial).toLowerCase();
     return nodes
         .map((node) => {
-            const label = node.data.label.toLowerCase();
+            const label = node.data.label.normalize("NFC").toLowerCase();
             const rank =
                 label === needle
                     ? 0
@@ -45,7 +45,7 @@ function rankMatches(
                 a.rank - b.rank ||
                 a.node.data.label.localeCompare(b.node.data.label),
         )
-        .slice(0, limit)
+        .slice(0, Math.max(0, limit))
         .map((entry) => entry.node);
 }
 
@@ -71,7 +71,7 @@ function isCompleteNodeLabel(
     const needle = normalizeLabel(text).toLowerCase();
     if (needle.length === 0) return false;
     return architecture.nodes.some(
-        (node) => node.data.label.toLowerCase() === needle,
+        (node) => node.data.label.normalize("NFC").toLowerCase() === needle,
     );
 }
 
@@ -94,10 +94,7 @@ function candidateSeparatorSplits(
     return splits;
 }
 
-// Prefers the split whose non-edited side is a real, complete node label, so
-// a label that itself contains a separator word (e.g. "Load to Balance")
-// isn't mistaken for a second argument. Falls back to the right-most
-// occurrence, matching plain "A <sep> B" input with no such ambiguity.
+// Prefers the split whose non-edited side is a real, complete node label
 function bestSeparatorSplit(
     rest: string,
     separators: string[],
@@ -234,18 +231,18 @@ export function suggestNodeReference(
     return null;
 }
 
-// True when the argument span is already an exact, complete node reference —
-// selecting the suggestion would be a no-op, so Enter should submit instead
-// of being swallowed by the autocomplete dropdown.
+// True when the argument span is already an exact
 export function suggestionIsCompleteMatch(
     input: string,
     suggestion: NodeSuggestion,
 ): boolean {
-    if (suggestion.matches.length !== 1) return false;
     const typed = normalizeLabel(
         input.slice(suggestion.replaceFrom, suggestion.replaceTo),
     ).toLowerCase();
-    return typed === suggestion.matches[0].data.label.toLowerCase();
+    if (typed.length === 0) return false;
+    return suggestion.matches.some(
+        (match) => match.data.label.toLowerCase() === typed,
+    );
 }
 
 // Splices a chosen node's label into the input at the suggestion's span

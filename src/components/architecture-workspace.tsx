@@ -145,9 +145,7 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, edges }));
     }, []);
 
-    // Runs a command line exactly the same way whether it was typed at the
-    // prompt or synthesized by a mouse gesture (e.g. deleting an edge), so
-    // both stay logged and in sync through one code path.
+    // Runs a command line exactly the same way whether it was typed
     const runCommand = useCallback(
         (text: string) => {
             const trimmed = text.trim();
@@ -212,7 +210,7 @@ export function ArchitectureWorkspace({
                     onEdgeDelete={handleEdgeDelete}
                 />
             </div>
-            <aside className="flex w-96 flex-col border-l border-border bg-chrome">
+            <aside className="flex w-fit shrink-0 flex-col border-l border-border bg-chrome">
                 {trace.length > 0 && (
                     <SimulationPanel
                         trace={trace}

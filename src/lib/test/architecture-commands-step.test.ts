@@ -430,4 +430,47 @@ describe("parseCommand — trace step commands", () => {
         if (result.ok) throw new Error("expected out-of-range move to fail");
         expect(result.message).toBe("No step numbered 5.");
     });
+
+    test("echoes an out-of-range step number exactly as typed, not a float-rounded value", () => {
+        const trace: SimulationTrace = [
+            { step: 1, nodeId: "node-a", description: "first" },
+        ];
+
+        // 16 digits, past Number.MAX_SAFE_INTEGER — Number(...) would round
+        // this to a different value before it's echoed back
+        const result = parseCommand(
+            "move step 9007199254740993 to 1",
+            emptyArchitecture,
+            trace,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected out-of-range move to fail");
+        expect(result.message).toBe("No step numbered 9007199254740993.");
+    });
+
+    test("echoes an enormous out-of-range position without switching to scientific notation", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-cache",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Cache" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "insert step 99999999999999999999999 Cache",
+            architecture,
+            [],
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected out-of-range insert to fail");
+        expect(result.message).toBe(
+            "No position numbered 99999999999999999999999; valid positions are 1-1.",
+        );
+    });
 });

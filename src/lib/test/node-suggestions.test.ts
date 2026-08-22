@@ -256,6 +256,39 @@ describe("suggestNodeReference", () => {
             "Echo",
         ]);
     });
+
+    test("treats a negative limit as zero instead of slicing from the end of the ranked list", () => {
+        const input = "remove node  ";
+        const suggestion = suggestNodeReference(
+            input,
+            architecture,
+            input.length,
+            -1,
+        );
+
+        expect(suggestion!.matches).toEqual([]);
+    });
+
+    test("matches a node label even when the typed text uses a different Unicode composition (NFD vs NFC)", () => {
+        const nfc = "Caf\u00E9"; // precomposed e-acute
+        const nfd = "Cafe\u0301"; // base "e" + combining acute accent
+        expect(nfc).not.toBe(nfd);
+
+        const withCafe: Architecture = {
+            nodes: [
+                {
+                    id: "node-cafe",
+                    position: { x: 0, y: 0 },
+                    data: { label: nfc },
+                },
+            ],
+            edges: [],
+        };
+
+        const suggestion = suggestNodeReference(`remove node ${nfd}`, withCafe);
+
+        expect(labels(suggestion!.matches)).toEqual([nfc]);
+    });
 });
 
 describe("applyNodeSuggestion", () => {
@@ -363,7 +396,7 @@ describe("suggestionIsCompleteMatch", () => {
         expect(suggestionIsCompleteMatch(input, suggestion)).toBe(false);
     });
 
-    test("is false when the argument matches more than one node", () => {
+    test("is true when the typed argument exactly matches one node even if others merely contain it as a substring", () => {
         const withWeb: Architecture = {
             nodes: [
                 ...architecture.nodes,
@@ -378,6 +411,26 @@ describe("suggestionIsCompleteMatch", () => {
         const input = "remove node Web";
         const suggestion = suggestNodeReference(input, withWeb)!;
 
+        // "Web" is an exact match for a real node
+        expect(suggestionIsCompleteMatch(input, suggestion)).toBe(true);
+    });
+
+    test("is false when the argument matches multiple nodes and none is an exact match", () => {
+        const withWeb: Architecture = {
+            nodes: [
+                ...architecture.nodes,
+                {
+                    id: "node-web",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web" },
+                },
+            ],
+            edges: [],
+        };
+        const input = "remove node We";
+        const suggestion = suggestNodeReference(input, withWeb)!;
+
+        expect(labels(suggestion.matches)).toEqual(["Web", "Web Server"]);
         expect(suggestionIsCompleteMatch(input, suggestion)).toBe(false);
     });
 });

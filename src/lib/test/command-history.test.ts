@@ -89,4 +89,18 @@ describe("recallNewerCommand", () => {
         expect(newer2.value).toBe("my draft");
         expect(newer2.state).toEqual(IDLE);
     });
+
+    test("falls back to the draft instead of indexing out of bounds when the command list shrinks mid-recall", () => {
+        const recalling: CommandHistoryState = { index: 2, draft: "my draft" };
+        const result = recallNewerCommand(["only one left"], recalling);
+        expect(result.value).toBe("only one left");
+        expect(result.state.index).toBe(0);
+    });
+
+    test("falls back to the draft when the command list empties out mid-recall", () => {
+        const recalling: CommandHistoryState = { index: 1, draft: "my draft" };
+        const result = recallNewerCommand([], recalling);
+        expect(result.value).toBe("my draft");
+        expect(result.state).toEqual(IDLE);
+    });
 });

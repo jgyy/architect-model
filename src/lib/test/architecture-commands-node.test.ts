@@ -258,6 +258,40 @@ describe("parseCommand — node commands", () => {
         expect(result.architecture.nodes[0].data.label).toBe("Foo Bar");
     });
 
+    test("rejects a label that differs from an existing one only by an invisible zero-width character", () => {
+        const withServer = parseCommand("add node Server", emptyArchitecture);
+        if (!withServer.ok) throw new Error("expected first add to succeed");
+
+        // trailing zero-width space (U+200B) — visually identical to "Server"
+        const result = parseCommand(
+            `add node Server${"\u200B"}`,
+            withServer.architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected duplicate label to be rejected");
+        expect(result.message).toBe('A node named "Server" already exists.');
+        expect(withServer.architecture.nodes).toHaveLength(1);
+    });
+
+    test("rejects a label that differs from an existing one only by Unicode composition (NFC vs NFD)", () => {
+        const nfc = "Caf\u00E9"; // precomposed e-acute
+        const nfd = "Cafe\u0301"; // base "e" + combining acute accent
+        expect(nfc).not.toBe(nfd);
+        expect(nfc.normalize("NFC")).toBe(nfd.normalize("NFC"));
+
+        const withCafe = parseCommand(`add node ${nfc}`, emptyArchitecture);
+        if (!withCafe.ok) throw new Error("expected first add to succeed");
+
+        const result = parseCommand(`add node ${nfd}`, withCafe.architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected duplicate label to be rejected");
+        expect(withCafe.architecture.nodes).toHaveLength(1);
+    });
+
     test("finds a node by label even when the reference has different internal spacing", () => {
         const architecture: Architecture = {
             nodes: [

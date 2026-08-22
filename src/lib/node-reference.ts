@@ -10,9 +10,20 @@ export function matchFirst(
     return null;
 }
 
-// collapses runs of internal whitespace (not just leading/trailing)
+// zero-width space/non-joiner/joiner and byte-order-mark
+const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
+
+// Collapses runs of internal whitespace (not just leading/trailing), strips
+// invisible formatting characters, and folds Unicode composition to NFC —
+// so two labels that render identically (e.g. a trailing zero-width space,
+// or an accented character typed as base+combining-mark vs. precomposed)
+// compare equal everywhere this feeds into label matching.
 export function normalizeLabel(label: string): string {
-    return label.trim().replace(/\s+/g, " ");
+    return label
+        .normalize("NFC")
+        .replace(INVISIBLE_CHARS_PATTERN, "")
+        .trim()
+        .replace(/\s+/g, " ");
 }
 
 export const CONNECT_PATTERNS = [/^connect (.+)$/i, /^link (.+)$/i];
