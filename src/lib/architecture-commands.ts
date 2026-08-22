@@ -32,11 +32,10 @@ function slugify(label: string): string {
         .replace(/(^-|-$)/g, "");
 }
 
-function uniqueNodeId(slug: string, architecture: Architecture): string {
-    const usedIds = new Set(architecture.nodes.map((node) => node.id));
+function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     let id = `node-${slug}`;
     let suffix = 2;
-    while (usedIds.has(id)) {
+    while (nodeIndex.ids.has(id)) {
         id = `node-${slug}-${suffix}`;
         suffix += 1;
     }
@@ -48,16 +47,36 @@ function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
 
+// A label->node lookup (plus the id set uniqueNodeId needs), built once by
+// the caller and reused across commands instead of rescanning every node on
+// every command — the exact-match and id-collision checks below would
+// otherwise be O(nodes) each, making a run of many commands O(nodes^2)
+export type NodeIndex = {
+    byLabel: Map<string, ArchitectureNode>;
+    ids: Set<string>;
+};
+
+export function buildNodeIndex(nodes: ArchitectureNode[]): NodeIndex {
+    const byLabel = new Map<string, ArchitectureNode>();
+    const ids = new Set<string>();
+    for (const node of nodes) {
+        byLabel.set(foldLabel(node.data.label), node);
+        ids.add(node.id);
+    }
+    return { byLabel, ids };
+}
+
 function findNodeOrAmbiguity(
     label: string,
     architecture: Architecture,
+    nodeIndex: NodeIndex,
 ): ArchitectureNode | ArchitectureNode[] | null {
     const needle = normalizeLabel(label).toLowerCase();
     if (needle.length === 0) return null;
-    const exact = architecture.nodes.find(
-        (node) => foldLabel(node.data.label) === needle,
-    );
+    const exact = nodeIndex.byLabel.get(needle);
     if (exact) return exact;
+    // no fast path for a substring match — this only runs for a
+    // non-exact/partial reference, which is inherently rarer
     const matches = architecture.nodes.filter((node) =>
         foldLabel(node.data.label).includes(needle),
     );
@@ -66,22 +85,27 @@ function findNodeOrAmbiguity(
     return matches;
 }
 
+const AMBIGUOUS_MATCHES_SHOWN = 20;
+
 function ambiguousLabelMessage(
     label: string,
     matches: ArchitectureNode[],
 ): string {
-    const names = matches.map((node) => `"${node.data.label}"`).join(", ");
+    const shown = matches
+        .slice(0, AMBIGUOUS_MATCHES_SHOWN)
+        .map((node) => `"${node.data.label}"`)
+        .join(", ");
+    const rest = matches.length - AMBIGUOUS_MATCHES_SHOWN;
+    const names = rest > 0 ? `${shown}, and ${rest} more` : shown;
     return `"${label}" matches multiple nodes: ${names}. Be more specific.`;
 }
 
 function findNodeByExactLabel(
     label: string,
-    architecture: Architecture,
+    nodeIndex: NodeIndex,
 ): ArchitectureNode | undefined {
     const needle = normalizeLabel(label).toLowerCase();
-    return architecture.nodes.find(
-        (node) => foldLabel(node.data.label) === needle,
-    );
+    return nodeIndex.byLabel.get(needle);
 }
 
 // "<A> <sep> <B>" is ambiguous when a label itself contains a separator word
@@ -122,6 +146,7 @@ function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
 function resolveConnectionEndpoints(
     rest: string,
     architecture: Architecture,
+    nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedEndpoints | null {
     const splits = splitConnectionArgs(rest, separators);
@@ -129,8 +154,8 @@ function resolveConnectionEndpoints(
 
     const resolved = splits.map((split) => ({
         ...split,
-        source: findNodeOrAmbiguity(split.sourceLabel, architecture),
-        target: findNodeOrAmbiguity(split.targetLabel, architecture),
+        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
+        target: findNodeOrAmbiguity(split.targetLabel, architecture, nodeIndex),
     }));
 
     return (
@@ -150,6 +175,7 @@ type ResolvedRenameArgs = {
 function resolveRenameArgs(
     rest: string,
     architecture: Architecture,
+    nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedRenameArgs | null {
     const splits = splitConnectionArgs(rest, separators);
@@ -158,7 +184,7 @@ function resolveRenameArgs(
     const resolved = splits.map((split) => ({
         sourceLabel: split.sourceLabel,
         newLabel: split.targetLabel,
-        source: findNodeOrAmbiguity(split.sourceLabel, architecture),
+        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
     }));
 
     return resolved.find((r) => isSingleNode(r.source)) ?? resolved[0];
@@ -177,12 +203,25 @@ export type ParseCommandOptions = {
     position?: { x: number; y: number };
 };
 
+// connect/remove-edge/rename-node parsing tries every occurrence of every
+// separator word in the argument; an unbounded input turns that into O(n^2)
+// work, so absurdly long input (e.g. a large pasted block) is rejected outright
+const MAX_COMMAND_LENGTH = 500;
+
 export function parseCommand(
     input: string,
     architecture: Architecture,
     options: ParseCommandOptions = {},
+    nodeIndex: NodeIndex = buildNodeIndex(architecture.nodes),
 ): CommandResult {
     const trimmed = input.trim();
+
+    if (trimmed.length > MAX_COMMAND_LENGTH) {
+        return {
+            ok: false,
+            message: `Command is too long (${trimmed.length} characters; max ${MAX_COMMAND_LENGTH}).`,
+        };
+    }
 
     const addNodeMatch = matchFirst(ADD_NODE_PATTERNS, trimmed);
     if (addNodeMatch) {
@@ -190,7 +229,7 @@ export function parseCommand(
         if (isBlankLabel(label)) {
             return { ok: false, message: "A node label cannot be blank." };
         }
-        const duplicate = findNodeByExactLabel(label, architecture);
+        const duplicate = findNodeByExactLabel(label, nodeIndex);
         if (duplicate) {
             return {
                 ok: false,
@@ -198,7 +237,7 @@ export function parseCommand(
             };
         }
         const node: ArchitectureNode = {
-            id: uniqueNodeId(slugify(label), architecture),
+            id: uniqueNodeId(slugify(label), nodeIndex),
             position: options.position ?? {
                 x: architecture.nodes.length * 250,
                 y: 0,
@@ -220,6 +259,7 @@ export function parseCommand(
         const resolved = resolveConnectionEndpoints(
             connectMatch[1],
             architecture,
+            nodeIndex,
             CONNECT_SEPARATORS,
         );
         if (!resolved) {
@@ -274,7 +314,7 @@ export function parseCommand(
     const removeNodeMatch = matchFirst(REMOVE_NODE_PATTERNS, trimmed);
     if (removeNodeMatch) {
         const label = removeNodeMatch[1].trim();
-        const resolved = findNodeOrAmbiguity(label, architecture);
+        const resolved = findNodeOrAmbiguity(label, architecture, nodeIndex);
         if (resolved === null) {
             return { ok: false, message: `No node named "${label}".` };
         }
@@ -303,6 +343,7 @@ export function parseCommand(
         const resolved = resolveConnectionEndpoints(
             removeEdgeMatch[1],
             architecture,
+            nodeIndex,
             DISCONNECT_SEPARATORS,
         );
         if (!resolved) {
@@ -354,6 +395,7 @@ export function parseCommand(
         const resolved = resolveRenameArgs(
             renameNodeMatch[1],
             architecture,
+            nodeIndex,
             RENAME_SEPARATORS,
         );
         if (!resolved) {
@@ -382,10 +424,7 @@ export function parseCommand(
                 message: `"${source.data.label}" is already named that.`,
             };
         }
-        const duplicate = findNodeByExactLabel(
-            normalizedNewLabel,
-            architecture,
-        );
+        const duplicate = findNodeByExactLabel(normalizedNewLabel, nodeIndex);
         if (duplicate) {
             return {
                 ok: false,

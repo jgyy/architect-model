@@ -174,6 +174,7 @@ export function CommandInput({
                         placeholder="add node Cache"
                         aria-label="Command"
                         autoComplete="off"
+                        maxLength={500}
                         role="combobox"
                         aria-expanded={options.length > 0}
                         aria-controls="command-suggestions"

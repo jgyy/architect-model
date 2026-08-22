@@ -6,6 +6,7 @@ import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { ConsolePanel } from "@/components/console-panel";
 import { SimulationPanel } from "@/components/simulation-panel";
 import {
+    buildNodeIndex,
     parseCommand,
     type CommandResult,
     type ParseCommandOptions,
@@ -35,8 +36,25 @@ import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 const HELP_MESSAGE = SUPPORTED_COMMANDS.join("\n");
 
-function nextLogId(entries: LogEntry[]): number {
-    return entries.length === 0 ? 1 : Math.max(...entries.map((e) => e.id)) + 1;
+// A plain loop (not Math.max(...ids))
+function maxLogId(entries: LogEntry[]): number {
+    let max = 0;
+    for (const entry of entries) {
+        if (entry.id > max) max = entry.id;
+    }
+    return max;
+}
+
+// Bounds the console's scrollback (and what gets persisted/serialized every
+// command) — well above any normal session, but a long-running or scripted
+// spam session shouldn't grow this without limit
+const MAX_LOG_ENTRIES = 5000;
+
+function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
+    const next = [...entries, entry];
+    return next.length > MAX_LOG_ENTRIES
+        ? next.slice(next.length - MAX_LOG_ENTRIES)
+        : next;
 }
 
 type ArchitectureWorkspaceProps = {
@@ -54,12 +72,15 @@ export function ArchitectureWorkspace({
     const [hydrated, setHydrated] = useState(false);
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
+    // Next id to hand out via nextLogId()
+    const nextLogIdRef = useRef(1);
 
     const applyPersisted = useCallback((state: PersistedState) => {
         setArchitecture(state.architecture);
         setLog(state.log);
         setCurrentStepIndex(state.stepIndex);
         setSpeedIndex(state.speedIndex);
+        nextLogIdRef.current = maxLogId(state.log) + 1;
     }, []);
 
     const resetToInitial = useCallback(() => {
@@ -67,7 +88,14 @@ export function ArchitectureWorkspace({
         setLog([]);
         setCurrentStepIndex(0);
         setSpeedIndex(DEFAULT_SPEED_INDEX);
+        nextLogIdRef.current = 1;
     }, [initialArchitecture]);
+
+    function nextLogId(): number {
+        const id = nextLogIdRef.current;
+        nextLogIdRef.current += 1;
+        return id;
+    }
 
     // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -141,43 +169,55 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
-    // Runs a command line exactly the same way whether it was typed or
-    // synthesized from a canvas mouse action — the single source of truth
-    // for every architecture mutation, so every one of them reaches the log
+    // Node lookups (by label, and the id-collision check) would otherwise
+    // rescan every node on every single command — rebuilding this only
+    // when the node list itself changes keeps a run of many commands
+    // (e.g. connecting hundreds of nodes) from becoming quadratic
+    const nodeIndex = useMemo(
+        () => buildNodeIndex(architecture.nodes),
+        [architecture.nodes],
+    );
+
+    // Runs a command line exactly the same way whether it was typed
     const runCommand = useCallback(
         (text: string, options?: ParseCommandOptions): CommandResult | null => {
             const trimmed = text.trim();
             if (!trimmed) return null;
 
             if (trimmed.toLowerCase() === "help" || trimmed === "?") {
-                setLog((entries) => [
-                    ...entries,
-                    {
-                        id: nextLogId(entries),
+                const id = nextLogId();
+                setLog((entries) =>
+                    appendLogEntry(entries, {
+                        id,
                         input: trimmed,
                         ok: true,
                         message: HELP_MESSAGE,
-                    },
-                ]);
+                    }),
+                );
                 return { ok: true, architecture, message: HELP_MESSAGE };
             }
 
-            const result = parseCommand(trimmed, architecture, options);
+            const result = parseCommand(
+                trimmed,
+                architecture,
+                options,
+                nodeIndex,
+            );
             if (result.ok) {
                 setArchitecture(result.architecture);
             }
-            setLog((entries) => [
-                ...entries,
-                {
-                    id: nextLogId(entries),
+            const id = nextLogId();
+            setLog((entries) =>
+                appendLogEntry(entries, {
+                    id,
                     input: trimmed,
                     ok: result.ok,
                     message: result.message,
-                },
-            ]);
+                }),
+            );
             return result;
         },
-        [architecture],
+        [architecture, nodeIndex],
     );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

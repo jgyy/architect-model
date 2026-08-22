@@ -64,15 +64,18 @@ function singleSlotSuggestion(
     };
 }
 
-function isCompleteNodeLabel(
-    text: string,
-    architecture: Architecture,
-): boolean {
+function buildLabelSet(architecture: Architecture): Set<string> {
+    return new Set(
+        architecture.nodes.map((node) =>
+            node.data.label.normalize("NFC").toLowerCase(),
+        ),
+    );
+}
+
+function isCompleteNodeLabel(text: string, labelSet: Set<string>): boolean {
     const needle = normalizeLabel(text).toLowerCase();
     if (needle.length === 0) return false;
-    return architecture.nodes.some(
-        (node) => node.data.label.normalize("NFC").toLowerCase() === needle,
-    );
+    return labelSet.has(needle);
 }
 
 // every occurrence of every separator word, left to right within each word
@@ -104,12 +107,15 @@ function bestSeparatorSplit(
     const splits = candidateSeparatorSplits(rest, separators);
     if (splits.length === 0) return null;
 
+    // Built once per call, not once per split — isCompleteNodeLabel would
+    // otherwise rescan every node for every candidate split
+    const labelSet = buildLabelSet(architecture);
     const anchored = splits.find((split) => {
         const cursorInSource = cursorInRest <= split.index;
         const fixedLabel = cursorInSource
             ? rest.slice(split.index + split.length).trim()
             : rest.slice(0, split.index).trim();
-        return isCompleteNodeLabel(fixedLabel, architecture);
+        return isCompleteNodeLabel(fixedLabel, labelSet);
     });
     if (anchored) return anchored;
 

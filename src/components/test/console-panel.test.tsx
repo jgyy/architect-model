@@ -47,7 +47,6 @@ function renderPanel(overrides: PanelOverrides = {}) {
 }
 
 // Finds the log row containing the given text by walking up from the text
-// node's element: text -> "> input"/message wrapper -> icon + text row.
 function logRow(text: string): HTMLElement {
     const cell = screen.getByText(text);
     const row = cell.parentElement?.parentElement;
