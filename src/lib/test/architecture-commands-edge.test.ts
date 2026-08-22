@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { parseCommand } from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
 
-describe("parseCommand — edge commands", () => {
+describe("parseCommand - edge commands", () => {
     test("connects two existing nodes by label", () => {
         const architecture: Architecture = {
             nodes: [

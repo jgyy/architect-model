@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
 import { stepDescription } from "@/lib/simulation";
@@ -12,7 +13,7 @@ type SimulationTimelineProps = {
     onReorder: (nodeId: string, toIndex: number) => void;
 };
 
-// All steps at a glance — click any to jump straight to it, or drag to reorder
+// All steps at a glance - click any to jump straight to it, or drag to reorder
 export function SimulationTimeline({
     architecture,
     currentStepIndex,
@@ -27,11 +28,14 @@ export function SimulationTimeline({
         setDragOverIndex(null);
     }
 
+    const lastIndex = architecture.nodes.length - 1;
+
     return (
         <ol className="max-h-40 overflow-y-auto border-t border-border">
             {architecture.nodes.map((node, index) => {
                 const isCurrent = index === currentStepIndex;
                 const isTraversed = !isCurrent && index < currentStepIndex;
+                const stepNumber = index + 1;
                 return (
                     <li
                         key={node.id}
@@ -58,11 +62,11 @@ export function SimulationTimeline({
                             endDrag();
                         }}
                         onDragEnd={endDrag}
-                        className={
+                        className={`flex items-stretch ${
                             dragOverIndex === index && draggedIndex !== index
                                 ? "border-t-2 border-accent"
                                 : ""
-                        }
+                        }`}
                     >
                         <button
                             type="button"
@@ -88,9 +92,31 @@ export function SimulationTimeline({
                                         : "text-foreground"
                                 }`}
                             >
-                                {index + 1}. {stepDescription(node)}
+                                {stepNumber}. {stepDescription(node)}
                             </span>
                         </button>
+                        <div className="flex shrink-0 flex-col border-l border-border">
+                            <button
+                                type="button"
+                                onClick={() => onReorder(node.id, index - 1)}
+                                disabled={index === 0}
+                                title="Move up"
+                                aria-label={`Move step ${stepNumber} up`}
+                                className="flex flex-1 items-center px-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
+                            >
+                                <ChevronUp size={12} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onReorder(node.id, index + 1)}
+                                disabled={index === lastIndex}
+                                title="Move down"
+                                aria-label={`Move step ${stepNumber} down`}
+                                className="flex flex-1 items-center px-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
+                            >
+                                <ChevronDown size={12} />
+                            </button>
+                        </div>
                     </li>
                 );
             })}

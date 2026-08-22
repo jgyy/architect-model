@@ -14,7 +14,7 @@ function architectureOf(...labels: string[]): Architecture {
     };
 }
 
-describe("parseCommand — move node <label> to step <n>", () => {
+describe("parseCommand - move node <label> to step <n>", () => {
     test("moves the node later, shifting the nodes in between earlier", () => {
         const architecture = architectureOf("A", "B", "C", "D");
 

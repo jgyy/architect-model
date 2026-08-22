@@ -58,7 +58,7 @@ function foldLabel(label: string): string {
 
 // A label->node lookup (plus the id set uniqueNodeId needs), built once by
 // the caller and reused across commands instead of rescanning every node on
-// every command — the exact-match and id-collision checks below would
+// every command - the exact-match and id-collision checks below would
 // otherwise be O(nodes) each, making a run of many commands O(nodes^2)
 export type NodeIndex = {
     byLabel: Map<string, ArchitectureNode>;
@@ -84,7 +84,7 @@ function findNodeOrAmbiguity(
     if (needle.length === 0) return null;
     const exact = nodeIndex.byLabel.get(needle);
     if (exact) return exact;
-    // no fast path for a substring match — this only runs for a
+    // no fast path for a substring match - this only runs for a
     // non-exact/partial reference, which is inherently rarer
     const matches = architecture.nodes.filter((node) =>
         foldLabel(node.data.label).includes(needle),

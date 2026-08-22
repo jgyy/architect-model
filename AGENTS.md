@@ -10,4 +10,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## File size limit
 
-No script may exceed **1000 lines** (blank lines and comments excluded). This is enforced by the `max-lines` ESLint rule in `eslint.config.mjs` — `npm run lint` fails on violation. Split an oversized file into multiple files along natural boundaries (e.g. by feature/command area) instead of raising the limit.
+No script may exceed **1000 lines** (blank lines and comments excluded). This is enforced by the `max-lines` ESLint rule in `eslint.config.mjs` - `npm run lint` fails on violation. Split an oversized file into multiple files along natural boundaries (e.g. by feature/command area) instead of raising the limit.

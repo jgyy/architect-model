@@ -14,7 +14,7 @@ command a typed instruction would.
 
 The seed data (`src/data/example-architecture.ts`) tells that story:
 "Attacker starts from Internet → reaches Web Server → accesses Database". A
-node's position in `architecture.nodes` _is_ its simulation step — there is
+node's position in `architecture.nodes` _is_ its simulation step - there is
 no separate step list to keep in sync with the architecture.
 
 ## Run locally
@@ -46,7 +46,7 @@ for `add node`, since that label is new).
 
 Nodes are also draggable on the canvas (positions persist), double-click to
 rename, drag from a node's edge to connect another, and a hover-revealed ×
-deletes — each mirrors the command above in the log. Delete/Backspace on
+deletes - each mirrors the command above in the log. Delete/Backspace on
 the canvas is disabled, so removal is always logged and always cleans up
 edges. A "?" button in the canvas corner explains the mouse gestures.
 
@@ -55,7 +55,7 @@ edges. A "?" button in the canvas corner explains the mouse gestures.
 The command log, architecture, current step, and playback speed all persist
 to `localStorage` and restore on reload (always paused). **Clear history**
 resets everything to the seeded example. Open a second tab and the same
-state stays live between them via the browser's native `storage` event — no
+state stays live between them via the browser's native `storage` event - no
 reload needed (only play/pause stays per-tab).
 
 The Simulation panel steps through `architecture.nodes` in order:
@@ -64,16 +64,17 @@ adjustable 0.5x–4x speed, stopping at the last step. It degrades gracefully
 if the current step's node was removed. On the canvas, the current step's
 node is ringed in accent; every node/edge already crossed is colored red,
 so the traversed path reads as a route, not a single blinking dot. Steps
-can also be dragged to a new position in the panel's list, which runs the
-same `move node ... to step ...` command shown above.
+can also be dragged to a new position in the panel's list, or reordered with
+each row's up/down buttons (keyboard-operable, disabled at the ends); both
+run the same `move node ... to step ...` command shown above.
 
 ## Key design decisions and assumptions
 
 - Regex mini-syntax, not NLP: predictable, testable command forms, no LLM used or required.
 - Pure, tested logic lives in `lib/`; components only call it.
-- The simulation trace is embedded in node order and `data.description`, not a parallel structure — adding, removing, or reordering a node does the same to its step.
+- The simulation trace is embedded in node order and `data.description`, not a parallel structure - adding, removing, or reordering a node does the same to its step.
 - Node matching is case-insensitive substring; duplicate-label rejection is exact-match.
-- The command log doubles as the validation UI — every command is appended with its outcome.
+- The command log doubles as the validation UI - every command is appended with its outcome.
 - Persistence takes a storage interface, not `window.localStorage` directly, so it's unit-tested with a fake store.
 - Every canvas mouse action (drag-connect, rename, delete, create) synthesizes and runs the same command text a user would type, so the log always explains what happened; dragging a Simulation step to reorder it does the same.
 - Auto-play schedules one `setTimeout` per tick, not `setInterval`, so it can't drift and auto-stops at the last step.
@@ -84,4 +85,4 @@ same `move node ... to step ...` command shown above.
 
 ## What I'd improve with more time
 
-- Keyboard-accessible step reordering (e.g. up/down buttons), since drag-and-drop alone isn't operable without a mouse.
+- The `connect` command's "already connected" check is still an O(edges) scan per call; an adjacency-list data model would make it constant-time, but wasn't worth the added complexity at this app's scale.

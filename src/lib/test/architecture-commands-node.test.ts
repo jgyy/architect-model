@@ -5,7 +5,7 @@ import type { Architecture } from "@/types/architecture";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
 
-describe("parseCommand — node commands", () => {
+describe("parseCommand - node commands", () => {
     test("adds a node with the given label", () => {
         const result = parseCommand("add node Cache", emptyArchitecture);
 
@@ -264,7 +264,7 @@ describe("parseCommand — node commands", () => {
         const withServer = parseCommand("add node Server", emptyArchitecture);
         if (!withServer.ok) throw new Error("expected first add to succeed");
 
-        // trailing zero-width space (U+200B) — visually identical to "Server"
+        // trailing zero-width space (U+200B) - visually identical to "Server"
         const result = parseCommand(
             `add node Server${"\u200B"}`,
             withServer.architecture,

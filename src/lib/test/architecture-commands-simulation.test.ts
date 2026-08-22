@@ -5,7 +5,7 @@ import type { Architecture } from "@/types/architecture";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
 
-describe("parseCommand — simulation steps embedded in nodes", () => {
+describe("parseCommand - simulation steps embedded in nodes", () => {
     test("adding a node auto-generates its simulation step description", () => {
         const result = parseCommand("add node Web Server", emptyArchitecture);
 

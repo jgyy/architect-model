@@ -23,7 +23,7 @@ const TIPS: GuideTip[] = [
     {
         title: "Simulate",
         description:
-            "Step through the Simulation panel — blue is the current node, red is one already crossed.",
+            "Step through the Simulation panel - blue is the current node, red is one already crossed.",
     },
     {
         title: "Console",

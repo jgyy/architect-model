@@ -53,7 +53,7 @@ export function ConsolePanel({
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
                 {log.length === 0 ? (
                     <p className="max-w-[80ch] break-words px-3 py-2 text-muted-foreground">
-                        Blast Radius console — type{" "}
+                        Blast Radius console - type{" "}
                         <span className="text-foreground">help</span> for a list
                         of commands.
                     </p>

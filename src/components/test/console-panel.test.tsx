@@ -63,7 +63,7 @@ describe("ConsolePanel", () => {
                     (_, element) =>
                         element?.tagName.toLowerCase() === "p" &&
                         element.textContent ===
-                            "Blast Radius console — type help for a list of commands.",
+                            "Blast Radius console - type help for a list of commands.",
                 ),
             ).toBeInTheDocument();
         });
