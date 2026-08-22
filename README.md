@@ -3,6 +3,27 @@
 A small web app for updating a system architecture (nodes + edges) via text
 input and exploring a simulation trace through it.
 
+## Who this is for
+
+> As a security engineer reviewing a proposed system design, I want to
+> sketch the architecture in plain text and then step through a simulated
+> attacker's path across it, so I can see at a glance which components are
+> reachable, in what order, and where the blast radius stops — without
+> hand-drawing a diagram.
+
+The seed data (`src/data/example-simulation.ts`) tells that story already —
+"Attacker starts from Internet → reaches Web Server → accesses Database" —
+and the UI is built to serve it:
+
+- The command box (with autocomplete and inline validation) keeps editing
+  the architecture low-friction as the model grows.
+- Stepping through the simulation doesn't just mark where the attacker is
+  now — it colors in the whole route already crossed (nodes and edges, in
+  `--danger` red) against the current node (`--accent`), so the blast
+  radius is visible at a glance, not just one dot at a time.
+- A failed command explains why, in place, so you can trust the model
+  reflects what you typed.
+
 ## Run locally
 
 ```bash
@@ -48,7 +69,10 @@ The "Simulation" panel steps through the trace (seeded from
 `src/data/example-simulation.ts`, editable via the step commands above):
 **Prev**/**Next** navigate manually; **Play**/**Pause** auto-advances at an
 adjustable 0.5x–4x speed, stopping at the last step. It degrades gracefully
-if a step's node was removed or the step itself is removed.
+if a step's node was removed or the step itself is removed. On the canvas,
+the current step's node is ringed in the accent color; every node and edge
+already crossed to get there is colored red, so the traversed path reads as
+a route, not a single blinking dot.
 
 ## Key design decisions and assumptions
 
@@ -61,6 +85,7 @@ if a step's node was removed or the step itself is removed.
 - Persistence takes a storage interface, not `window.localStorage` directly, so it's unit-tested with a fake store.
 - The canvas re-fits via `fitView()` imperatively on node-id changes, since the `fitView` prop only runs once.
 - Auto-play schedules one `setTimeout` per tick, not `setInterval`, so it can't drift and auto-stops at the last step.
+- `getTraversedPath` derives visited nodes/edges from the trace up to the current step; a step pair with no matching edge just contributes no edge, same graceful-degradation approach as the rest of the simulation code.
 - Speed index is lifted into `ArchitectureWorkspace`; `isPlaying` stays local/unpersisted so a reload never auto-resumes playback.
 - The autocomplete's command patterns live in `lib/node-reference.ts`, shared with the parser, so the two never diverge.
 - `onNodesChange` only applies `"position"` changes; `deleteKeyCode={null}` backs it up, keeping removal text-only.

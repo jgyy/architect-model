@@ -3,6 +3,7 @@
 import {
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
     type CSSProperties,
@@ -38,8 +39,17 @@ import type {
 type ArchitectureCanvasProps = {
     architecture: Architecture;
     highlightedNodeId?: string;
+    traversedNodeIds?: Set<string>;
+    traversedEdgeIds?: Set<string>;
     onNodesChange: (nodes: ArchitectureNode[]) => void;
     onEdgesChange: (edges: ArchitectureEdge[]) => void;
+};
+
+const EMPTY_ID_SET = new Set<string>();
+const TRAVERSED_EDGE_STYLE = { stroke: "var(--danger)", strokeWidth: 2.5 };
+const TRAVERSED_EDGE_MARKER = {
+    type: MarkerType.ArrowClosed,
+    color: "var(--danger)",
 };
 
 // Overrides React Flow's default theming to follow this app's own color
@@ -89,6 +99,8 @@ function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
 export function ArchitectureCanvas({
     architecture,
     highlightedNodeId,
+    traversedNodeIds = EMPTY_ID_SET,
+    traversedEdgeIds = EMPTY_ID_SET,
     onNodesChange,
     onEdgesChange,
 }: ArchitectureCanvasProps) {
@@ -128,11 +140,30 @@ export function ArchitectureCanvas({
         [architecture, onEdgesChange],
     );
 
+    const renderEdges = useMemo(
+        () =>
+            architecture.edges.map((edge) =>
+                traversedEdgeIds.has(edge.id)
+                    ? {
+                          ...edge,
+                          style: TRAVERSED_EDGE_STYLE,
+                          markerEnd: TRAVERSED_EDGE_MARKER,
+                      }
+                    : edge,
+            ),
+        [architecture.edges, traversedEdgeIds],
+    );
+
+    const highlight = useMemo(
+        () => ({ currentNodeId: highlightedNodeId, traversedNodeIds }),
+        [highlightedNodeId, traversedNodeIds],
+    );
+
     return (
-        <HighlightedNodeContext.Provider value={highlightedNodeId}>
+        <HighlightedNodeContext.Provider value={highlight}>
             <ReactFlow
                 nodes={renderNodes}
-                edges={architecture.edges}
+                edges={renderEdges}
                 nodeTypes={NODE_TYPES}
                 defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
                 connectionLineStyle={{
