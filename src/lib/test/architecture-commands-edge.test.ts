@@ -118,7 +118,7 @@ describe("parseCommand — edge commands", () => {
         expect(result.message).toBe('No edge from "Web Server" to "Database".');
     });
 
-    test("rejects connecting a node to itself", () => {
+    test("allows connecting a node to itself, creating a self-loop edge", () => {
         const architecture: Architecture = {
             nodes: [
                 {
@@ -135,9 +135,44 @@ describe("parseCommand — edge commands", () => {
             architecture,
         );
 
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.edges).toHaveLength(1);
+        expect(result.architecture.edges[0]).toMatchObject({
+            source: "node-web-server",
+            target: "node-web-server",
+        });
+    });
+
+    test("rejects creating the same self-loop twice", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+        const first = parseCommand(
+            "connect Web Server to Web Server",
+            architecture,
+        );
+        if (!first.ok)
+            throw new Error("expected first self-connect to succeed");
+
+        const result = parseCommand(
+            "connect Web Server to Web Server",
+            first.architecture,
+        );
+
         expect(result.ok).toBe(false);
-        if (result.ok) throw new Error("expected self-connect to fail");
-        expect(result.message).toBe('Cannot connect "Web Server" to itself.');
+        if (result.ok)
+            throw new Error("expected duplicate self-connect to fail");
+        expect(result.message).toBe(
+            'An edge from "Web Server" to "Web Server" already exists.',
+        );
     });
 
     test("rejects connecting the same two nodes twice instead of creating a duplicate edge", () => {

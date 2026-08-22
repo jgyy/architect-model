@@ -29,9 +29,7 @@ export function recallNewerCommand(
     state: CommandHistoryState,
 ): { state: CommandHistoryState; value: string } {
     if (state.index === null) return { state, value: state.draft };
-    // commands may have shrunk (or emptied) since this recall started, e.g.
-    // via a cross-tab sync or "Clear history" — fall back to the draft
-    // rather than indexing out of bounds.
+    // commands may have shrunk (or emptied) since this recall started
     if (state.index === 0 || commands.length === 0) {
         return { state: { index: null, draft: "" }, value: state.draft };
     }

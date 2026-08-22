@@ -15,6 +15,27 @@ describe("parseCommand — node commands", () => {
         expect(result.architecture.nodes[0].data.label).toBe("Cache");
     });
 
+    test("places a new node at the given position instead of the default formula", () => {
+        const result = parseCommand("add node Cache", emptyArchitecture, {
+            position: { x: 111, y: 222 },
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].position).toEqual({
+            x: 111,
+            y: 222,
+        });
+    });
+
+    test("falls back to the default position formula when no position is given", () => {
+        const result = parseCommand("add node Cache", emptyArchitecture);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].position).toEqual({ x: 0, y: 0 });
+    });
+
     test("assigns a unique id when two different labels slugify to the same value", () => {
         const withCache = parseCommand("add node Cache!", emptyArchitecture);
         if (!withCache.ok) throw new Error("expected first add to succeed");
@@ -299,5 +320,226 @@ describe("parseCommand — node commands", () => {
         if (result.ok)
             throw new Error("expected invisible-only label to be rejected");
         expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("renames a node to a new label", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Web Server to Frontend",
+            architecture,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].id).toBe("node-web-server");
+        expect(result.architecture.nodes[0].data.label).toBe("Frontend");
+        expect(result.message).toBe('Renamed "Web Server" to "Frontend".');
+    });
+
+    test("updates a node's default simulation description to match its new label", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: {
+                        label: "Web Server",
+                        description: 'Reaches "Web Server".',
+                    },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Web Server to Frontend",
+            architecture,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].data.description).toBe(
+            'Reaches "Frontend".',
+        );
+    });
+
+    test("preserves a node's edges across a rename", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [
+                {
+                    id: "edge-web-server-database",
+                    source: "node-web-server",
+                    target: "node-database",
+                },
+            ],
+        };
+
+        const result = parseCommand(
+            "rename node Web Server to Frontend",
+            architecture,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.edges).toEqual(architecture.edges);
+    });
+
+    test("fails to rename a node that does not exist", () => {
+        const result = parseCommand(
+            "rename node Cache to Redis",
+            emptyArchitecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected rename to fail");
+        expect(result.message).toBe('No node named "Cache".');
+    });
+
+    test("reports an ambiguous label when renaming a node whose reference matches multiple nodes", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-app-server",
+                    position: { x: 250, y: 0 },
+                    data: { label: "App Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Server to Frontend",
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("Web Server");
+        expect(result.message).toContain("App Server");
+        expect(result.message).toContain("multiple nodes");
+    });
+
+    test("rejects renaming to a blank label", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        // trailing zero-width space so a "to" separator is still found but
+        // the label normalizes to blank, mirroring the add-node blank test
+        const result = parseCommand(
+            `rename node Web Server to ${"​"}`,
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected blank new label to be rejected");
+        expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("rejects renaming a node to a label already used by a different node", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Web Server to database",
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected duplicate label to be rejected");
+        expect(result.message).toBe('A node named "Database" already exists.');
+    });
+
+    test("rejects renaming a node to the name it already has", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Web Server to Web Server",
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected no-op rename to be rejected");
+        expect(result.message).toBe('"Web Server" is already named that.');
+    });
+
+    test('accepts "relabel node ... to ..." as an alias for rename node', () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "relabel node Web Server to Frontend",
+            architecture,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].data.label).toBe("Frontend");
     });
 });

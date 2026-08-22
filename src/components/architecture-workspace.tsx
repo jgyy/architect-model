@@ -5,8 +5,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { ConsolePanel } from "@/components/console-panel";
 import { SimulationPanel } from "@/components/simulation-panel";
-import { parseCommand } from "@/lib/architecture-commands";
-import { buildRemoveEdgeCommand } from "@/lib/edge-delete";
+import {
+    parseCommand,
+    type CommandResult,
+    type ParseCommandOptions,
+} from "@/lib/architecture-commands";
+import {
+    buildConnectCommand,
+    buildRemoveEdgeCommand,
+    buildRemoveNodeCommand,
+    buildRenameNodeCommand,
+    nextDefaultNodeLabel,
+} from "@/lib/canvas-commands";
 import {
     clearPersistedState,
     interpretStorageEvent,
@@ -21,11 +31,7 @@ import {
     getTraversedPath,
 } from "@/lib/simulation";
 import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
-import type {
-    Architecture,
-    ArchitectureEdge,
-    ArchitectureNode,
-} from "@/types/architecture";
+import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 const HELP_MESSAGE = SUPPORTED_COMMANDS.join("\n");
 
@@ -135,15 +141,13 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
-    const handleEdgesChange = useCallback((edges: ArchitectureEdge[]) => {
-        setArchitecture((current) => ({ ...current, edges }));
-    }, []);
-
-    // Runs a command line exactly the same way whether it was typed
+    // Runs a command line exactly the same way whether it was typed or
+    // synthesized from a canvas mouse action — the single source of truth
+    // for every architecture mutation, so every one of them reaches the log
     const runCommand = useCallback(
-        (text: string) => {
+        (text: string, options?: ParseCommandOptions): CommandResult | null => {
             const trimmed = text.trim();
-            if (!trimmed) return;
+            if (!trimmed) return null;
 
             if (trimmed.toLowerCase() === "help" || trimmed === "?") {
                 setLog((entries) => [
@@ -155,10 +159,10 @@ export function ArchitectureWorkspace({
                         message: HELP_MESSAGE,
                     },
                 ]);
-                return;
+                return { ok: true, architecture, message: HELP_MESSAGE };
             }
 
-            const result = parseCommand(trimmed, architecture);
+            const result = parseCommand(trimmed, architecture, options);
             if (result.ok) {
                 setArchitecture(result.architecture);
             }
@@ -171,6 +175,7 @@ export function ArchitectureWorkspace({
                     message: result.message,
                 },
             ]);
+            return result;
         },
         [architecture],
     );
@@ -190,6 +195,49 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    const handleEdgeCreate = useCallback(
+        (sourceId: string, targetId: string) => {
+            const command = buildConnectCommand(
+                sourceId,
+                targetId,
+                architecture,
+            );
+            if (command) runCommand(command);
+        },
+        [architecture, runCommand],
+    );
+
+    const handleNodeRename = useCallback(
+        (nodeId: string, newLabel: string) => {
+            const command = buildRenameNodeCommand(
+                nodeId,
+                newLabel,
+                architecture,
+            );
+            if (command) runCommand(command);
+        },
+        [architecture, runCommand],
+    );
+
+    const handleNodeDelete = useCallback(
+        (nodeId: string) => {
+            const command = buildRemoveNodeCommand(nodeId, architecture);
+            if (command) runCommand(command);
+        },
+        [architecture, runCommand],
+    );
+
+    const handleNodeCreate = useCallback(
+        (position: { x: number; y: number }): string | null => {
+            const label = nextDefaultNodeLabel(architecture);
+            const result = runCommand(`add node ${label}`, { position });
+            return result?.ok
+                ? (result.architecture.nodes.at(-1)?.id ?? null)
+                : null;
+        },
+        [architecture, runCommand],
+    );
+
     return (
         <div className="flex h-full w-full">
             <div className="min-w-0 flex-1">
@@ -199,7 +247,10 @@ export function ArchitectureWorkspace({
                     traversedNodeIds={traversedPath.nodeIds}
                     traversedEdgeIds={traversedPath.edgeIds}
                     onNodesChange={handleNodesChange}
-                    onEdgesChange={handleEdgesChange}
+                    onNodeCreate={handleNodeCreate}
+                    onNodeRename={handleNodeRename}
+                    onNodeDelete={handleNodeDelete}
+                    onEdgeCreate={handleEdgeCreate}
                     onEdgeDelete={handleEdgeDelete}
                 />
             </div>

@@ -242,6 +242,30 @@ describe("suggestNodeReference", () => {
 
         expect(labels(suggestion!.matches)).toEqual([nfc]);
     });
+
+    test("suggests the node being renamed for the first argument of 'rename node'", () => {
+        const suggestion = suggestNodeReference("rename node We", architecture);
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+        expect(suggestion!.replaceFrom).toBe("rename node ".length);
+        expect(suggestion!.replaceTo).toBe("rename node We".length);
+    });
+
+    test("suggests nothing for the new-label argument of 'rename node A to B', since it isn't a node reference", () => {
+        const input = "rename node Web Server to Fronte";
+        const suggestion = suggestNodeReference(input, architecture);
+
+        expect(suggestion).toBeNull();
+    });
+
+    test('suggests the node being renamed for "relabel node", the rename alias', () => {
+        const suggestion = suggestNodeReference(
+            "relabel node We",
+            architecture,
+        );
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+    });
 });
 
 describe("applyNodeSuggestion", () => {
