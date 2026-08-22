@@ -57,6 +57,20 @@ export function buildRemoveNodeCommand(
     return `remove node ${node.data.label}`;
 }
 
+// Synthesizes the same "move node A to step N" text a user would type
+export function buildMoveNodeCommand(
+    nodeId: string,
+    targetPosition: number,
+    architecture: Architecture,
+): string | null {
+    const node = architecture.nodes.find(
+        (candidate) => candidate.id === nodeId,
+    );
+    if (!node) return null;
+
+    return `move node ${node.data.label} to step ${targetPosition}`;
+}
+
 // Default label offered when a node is created from the canvas rather than typed
 export function nextDefaultNodeLabel(architecture: Architecture): string {
     const used = new Set(

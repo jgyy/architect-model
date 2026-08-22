@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -29,15 +29,38 @@ function renderTimeline(
     architecture: Architecture,
     currentStepIndex: number,
     onStepChange = vi.fn(),
+    onReorder = vi.fn(),
 ) {
     render(
         <SimulationTimeline
             architecture={architecture}
             currentStepIndex={currentStepIndex}
             onStepChange={onStepChange}
+            onReorder={onReorder}
         />,
     );
-    return onStepChange;
+    return { onStepChange, onReorder };
+}
+
+// jsdom has no DataTransfer constructor; a minimal stand-in is enough since
+// the component tracks the dragged row in its own state, not via getData
+function makeDataTransfer() {
+    const store = new Map<string, string>();
+    return {
+        setData: (key: string, value: string) => store.set(key, value),
+        getData: (key: string) => store.get(key) ?? "",
+    };
+}
+
+function dragRow(fromText: string, toText: string) {
+    const dataTransfer = makeDataTransfer();
+    const from = screen.getByText(fromText).closest("li");
+    const to = screen.getByText(toText).closest("li");
+    if (!from || !to) throw new Error("row not found");
+    fireEvent.dragStart(from, { dataTransfer });
+    fireEvent.dragOver(to, { dataTransfer });
+    fireEvent.drop(to, { dataTransfer });
+    fireEvent.dragEnd(from, { dataTransfer });
 }
 
 const THREE_NODES = [
@@ -94,7 +117,10 @@ describe("SimulationTimeline", () => {
 
     test("clicking an item calls onStepChange with that item's index", async () => {
         const user = userEvent.setup();
-        const onStepChange = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        const { onStepChange } = renderTimeline(
+            makeArchitecture(THREE_NODES),
+            0,
+        );
         await user.click(screen.getByText("3. Persists the result."));
         expect(onStepChange).toHaveBeenCalledWith(2);
     });
@@ -116,5 +142,30 @@ describe("SimulationTimeline", () => {
         renderTimeline(makeArchitecture([]), 0);
         expect(screen.getByRole("list")).toBeEmptyDOMElement();
         expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    });
+
+    test("every row is draggable", () => {
+        renderTimeline(makeArchitecture(THREE_NODES), 0);
+        for (const item of screen.getAllByRole("listitem")) {
+            expect(item).toHaveAttribute("draggable", "true");
+        }
+    });
+
+    test("dragging a row onto a later row calls onReorder with the dragged node's id and the drop target's index", () => {
+        const { onReorder } = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        dragRow("1. Sends the request.", "3. Persists the result.");
+        expect(onReorder).toHaveBeenCalledWith("a", 2);
+    });
+
+    test("dragging a row onto an earlier row calls onReorder with the dragged node's id and the drop target's index", () => {
+        const { onReorder } = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        dragRow("3. Persists the result.", "1. Sends the request.");
+        expect(onReorder).toHaveBeenCalledWith("c", 0);
+    });
+
+    test("dropping a row on itself does not call onReorder", () => {
+        const { onReorder } = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        dragRow("2. Handles the request.", "2. Handles the request.");
+        expect(onReorder).not.toHaveBeenCalled();
     });
 });

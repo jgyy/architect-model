@@ -29,6 +29,7 @@ describe("SUPPORTED_COMMANDS", () => {
         "remove node",
         "remove edge",
         "rename node",
+        "move node <label> to step",
     ])("documents the '%s' command", (keyword) => {
         expect(
             SUPPORTED_COMMANDS.some((entry) => entry.includes(keyword)),

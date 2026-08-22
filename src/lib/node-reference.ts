@@ -44,6 +44,9 @@ export const RENAME_NODE_PATTERNS = [
     /^relabel node (.+)$/i,
 ];
 
+export const MOVE_NODE_PATTERNS = [/^move node (.+)$/i, /^reorder node (.+)$/i];
+
 export const CONNECT_SEPARATORS = [" to ", " and "];
 export const DISCONNECT_SEPARATORS = [" to ", " from ", " and "];
 export const RENAME_SEPARATORS = [" to "];
+export const MOVE_NODE_SEPARATORS = [" to step "];

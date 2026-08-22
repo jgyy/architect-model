@@ -17,6 +17,7 @@ type SimulationPanelProps = {
     onStepChange: (index: number) => void;
     speedIndex: number;
     onSpeedChange: (index: number) => void;
+    onReorder: (nodeId: string, toIndex: number) => void;
 };
 
 export function SimulationPanel({
@@ -25,6 +26,7 @@ export function SimulationPanel({
     onStepChange,
     speedIndex,
     onSpeedChange,
+    onReorder,
 }: SimulationPanelProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const stepCount = architecture.nodes.length;
@@ -120,6 +122,7 @@ export function SimulationPanel({
                 architecture={architecture}
                 currentStepIndex={currentStepIndex}
                 onStepChange={onStepChange}
+                onReorder={onReorder}
             />
         </div>
     );
