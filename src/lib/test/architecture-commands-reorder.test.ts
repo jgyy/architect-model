@@ -151,4 +151,48 @@ describe("parseCommand - move node <label> to step <n>", () => {
         if (result.ok) return;
         expect(result.message).toContain('"to step" separator');
     });
+
+    test("repositions every node's x to match its new step order, preserving y", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-0",
+                    position: { x: 0, y: 40 },
+                    data: { label: "A" },
+                },
+                {
+                    id: "node-1",
+                    position: { x: 250, y: -20 },
+                    data: { label: "B" },
+                },
+                {
+                    id: "node-2",
+                    position: { x: 500, y: 0 },
+                    data: { label: "C" },
+                },
+                {
+                    id: "node-3",
+                    position: { x: 750, y: 15 },
+                    data: { label: "D" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("move node A to step 3", architecture);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(
+            result.architecture.nodes.map((n) => ({
+                label: n.data.label,
+                position: n.position,
+            })),
+        ).toEqual([
+            { label: "B", position: { x: 0, y: -20 } },
+            { label: "C", position: { x: 250, y: 0 } },
+            { label: "A", position: { x: 500, y: 40 } },
+            { label: "D", position: { x: 750, y: 15 } },
+        ]);
+    });
 });

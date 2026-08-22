@@ -166,10 +166,10 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
-    // Node lookups (by label, and the id-collision check)
+    // Node lookups (by label, id-collision check) and edge connectivity lookups
     const nodeIndex = useMemo(
-        () => buildNodeIndex(architecture.nodes),
-        [architecture.nodes],
+        () => buildNodeIndex(architecture.nodes, architecture.edges),
+        [architecture.nodes, architecture.edges],
     );
 
     // Runs a command line exactly the same way whether it was typed

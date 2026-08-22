@@ -17,7 +17,7 @@ const COMMAND_DOCS: CommandDoc[] = [
         usage: "connect <A> to <B>",
         example: 'e.g. "connect Web Server to Cache"',
         aliases: ["connect A and B", "link A to B", "link A and B"],
-        note: "A and B may be the same node (self-loop); cycles are allowed",
+        note: "each node allows only 1 outgoing/1 incoming edge; no self-loops or cycles",
     },
     {
         usage: "remove node <label>",

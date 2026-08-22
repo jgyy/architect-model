@@ -33,10 +33,10 @@ function rankMatches(
                 label === needle
                     ? 0
                     : label.startsWith(needle)
-                        ? 1
-                        : label.includes(needle)
-                            ? 2
-                            : -1;
+                      ? 1
+                      : label.includes(needle)
+                        ? 2
+                        : -1;
             return { node, rank };
         })
         .filter((entry) => entry.rank >= 0)
@@ -107,8 +107,7 @@ function bestSeparatorSplit(
     const splits = candidateSeparatorSplits(rest, separators);
     if (splits.length === 0) return null;
 
-    // Built once per call, not once per split - isCompleteNodeLabel would
-    // otherwise rescan every node for every candidate split
+    // Built once per call, not once per split
     const labelSet = buildLabelSet(architecture);
     const anchored = splits.find((split) => {
         const cursorInSource = cursorInRest <= split.index;

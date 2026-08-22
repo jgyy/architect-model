@@ -12,7 +12,11 @@ import {
     normalizeLabel,
 } from "@/lib/node-reference";
 import { COMMAND_USAGE } from "@/lib/supported-commands";
-import type { Architecture, ArchitectureNode } from "@/types/architecture";
+import type {
+    Architecture,
+    ArchitectureEdge,
+    ArchitectureNode,
+} from "@/types/architecture";
 
 // One usage line per row instead of a semicolon-joined run-on sentence, so
 // it stays scannable when it wraps inside the console's 80-column width.
@@ -56,23 +60,73 @@ function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
 
-// A label->node lookup (plus the id set uniqueNodeId needs), built once by
-// the caller and reused across commands instead of rescanning every node on
-// every command - the exact-match and id-collision checks below would
-// otherwise be O(nodes) each, making a run of many commands O(nodes^2)
+// A label->node lookup (plus the id set uniqueNodeId needs) and edge lookups
+// by source/target pair and by each endpoint alone, built once by the caller
+// and reused across commands instead of rescanning every node/edge on every
+// command - the exact-match, id-collision, and connectivity checks below
+// would otherwise be O(nodes)/O(edges) each, making a run of many commands
+// quadratic. outgoingBySource/incomingByTarget hold at most one edge per key
+// because connect() below caps every node at one outgoing and one incoming
+// edge, so a Map (not a multimap) is the right shape.
 export type NodeIndex = {
     byLabel: Map<string, ArchitectureNode>;
     ids: Set<string>;
+    edgesBySourceTarget: Map<string, ArchitectureEdge>;
+    outgoingBySource: Map<string, ArchitectureEdge>;
+    incomingByTarget: Map<string, ArchitectureEdge>;
 };
 
-export function buildNodeIndex(nodes: ArchitectureNode[]): NodeIndex {
+function edgeKey(sourceId: string, targetId: string): string {
+    return `${sourceId}::${targetId}`;
+}
+
+export function buildNodeIndex(
+    nodes: ArchitectureNode[],
+    edges: ArchitectureEdge[] = [],
+): NodeIndex {
     const byLabel = new Map<string, ArchitectureNode>();
     const ids = new Set<string>();
     for (const node of nodes) {
         byLabel.set(foldLabel(node.data.label), node);
         ids.add(node.id);
     }
-    return { byLabel, ids };
+    const edgesBySourceTarget = new Map<string, ArchitectureEdge>();
+    const outgoingBySource = new Map<string, ArchitectureEdge>();
+    const incomingByTarget = new Map<string, ArchitectureEdge>();
+    for (const edge of edges) {
+        edgesBySourceTarget.set(edgeKey(edge.source, edge.target), edge);
+        outgoingBySource.set(edge.source, edge);
+        incomingByTarget.set(edge.target, edge);
+    }
+    return {
+        byLabel,
+        ids,
+        edgesBySourceTarget,
+        outgoingBySource,
+        incomingByTarget,
+    };
+}
+
+// Would connecting source->target close a loop? Walks forward from target
+// along the (at most one) outgoing edge per node, since connect() below
+// keeps fan-out capped at 1 - a single linear walk, no branching search.
+// The visited set is a defensive guard against legacy data that predates
+// this constraint and might already contain a cycle.
+function wouldCreateCycle(
+    sourceId: string,
+    targetId: string,
+    nodeIndex: NodeIndex,
+): boolean {
+    const visited = new Set<string>();
+    let current = targetId;
+    while (true) {
+        if (current === sourceId) return true;
+        if (visited.has(current)) return false;
+        visited.add(current);
+        const next = nodeIndex.outgoingBySource.get(current);
+        if (!next) return false;
+        current = next.target;
+    }
 }
 
 function findNodeOrAmbiguity(
@@ -246,11 +300,18 @@ export type ParseCommandOptions = {
 // work, so absurdly long input (e.g. a large pasted block) is rejected outright
 const MAX_COMMAND_LENGTH = 500;
 
+// Horizontal gap between simulation steps, left to right - shared by a new
+// node's default position and by move-node's re-layout after a reorder
+const NODE_X_SPACING = 250;
+
 export function parseCommand(
     input: string,
     architecture: Architecture,
     options: ParseCommandOptions = {},
-    nodeIndex: NodeIndex = buildNodeIndex(architecture.nodes),
+    nodeIndex: NodeIndex = buildNodeIndex(
+        architecture.nodes,
+        architecture.edges,
+    ),
 ): CommandResult {
     const trimmed = input.trim();
 
@@ -277,7 +338,7 @@ export function parseCommand(
         const node: ArchitectureNode = {
             id: uniqueNodeId(slugify(label), nodeIndex),
             position: options.position ?? {
-                x: architecture.nodes.length * 250,
+                x: architecture.nodes.length * NODE_X_SPACING,
                 y: 0,
             },
             data: { label, description: `Reaches "${label}".` },
@@ -325,13 +386,42 @@ export function parseCommand(
                 message: ambiguousLabelMessage(targetLabel, target),
             };
         }
-        const alreadyConnected = architecture.edges.some(
-            (e) => e.source === source.id && e.target === target.id,
-        );
-        if (alreadyConnected) {
+        if (source.id === target.id) {
             return {
                 ok: false,
-                message: `An edge from "${source.data.label}" to "${target.data.label}" already exists.`,
+                message: `"${source.data.label}" can't connect to itself.`,
+            };
+        }
+        const existingOutgoing = nodeIndex.outgoingBySource.get(source.id);
+        if (existingOutgoing) {
+            if (existingOutgoing.target === target.id) {
+                return {
+                    ok: false,
+                    message: `An edge from "${source.data.label}" to "${target.data.label}" already exists.`,
+                };
+            }
+            const existingTarget = architecture.nodes.find(
+                (n) => n.id === existingOutgoing.target,
+            );
+            return {
+                ok: false,
+                message: `"${source.data.label}" already connects to "${existingTarget?.data.label ?? existingOutgoing.target}"; a node can have only one outgoing connection.`,
+            };
+        }
+        const existingIncoming = nodeIndex.incomingByTarget.get(target.id);
+        if (existingIncoming) {
+            const existingSource = architecture.nodes.find(
+                (n) => n.id === existingIncoming.source,
+            );
+            return {
+                ok: false,
+                message: `"${target.data.label}" is already reached from "${existingSource?.data.label ?? existingIncoming.source}"; a node can have only one incoming connection.`,
+            };
+        }
+        if (wouldCreateCycle(source.id, target.id, nodeIndex)) {
+            return {
+                ok: false,
+                message: `Connecting "${source.data.label}" to "${target.data.label}" would create a circular loop.`,
             };
         }
         const edge = {
@@ -409,8 +499,8 @@ export function parseCommand(
                 message: ambiguousLabelMessage(targetLabel, target),
             };
         }
-        const edge = architecture.edges.find(
-            (e) => e.source === source.id && e.target === target.id,
+        const edge = nodeIndex.edgesBySourceTarget.get(
+            edgeKey(source.id, target.id),
         );
         if (!edge) {
             return {
@@ -539,11 +629,16 @@ export function parseCommand(
         const withoutNode = architecture.nodes.filter(
             (n) => n.id !== source.id,
         );
+        // Re-lays out every node's x to match its new step order (y is left
+        // alone, since only left-to-right position conveys step order here)
         const reorderedNodes = [
             ...withoutNode.slice(0, targetIndex),
             source,
             ...withoutNode.slice(targetIndex),
-        ];
+        ].map((node, index) => ({
+            ...node,
+            position: { ...node.position, x: index * NODE_X_SPACING },
+        }));
         return {
             ok: true,
             architecture: { ...architecture, nodes: reorderedNodes },

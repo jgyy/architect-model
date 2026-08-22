@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseCommand } from "@/lib/architecture-commands";
+import { buildNodeIndex, parseCommand } from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
 
 describe("parseCommand - edge commands", () => {
@@ -118,7 +118,7 @@ describe("parseCommand - edge commands", () => {
         expect(result.message).toBe('No edge from "Web Server" to "Database".');
     });
 
-    test("allows connecting a node to itself, creating a self-loop edge", () => {
+    test("rejects connecting a node to itself", () => {
         const architecture: Architecture = {
             nodes: [
                 {
@@ -133,46 +133,145 @@ describe("parseCommand - edge commands", () => {
         const result = parseCommand(
             "connect Web Server to Web Server",
             architecture,
-        );
-
-        expect(result.ok).toBe(true);
-        if (!result.ok) return;
-        expect(result.architecture.edges).toHaveLength(1);
-        expect(result.architecture.edges[0]).toMatchObject({
-            source: "node-web-server",
-            target: "node-web-server",
-        });
-    });
-
-    test("rejects creating the same self-loop twice", () => {
-        const architecture: Architecture = {
-            nodes: [
-                {
-                    id: "node-web-server",
-                    position: { x: 0, y: 0 },
-                    data: { label: "Web Server" },
-                },
-            ],
-            edges: [],
-        };
-        const first = parseCommand(
-            "connect Web Server to Web Server",
-            architecture,
-        );
-        if (!first.ok)
-            throw new Error("expected first self-connect to succeed");
-
-        const result = parseCommand(
-            "connect Web Server to Web Server",
-            first.architecture,
         );
 
         expect(result.ok).toBe(false);
-        if (result.ok)
-            throw new Error("expected duplicate self-connect to fail");
+        if (result.ok) throw new Error("expected self-connect to fail");
+        expect(result.message).toBe('"Web Server" can\'t connect to itself.');
+        expect(architecture.edges).toHaveLength(0);
+    });
+
+    test("rejects a second outgoing edge from a node that already has one (fan-out)", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-a",
+                    position: { x: 0, y: 0 },
+                    data: { label: "A" },
+                },
+                {
+                    id: "node-b",
+                    position: { x: 250, y: 0 },
+                    data: { label: "B" },
+                },
+                {
+                    id: "node-c",
+                    position: { x: 500, y: 0 },
+                    data: { label: "C" },
+                },
+            ],
+            edges: [{ id: "edge-a-b", source: "node-a", target: "node-b" }],
+        };
+
+        const result = parseCommand("connect A to C", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected fan-out connect to fail");
         expect(result.message).toBe(
-            'An edge from "Web Server" to "Web Server" already exists.',
+            '"A" already connects to "B"; a node can have only one outgoing connection.',
         );
+    });
+
+    test("rejects a second incoming edge into a node that already has one (fan-in)", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-a",
+                    position: { x: 0, y: 0 },
+                    data: { label: "A" },
+                },
+                {
+                    id: "node-b",
+                    position: { x: 250, y: 0 },
+                    data: { label: "B" },
+                },
+                {
+                    id: "node-c",
+                    position: { x: 500, y: 0 },
+                    data: { label: "C" },
+                },
+            ],
+            edges: [{ id: "edge-a-c", source: "node-a", target: "node-c" }],
+        };
+
+        const result = parseCommand("connect B to C", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected fan-in connect to fail");
+        expect(result.message).toBe(
+            '"C" is already reached from "A"; a node can have only one incoming connection.',
+        );
+    });
+
+    test("rejects a connection that would close a multi-node cycle", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-a",
+                    position: { x: 0, y: 0 },
+                    data: { label: "A" },
+                },
+                {
+                    id: "node-b",
+                    position: { x: 250, y: 0 },
+                    data: { label: "B" },
+                },
+                {
+                    id: "node-c",
+                    position: { x: 500, y: 0 },
+                    data: { label: "C" },
+                },
+            ],
+            edges: [
+                { id: "edge-a-b", source: "node-a", target: "node-b" },
+                { id: "edge-b-c", source: "node-b", target: "node-c" },
+            ],
+        };
+
+        const result = parseCommand("connect C to A", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected cyclic connect to fail");
+        expect(result.message).toBe(
+            'Connecting "C" to "A" would create a circular loop.',
+        );
+    });
+
+    test("allows joining the tail of one chain to the head of another (no cycle, no fan-out/fan-in violation)", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-a",
+                    position: { x: 0, y: 0 },
+                    data: { label: "A" },
+                },
+                {
+                    id: "node-b",
+                    position: { x: 250, y: 0 },
+                    data: { label: "B" },
+                },
+                {
+                    id: "node-x",
+                    position: { x: 500, y: 0 },
+                    data: { label: "X" },
+                },
+                {
+                    id: "node-y",
+                    position: { x: 750, y: 0 },
+                    data: { label: "Y" },
+                },
+            ],
+            edges: [
+                { id: "edge-a-b", source: "node-a", target: "node-b" },
+                { id: "edge-x-y", source: "node-x", target: "node-y" },
+            ],
+        };
+
+        const result = parseCommand("connect B to X", architecture);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.edges).toHaveLength(3);
     });
 
     test("rejects connecting the same two nodes twice instead of creating a duplicate edge", () => {
@@ -501,5 +600,41 @@ describe("parseCommand - edge commands", () => {
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.architecture.edges).toHaveLength(0);
+    });
+
+    test("buildNodeIndex indexes edges by source/target pair for O(1) connectivity lookups", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+                {
+                    id: "node-database",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Database" },
+                },
+            ],
+            edges: [
+                {
+                    id: "edge-web-server-database",
+                    source: "node-web-server",
+                    target: "node-database",
+                },
+            ],
+        };
+
+        const nodeIndex = buildNodeIndex(
+            architecture.nodes,
+            architecture.edges,
+        );
+
+        expect(
+            nodeIndex.edgesBySourceTarget.get("node-web-server::node-database"),
+        ).toBe(architecture.edges[0]);
+        expect(
+            nodeIndex.edgesBySourceTarget.has("node-database::node-web-server"),
+        ).toBe(false);
     });
 });
