@@ -35,6 +35,12 @@ const COMMAND_DOCS: CommandDoc[] = [
         example: 'e.g. "rename node Cache to Redis"',
         aliases: ["relabel node A to B"],
     },
+    {
+        usage: "move node <label> to step <n>",
+        example: 'e.g. "move node Cache to step 2"',
+        aliases: ["reorder node"],
+        note: "shifts the surrounding steps to make room",
+    },
 ];
 
 // Every command's plain usage line, in a fixed order

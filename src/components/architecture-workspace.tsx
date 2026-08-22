@@ -13,6 +13,7 @@ import {
 } from "@/lib/architecture-commands";
 import {
     buildConnectCommand,
+    buildMoveNodeCommand,
     buildRemoveEdgeCommand,
     buildRemoveNodeCommand,
     buildRenameNodeCommand,
@@ -260,6 +261,18 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    const handleStepReorder = useCallback(
+        (nodeId: string, toIndex: number) => {
+            const command = buildMoveNodeCommand(
+                nodeId,
+                toIndex + 1,
+                architecture,
+            );
+            if (command) runCommand(command);
+        },
+        [architecture, runCommand],
+    );
+
     const handleNodeCreate = useCallback(
         (position: { x: number; y: number }): string | null => {
             const label = nextDefaultNodeLabel(architecture);
@@ -295,6 +308,7 @@ export function ArchitectureWorkspace({
                         onStepChange={handleStepChange}
                         speedIndex={speedIndex}
                         onSpeedChange={setSpeedIndex}
+                        onReorder={handleStepReorder}
                     />
                 )}
                 <ConsolePanel

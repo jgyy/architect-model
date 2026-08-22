@@ -2,6 +2,8 @@ import {
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
+    MOVE_NODE_PATTERNS,
+    MOVE_NODE_SEPARATORS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
     RENAME_NODE_PATTERNS,
@@ -195,6 +197,35 @@ function resolveRenameArgs(
     }));
 
     return resolved.find((r) => isSingleNode(r.source)) ?? resolved[0];
+}
+
+type ResolvedMoveArgs = {
+    sourceLabel: string;
+    positionText: string;
+    source: EndpointMatch;
+};
+
+// Unlike resolveConnectionEndpoints, the right side is a step number, not a node reference
+function resolveMoveNodeArgs(
+    rest: string,
+    architecture: Architecture,
+    nodeIndex: NodeIndex,
+    separators: string[],
+): ResolvedMoveArgs | null {
+    const splits = splitConnectionArgs(rest, separators);
+    if (splits.length === 0) return null;
+
+    const resolved = splits.map((split) => ({
+        sourceLabel: split.sourceLabel,
+        positionText: split.targetLabel.trim(),
+        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
+    }));
+
+    return (
+        resolved.find(
+            (r) => isSingleNode(r.source) && /^\d+$/.test(r.positionText),
+        ) ?? resolved[0]
+    );
 }
 
 const ADD_NODE_PATTERNS = [
@@ -454,6 +485,69 @@ export function parseCommand(
             ok: true,
             architecture: { ...architecture, nodes: renamedNodes },
             message: `Renamed "${source.data.label}" to "${normalizedNewLabel}".`,
+        };
+    }
+
+    const moveNodeMatch = matchFirst(MOVE_NODE_PATTERNS, trimmed);
+    if (moveNodeMatch) {
+        const resolved = resolveMoveNodeArgs(
+            moveNodeMatch[1],
+            architecture,
+            nodeIndex,
+            MOVE_NODE_SEPARATORS,
+        );
+        if (!resolved) {
+            return {
+                ok: false,
+                message: `Couldn't find a "to step" separator in "${moveNodeMatch[1]}". Try: move node <label> to step <n>.`,
+            };
+        }
+        const { source, sourceLabel, positionText } = resolved;
+        if (source === null) {
+            return { ok: false, message: `No node named "${sourceLabel}".` };
+        }
+        if (Array.isArray(source)) {
+            return {
+                ok: false,
+                message: ambiguousLabelMessage(sourceLabel, source),
+            };
+        }
+        if (!/^\d+$/.test(positionText)) {
+            return {
+                ok: false,
+                message: `"${positionText}" isn't a valid step number. Try: move node <label> to step <n>.`,
+            };
+        }
+        const targetPosition = Number(positionText);
+        const stepCount = architecture.nodes.length;
+        if (targetPosition < 1 || targetPosition > stepCount) {
+            return {
+                ok: false,
+                message: `Step ${targetPosition} is out of range (architecture has ${stepCount} step${stepCount === 1 ? "" : "s"}).`,
+            };
+        }
+        const currentIndex = architecture.nodes.findIndex(
+            (n) => n.id === source.id,
+        );
+        const targetIndex = targetPosition - 1;
+        if (targetIndex === currentIndex) {
+            return {
+                ok: false,
+                message: `"${source.data.label}" is already step ${targetPosition}.`,
+            };
+        }
+        const withoutNode = architecture.nodes.filter(
+            (n) => n.id !== source.id,
+        );
+        const reorderedNodes = [
+            ...withoutNode.slice(0, targetIndex),
+            source,
+            ...withoutNode.slice(targetIndex),
+        ];
+        return {
+            ok: true,
+            architecture: { ...architecture, nodes: reorderedNodes },
+            message: `Moved "${source.data.label}" to step ${targetPosition}.`,
         };
     }
 

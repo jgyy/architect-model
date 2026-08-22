@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
     buildConnectCommand,
+    buildMoveNodeCommand,
     buildRemoveEdgeCommand,
     buildRemoveNodeCommand,
     buildRenameNodeCommand,
@@ -111,6 +112,18 @@ describe("buildRemoveNodeCommand", () => {
 
     test("returns null when the node id doesn't exist", () => {
         expect(buildRemoveNodeCommand("missing", architecture)).toBeNull();
+    });
+});
+
+describe("buildMoveNodeCommand", () => {
+    test("builds a 'move node A to step N' command from the node's label and target position", () => {
+        expect(buildMoveNodeCommand("node-database", 1, architecture)).toBe(
+            "move node Database to step 1",
+        );
+    });
+
+    test("returns null when the node id doesn't exist", () => {
+        expect(buildMoveNodeCommand("missing", 1, architecture)).toBeNull();
     });
 });
 

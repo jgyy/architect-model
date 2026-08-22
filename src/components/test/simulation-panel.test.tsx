@@ -45,6 +45,7 @@ type PanelProps = {
     onStepChange: (index: number) => void;
     speedIndex: number;
     onSpeedChange: (index: number) => void;
+    onReorder: (nodeId: string, toIndex: number) => void;
 };
 
 function renderPanel(overrides: Partial<PanelProps> = {}) {
@@ -54,15 +55,14 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
         onStepChange: vi.fn(),
         speedIndex: DEFAULT_SPEED_INDEX,
         onSpeedChange: vi.fn(),
+        onReorder: vi.fn(),
         ...overrides,
     };
     render(<SimulationPanel {...props} />);
     return props;
 }
 
-// Mirrors how a real parent wires SimulationPanel: onStepChange feeds back
-// into currentStepIndex, which is what lets autoplay carry forward across
-// steps instead of replaying the same step index forever.
+// Mirrors how a real parent wires SimulationPanel
 function ControlledPanel({
     architecture,
     initialStepIndex = 0,
@@ -83,6 +83,7 @@ function ControlledPanel({
             }}
             speedIndex={DEFAULT_SPEED_INDEX}
             onSpeedChange={() => {}}
+            onReorder={() => {}}
         />
     );
 }
@@ -97,6 +98,7 @@ describe("SimulationPanel", () => {
                     onStepChange={vi.fn()}
                     speedIndex={DEFAULT_SPEED_INDEX}
                     onSpeedChange={vi.fn()}
+                    onReorder={vi.fn()}
                 />,
             );
             expect(container).toBeEmptyDOMElement();
@@ -207,8 +209,7 @@ describe("SimulationPanel", () => {
             );
             fireEvent.click(screen.getByTitle("Play"));
 
-            // Step 0 -> 1, the last step: the panel schedules another timer
-            // that immediately notices there is no next step and stops.
+            // Step 0 -> 1, the last step
             act(() => {
                 vi.advanceTimersByTime(
                     PLAY_SPEEDS[DEFAULT_SPEED_INDEX].intervalMs,
@@ -222,6 +223,25 @@ describe("SimulationPanel", () => {
             });
             expect(screen.getByTitle("Play")).toBeInTheDocument();
             expect(onStepChange).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("step reordering", () => {
+        test("dragging a timeline row and dropping it on another calls onReorder with the dragged node's id and the drop target's index", () => {
+            const props = renderPanel();
+
+            const dataTransfer = {
+                setData: vi.fn(),
+                getData: vi.fn(),
+            };
+            const from = screen.getByText(/^1\./).closest("li");
+            const to = screen.getByText(/^3\./).closest("li");
+            if (!from || !to) throw new Error("row not found");
+            fireEvent.dragStart(from, { dataTransfer });
+            fireEvent.dragOver(to, { dataTransfer });
+            fireEvent.drop(to, { dataTransfer });
+
+            expect(props.onReorder).toHaveBeenCalledWith("a", 2);
         });
     });
 

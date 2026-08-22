@@ -239,6 +239,30 @@ describe("ArchitectureWorkspace", () => {
         expect(screen.getByText("add node Message Queue")).toBeInTheDocument();
     });
 
+    test("dragging a simulation step onto another runs the equivalent 'move node' command and reorders the architecture", async () => {
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const dataTransfer = { setData: () => {}, getData: () => "" };
+        const from = screen.getByText(/^1\./).closest("li");
+        const to = screen.getByText(/^2\./).closest("li");
+        if (!from || !to) throw new Error("row not found");
+        fireEvent.dragStart(from, { dataTransfer });
+        fireEvent.dragOver(to, { dataTransfer });
+        fireEvent.drop(to, { dataTransfer });
+
+        expect(
+            screen.getByText("move node Web Server to step 2"),
+        ).toBeInTheDocument();
+
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Database", "Web Server"]);
+        });
+    });
+
     test("a storage event that clears the key resets the workspace back to initialArchitecture", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
