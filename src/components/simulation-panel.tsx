@@ -3,6 +3,7 @@
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { SimulationTimeline } from "@/components/simulation-timeline";
 import {
     PLAY_SPEEDS,
     getNextPlayIndex,
@@ -121,6 +122,12 @@ export function SimulationPanel({
                     traversed
                 </span>
             </div>
+            <SimulationTimeline
+                trace={trace}
+                architecture={architecture}
+                currentStepIndex={currentStepIndex}
+                onStepChange={onStepChange}
+            />
         </div>
     );
 }

@@ -3,37 +3,36 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+    recallNewerCommand,
+    recallOlderCommand,
+    type CommandHistoryState,
+} from "@/lib/command-history";
+import {
     applyNodeSuggestion,
     suggestNodeReference,
     suggestionIsCompleteMatch,
 } from "@/lib/node-suggestions";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-const SUPPORTED_COMMANDS = [
-    'add node <label>              — e.g. "add node Cache" (aliases: create node, new node, add a node called)',
-    'connect <A> to <B>            — e.g. "connect Web Server to Cache" (aliases: connect A and B, link A to B, link A and B)',
-    'remove node <label>           — e.g. "remove node Cache" (alias: delete node)',
-    'remove edge <A> to <B>        — e.g. "remove edge Web Server to Cache" (aliases: delete edge, disconnect A from B, disconnect A and B)',
-    'add step <label>              — e.g. "add step Cache" (appends a simulation step reaching that node)',
-    'insert step <n> <label>       — e.g. "insert step 2 Cache" (inserts a step at that position, shifting later ones down)',
-    'set step <n> description ...  — e.g. "set step 2 description Attacker pivots to Cache"',
-    'remove step <n>               — e.g. "remove step 2"',
-    'move step <a> to <b>          — e.g. "move step 3 to 1" (relocates a step, renumbering the rest)',
-];
+const IDLE_HISTORY: CommandHistoryState = { index: null, draft: "" };
 
 type CommandInputProps = {
     value: string;
     onChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
+    // previously submitted command text, oldest first — recalled with Up/Down
+    commands: string[];
 };
 
-// Free-text command box with an inline node-reference autocomplete
+// Terminal-style prompt line with inline node-reference autocomplete and
+// shell-style Up/Down command-history recall
 export function CommandInput({
     value,
     onChange,
     onSubmit,
     architecture,
+    commands,
 }: CommandInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [activeIndex, setActiveIndex] = useState(0);
@@ -41,6 +40,8 @@ export function CommandInput({
     const [dismissed, setDismissed] = useState(false);
     // which argument ("connect A|to B" vs "connect A to B|") suggestions target
     const [cursorPosition, setCursorPosition] = useState(value.length);
+    const [historyState, setHistoryState] =
+        useState<CommandHistoryState>(IDLE_HISTORY);
 
     // selectSuggestion queues a target here; applied once `value`'s DOM
     const pendingCursorRef = useRef<number | null>(null);
@@ -51,6 +52,13 @@ export function CommandInput({
         inputRef.current?.setSelectionRange(pending, pending);
         setCursorPosition(pending);
     }, [value]);
+
+    // A submitted command clears the field from outside (not via the typing
+    // handler below, which already resets on every keystroke) — recall
+    // should start fresh next time either way.
+    if (value === "" && historyState.index !== null) {
+        setHistoryState(IDLE_HISTORY);
+    }
 
     const suggestion = suggestNodeReference(
         value,
@@ -89,46 +97,72 @@ export function CommandInput({
         inputRef.current?.focus();
     }
 
+    function recallOlder() {
+        const result = recallOlderCommand(commands, historyState, value);
+        setHistoryState(result.state);
+        onChange(result.value);
+    }
+
+    function recallNewer() {
+        if (historyState.index === null) return;
+        const result = recallNewerCommand(commands, historyState);
+        setHistoryState(result.state);
+        onChange(result.value);
+    }
+
     function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-        if (options.length === 0) return;
+        if (options.length > 0) {
+            switch (event.key) {
+                case "ArrowDown":
+                    event.preventDefault();
+                    setActiveIndex((i) => (i + 1) % options.length);
+                    return;
+                case "ArrowUp":
+                    event.preventDefault();
+                    setActiveIndex(
+                        (i) => (i - 1 + options.length) % options.length,
+                    );
+                    return;
+                case "Enter":
+                    // an already-complete, unambiguous reference should submit
+                    // the command, not be swallowed by the autocomplete
+                    if (
+                        suggestion &&
+                        suggestionIsCompleteMatch(value, suggestion)
+                    ) {
+                        return;
+                    }
+                    event.preventDefault();
+                    selectSuggestion(options[activeOptionIndex]);
+                    return;
+                case "Escape":
+                    setDismissed(true);
+                    return;
+            }
+            return;
+        }
+
         switch (event.key) {
-            case "ArrowDown":
-                event.preventDefault();
-                setActiveIndex((i) => (i + 1) % options.length);
-                break;
             case "ArrowUp":
                 event.preventDefault();
-                setActiveIndex(
-                    (i) => (i - 1 + options.length) % options.length,
-                );
+                recallOlder();
                 break;
-            case "Enter":
-                // an already-complete, unambiguous reference should submit
-                // the command, not be swallowed by the autocomplete
-                if (
-                    suggestion &&
-                    suggestionIsCompleteMatch(value, suggestion)
-                ) {
-                    break;
-                }
+            case "ArrowDown":
                 event.preventDefault();
-                selectSuggestion(options[activeOptionIndex]);
-                break;
-            case "Escape":
-                setDismissed(true);
+                recallNewer();
                 break;
         }
     }
 
     return (
-        <form onSubmit={onSubmit} className="border-b border-border p-3">
-            <label
-                htmlFor="command-input"
-                className="block text-xs font-medium tracking-wide text-muted-foreground uppercase"
-            >
-                Command
-            </label>
-            <div className="mt-1.5 flex gap-2">
+        <form onSubmit={onSubmit} className="border-t border-border p-2">
+            <div className="relative flex items-center gap-1.5">
+                <span
+                    className="shrink-0 font-mono text-sm text-accent"
+                    aria-hidden="true"
+                >
+                    &gt;
+                </span>
                 <div className="relative flex-1">
                     <input
                         id="command-input"
@@ -138,24 +172,27 @@ export function CommandInput({
                         onChange={(event) => {
                             onChange(event.target.value);
                             setDismissed(false);
+                            setHistoryState(IDLE_HISTORY);
                             trackCursor(event.target);
                         }}
                         onKeyDown={handleKeyDown}
                         onKeyUp={(event) => trackCursor(event.currentTarget)}
                         onClick={(event) => trackCursor(event.currentTarget)}
                         onSelect={(event) => trackCursor(event.currentTarget)}
-                        placeholder='e.g. "add node Cache"'
+                        placeholder="add node Cache"
+                        aria-label="Command"
                         autoComplete="off"
                         role="combobox"
                         aria-expanded={options.length > 0}
                         aria-controls="command-suggestions"
-                        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-sm text-foreground outline-none focus:border-accent"
+                        style={{ caretColor: "var(--accent)" }}
+                        className="w-full bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
                     />
                     {options.length > 0 && (
                         <ul
                             id="command-suggestions"
                             role="listbox"
-                            className="absolute top-full left-0 z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-background shadow-md"
+                            className="absolute bottom-full left-0 z-10 mb-1 max-h-40 w-full overflow-y-auto rounded-md border border-border bg-background shadow-md"
                         >
                             {options.map((node, index) => (
                                 <li
@@ -182,23 +219,7 @@ export function CommandInput({
                         </ul>
                     )}
                 </div>
-                <button
-                    type="submit"
-                    className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
-                >
-                    Run
-                </button>
             </div>
-            <details className="mt-2 text-xs text-muted-foreground">
-                <summary className="cursor-pointer select-none hover:text-foreground">
-                    Supported commands
-                </summary>
-                <ul className="mt-1.5 space-y-0.5 font-mono">
-                    {SUPPORTED_COMMANDS.map((command) => (
-                        <li key={command}>{command}</li>
-                    ))}
-                </ul>
-            </details>
         </form>
     );
 }
