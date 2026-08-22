@@ -168,4 +168,83 @@ describe("SimulationTimeline", () => {
         dragRow("2. Handles the request.", "2. Handles the request.");
         expect(onReorder).not.toHaveBeenCalled();
     });
+
+    test("every row has a move-up and a move-down button", () => {
+        renderTimeline(makeArchitecture(THREE_NODES), 0);
+        for (const n of [1, 2, 3]) {
+            expect(
+                screen.getByRole("button", { name: `Move step ${n} up` }),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByRole("button", { name: `Move step ${n} down` }),
+            ).toBeInTheDocument();
+        }
+    });
+
+    test("the first row's move-up button is disabled", () => {
+        renderTimeline(makeArchitecture(THREE_NODES), 0);
+        expect(
+            screen.getByRole("button", { name: "Move step 1 up" }),
+        ).toBeDisabled();
+    });
+
+    test("the last row's move-down button is disabled", () => {
+        renderTimeline(makeArchitecture(THREE_NODES), 0);
+        expect(
+            screen.getByRole("button", { name: "Move step 3 down" }),
+        ).toBeDisabled();
+    });
+
+    test("middle rows have both move buttons enabled", () => {
+        renderTimeline(makeArchitecture(THREE_NODES), 0);
+        expect(
+            screen.getByRole("button", { name: "Move step 2 up" }),
+        ).toBeEnabled();
+        expect(
+            screen.getByRole("button", { name: "Move step 2 down" }),
+        ).toBeEnabled();
+    });
+
+    test("clicking a row's move-down button calls onReorder with that node's id and the next index", async () => {
+        const user = userEvent.setup();
+        const { onReorder } = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        await user.click(
+            screen.getByRole("button", { name: "Move step 1 down" }),
+        );
+        expect(onReorder).toHaveBeenCalledWith("a", 1);
+    });
+
+    test("clicking a row's move-up button calls onReorder with that node's id and the previous index", async () => {
+        const user = userEvent.setup();
+        const { onReorder } = renderTimeline(makeArchitecture(THREE_NODES), 0);
+        await user.click(
+            screen.getByRole("button", { name: "Move step 3 up" }),
+        );
+        expect(onReorder).toHaveBeenCalledWith("c", 1);
+    });
+
+    test("clicking a move button does not also call onStepChange", async () => {
+        const user = userEvent.setup();
+        const { onStepChange } = renderTimeline(
+            makeArchitecture(THREE_NODES),
+            0,
+        );
+        await user.click(
+            screen.getByRole("button", { name: "Move step 1 down" }),
+        );
+        expect(onStepChange).not.toHaveBeenCalled();
+    });
+
+    test("a single-node architecture disables both move buttons on its only row", () => {
+        renderTimeline(
+            makeArchitecture([makeNode("only", "Solo", "Runs alone.")]),
+            0,
+        );
+        expect(
+            screen.getByRole("button", { name: "Move step 1 up" }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole("button", { name: "Move step 1 down" }),
+        ).toBeDisabled();
+    });
 });

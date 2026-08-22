@@ -11,7 +11,7 @@ import { X } from "lucide-react";
 
 import type { ArchitectureEdge as ArchitectureEdgeType } from "@/types/architecture";
 
-// Invoked with an edge's id to remove it — wired up by ArchitectureCanvas
+// Invoked with an edge's id to remove it - wired up by ArchitectureCanvas
 export const EdgeDeleteContext = createContext<(edgeId: string) => void>(
     () => {},
 );

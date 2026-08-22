@@ -258,7 +258,7 @@ export function ArchitectureCanvas({
                             single mutation and (unlike the canvas) never
                             skips off-screen nodes, so it's the single most
                             expensive thing on the page once a graph gets
-                            large — and by then it's just a gray smear of
+                            large - and by then it's just a gray smear of
                             overlapping dots anyway, so hiding it costs
                             nothing real. */}
                         {architecture.nodes.length <= MINIMAP_NODE_LIMIT && (

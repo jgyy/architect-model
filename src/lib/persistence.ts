@@ -76,7 +76,7 @@ function isValidArchitecture(value: unknown): value is Architecture {
 // instead of discarding an otherwise-intact architecture + log. Any other
 // shape (e.g. only one of the two present, or one of the wrong type) is
 // genuinely corrupted data and is still rejected. A leftover top-level
-// `trace` array — from before simulation steps moved onto node data — is
+// `trace` array - from before simulation steps moved onto node data - is
 // simply not read here, so its presence or shape no longer matters.
 function parsePersistedState(value: unknown): PersistedState | null {
     if (!isRecord(value)) return null;

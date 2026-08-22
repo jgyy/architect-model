@@ -17,7 +17,7 @@ const EMPTY_HIGHLIGHT: SimulationHighlight = { traversedNodeIds: new Set() };
 export const HighlightedNodeContext =
     createContext<SimulationHighlight>(EMPTY_HIGHLIGHT);
 
-// Mouse-driven mutations, wired up by ArchitectureCanvas — mirrors how edges
+// Mouse-driven mutations, wired up by ArchitectureCanvas - mirrors how edges
 // get their own delete callback via EdgeDeleteContext
 export type NodeActions = {
     onRename: (nodeId: string, newLabel: string) => void;
@@ -54,7 +54,7 @@ export function ArchitectureNode({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Enter edit mode the first render a just-created node sees itself as
-    // the auto-edit target — a render-time state adjustment (not an effect)
+    // the auto-edit target - a render-time state adjustment (not an effect)
     // so the input is already showing on the node's very first paint
     const [consumedAutoEditFor, setConsumedAutoEditFor] = useState<
         string | null

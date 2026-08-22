@@ -21,7 +21,7 @@ type CommandInputProps = {
     onChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
-    // previously submitted command text, oldest first — recalled with Up/Down
+    // previously submitted command text, oldest first - recalled with Up/Down
     commands: string[];
 };
 

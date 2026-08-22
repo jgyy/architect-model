@@ -5,7 +5,7 @@ import type { Architecture } from "@/types/architecture";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
 
-describe("parseCommand — command parsing", () => {
+describe("parseCommand - command parsing", () => {
     test("reports unrecognized commands instead of silently doing nothing, with a hint of supported commands", () => {
         const result = parseCommand("do something weird", emptyArchitecture);
 

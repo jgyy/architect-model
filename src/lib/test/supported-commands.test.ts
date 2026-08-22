@@ -6,7 +6,7 @@ import {
     SUPPORTED_COMMANDS,
 } from "@/lib/supported-commands";
 
-// The console renders at a fixed 80-column width — anything wider than that
+// The console renders at a fixed 80-column width - anything wider than that
 // wraps mid-word instead of at the line breaks the text was designed around
 const CONSOLE_WIDTH = 80;
 
