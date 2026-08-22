@@ -34,6 +34,7 @@ import {
     NodeActionsContext,
     type NodeActions,
 } from "@/components/architecture-node";
+import { DiagramGuide } from "@/components/diagram-guide";
 import { isDoubleClick, type ClickPoint } from "@/lib/canvas-commands";
 import { applyPersistableNodeChanges } from "@/lib/node-changes";
 import type {
@@ -263,6 +264,7 @@ export function ArchitectureCanvas({
                         {architecture.nodes.length <= MINIMAP_NODE_LIMIT && (
                             <MiniMap pannable zoomable />
                         )}
+                        <DiagramGuide />
                         <FitViewOnNodesChange nodeIds={nodeIds} />
                     </ReactFlow>
                 </EdgeDeleteContext.Provider>

@@ -1,6 +1,14 @@
 import { describe, expect, test } from "vitest";
 
-import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
+import {
+    COMMAND_USAGE,
+    HELP_MESSAGE,
+    SUPPORTED_COMMANDS,
+} from "@/lib/supported-commands";
+
+// The console renders at a fixed 80-column width — anything wider than that
+// wraps mid-word instead of at the line breaks the text was designed around
+const CONSOLE_WIDTH = 80;
 
 describe("SUPPORTED_COMMANDS", () => {
     test("is a non-empty array", () => {
@@ -25,5 +33,40 @@ describe("SUPPORTED_COMMANDS", () => {
         expect(
             SUPPORTED_COMMANDS.some((entry) => entry.includes(keyword)),
         ).toBe(true);
+    });
+
+    test("no line of any entry exceeds the console's 80-column width", () => {
+        for (const entry of SUPPORTED_COMMANDS) {
+            for (const line of entry.split("\n")) {
+                expect(line.length).toBeLessThanOrEqual(CONSOLE_WIDTH);
+            }
+        }
+    });
+});
+
+describe("COMMAND_USAGE", () => {
+    test("has one plain usage line per documented command", () => {
+        expect(COMMAND_USAGE.length).toBe(SUPPORTED_COMMANDS.length);
+    });
+
+    test("every usage line fits comfortably inside the console width", () => {
+        for (const usage of COMMAND_USAGE) {
+            expect(usage.length).toBeLessThanOrEqual(CONSOLE_WIDTH);
+        }
+    });
+});
+
+describe("HELP_MESSAGE", () => {
+    test("starts with a heading and includes every command's usage", () => {
+        expect(HELP_MESSAGE.startsWith("Commands:")).toBe(true);
+        for (const usage of COMMAND_USAGE) {
+            expect(HELP_MESSAGE).toContain(usage);
+        }
+    });
+
+    test("no line exceeds the console's 80-column width", () => {
+        for (const line of HELP_MESSAGE.split("\n")) {
+            expect(line.length).toBeLessThanOrEqual(CONSOLE_WIDTH);
+        }
     });
 });

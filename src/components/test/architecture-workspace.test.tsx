@@ -18,7 +18,7 @@ import {
 
 import { ArchitectureWorkspace } from "@/components/architecture-workspace";
 import { loadPersistedState, type PersistedState } from "@/lib/persistence";
-import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
+import { HELP_MESSAGE } from "@/lib/supported-commands";
 import type { Architecture } from "@/types/architecture";
 
 // Node 22+'s own global `localStorage` getter
@@ -120,9 +120,8 @@ describe("ArchitectureWorkspace", () => {
 
         await submitCommand(user, "help");
 
-        const expectedMessage = SUPPORTED_COMMANDS.join("\n");
         // testing-library's getByText normalizes (collapses whitespace in)
-        const normalizedMessage = expectedMessage.replace(/\s+/g, " ").trim();
+        const normalizedMessage = HELP_MESSAGE.replace(/\s+/g, " ").trim();
         expect(await screen.findByText(normalizedMessage)).toBeInTheDocument();
 
         await waitFor(() => {
@@ -130,7 +129,7 @@ describe("ArchitectureWorkspace", () => {
             expect(persisted?.log.at(-1)).toMatchObject({
                 input: "help",
                 ok: true,
-                message: expectedMessage,
+                message: HELP_MESSAGE,
             });
         });
     });
@@ -147,7 +146,7 @@ describe("ArchitectureWorkspace", () => {
             expect(persisted?.log.at(-1)).toMatchObject({
                 input: "?",
                 ok: true,
-                message: SUPPORTED_COMMANDS.join("\n"),
+                message: HELP_MESSAGE,
             });
         });
     });

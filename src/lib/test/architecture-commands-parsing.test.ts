@@ -18,6 +18,17 @@ describe("parseCommand — command parsing", () => {
         expect(result.message).toContain("add node <label>");
     });
 
+    test("the unrecognized-command hint lists one usage per line within 80 columns", () => {
+        const result = parseCommand("do something weird", emptyArchitecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected an unrecognized-command failure");
+        for (const line of result.message.split("\n")) {
+            expect(line.length).toBeLessThanOrEqual(80);
+        }
+    });
+
     test("trims whitespace-only input before echoing it back in the error", () => {
         const result = parseCommand("   ", emptyArchitecture);
 

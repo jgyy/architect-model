@@ -31,10 +31,8 @@ import {
     clampStepIndex,
     getTraversedPath,
 } from "@/lib/simulation";
-import { SUPPORTED_COMMANDS } from "@/lib/supported-commands";
+import { HELP_MESSAGE } from "@/lib/supported-commands";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
-
-const HELP_MESSAGE = SUPPORTED_COMMANDS.join("\n");
 
 // A plain loop (not Math.max(...ids))
 function maxLogId(entries: LogEntry[]): number {
@@ -45,9 +43,7 @@ function maxLogId(entries: LogEntry[]): number {
     return max;
 }
 
-// Bounds the console's scrollback (and what gets persisted/serialized every
-// command) — well above any normal session, but a long-running or scripted
-// spam session shouldn't grow this without limit
+// Bounds the console's scrollback
 const MAX_LOG_ENTRIES = 5000;
 
 function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
@@ -169,10 +165,7 @@ export function ArchitectureWorkspace({
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
-    // Node lookups (by label, and the id-collision check) would otherwise
-    // rescan every node on every single command — rebuilding this only
-    // when the node list itself changes keeps a run of many commands
-    // (e.g. connecting hundreds of nodes) from becoming quadratic
+    // Node lookups (by label, and the id-collision check)
     const nodeIndex = useMemo(
         () => buildNodeIndex(architecture.nodes),
         [architecture.nodes],
