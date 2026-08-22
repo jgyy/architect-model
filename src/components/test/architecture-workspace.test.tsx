@@ -170,6 +170,34 @@ describe("ArchitectureWorkspace", () => {
         });
     });
 
+    test('submitting "connect Database to Cache" twice in a row rejects the second as a duplicate', async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "add node Cache");
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(persisted?.log.at(-1)).toMatchObject({ ok: true });
+        });
+
+        await submitCommand(user, "connect Database to Cache");
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(persisted?.log.at(-1)).toMatchObject({ ok: true });
+        });
+
+        await submitCommand(user, "connect Database to Cache");
+
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(persisted?.log.at(-1)).toMatchObject({
+                ok: false,
+                message: 'An edge from "Database" to "Cache" already exists.',
+            });
+        });
+    });
+
     test("clicking the clear button resets the console and canvas back to initialArchitecture", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);

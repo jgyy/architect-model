@@ -124,8 +124,7 @@ describe("getTraversedPath", () => {
     });
 
     test("a one-to-many fan-out highlights every branch reached so far, not just the previous step", () => {
-        // A branches directly to both B (step 1) and C (step 2); B and C
-        // are not connected to each other at all.
+        // A branches directly to both B (step 1) and C (step 2)
         const fanOut: Architecture = {
             nodes: architecture.nodes,
             edges: [

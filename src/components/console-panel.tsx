@@ -28,9 +28,7 @@ export function ConsolePanel({
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // scrollIntoView on a sentinel forces a full geometry computation of
-        // the whole (unbounded) log list on every single command; setting
-        // scrollTop directly is far cheaper and has the same effect here
+        // scrollIntoView on a sentinel forces a full geometry computation
         const container = scrollRef.current;
         if (container) container.scrollTop = container.scrollHeight;
     }, [log.length]);

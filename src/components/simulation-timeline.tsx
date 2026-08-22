@@ -95,14 +95,17 @@ export function SimulationTimeline({
                                 {stepNumber}. {stepDescription(node)}
                             </span>
                         </button>
-                        <div className="flex shrink-0 flex-col border-l border-border">
+                        {/* self-center (not items-stretch's default) keeps this
+                        pair short, leaving blank space above/below it in the
+                        row for vertical-scroll gestures to land on */}
+                        <div className="flex shrink-0 items-center gap-0.5 self-center border-l border-border px-1.5">
                             <button
                                 type="button"
                                 onClick={() => onReorder(node.id, index - 1)}
                                 disabled={index === 0}
                                 title="Move up"
                                 aria-label={`Move step ${stepNumber} up`}
-                                className="flex flex-1 items-center px-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
+                                className="flex items-center rounded p-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
                             >
                                 <ChevronUp size={12} />
                             </button>
@@ -112,7 +115,7 @@ export function SimulationTimeline({
                                 disabled={index === lastIndex}
                                 title="Move down"
                                 aria-label={`Move step ${stepNumber} down`}
-                                className="flex flex-1 items-center px-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
+                                className="flex items-center rounded p-1 text-muted-foreground hover:bg-border/40 hover:text-foreground disabled:opacity-30"
                             >
                                 <ChevronDown size={12} />
                             </button>

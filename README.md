@@ -35,14 +35,14 @@ missing/ambiguous node reference is rejected inline in the log, with the
 match(es) it found. A dropdown autocompletes node names as you type (not
 for `add node`, since that label is new).
 
-| Command                         | Aliases                                        | Example                           | Effect                                       |
-| ------------------------------- | ---------------------------------------------- | --------------------------------- | -------------------------------------------- |
-| `add node <label>`              | `create node`, `new node`, `add a node called` | `add node Cache`                  | Adds a node as the next simulation step.     |
-| `connect <A> to <B>`            | `connect A and B`, `link A to/and B`           | `connect Web Server to Cache`     | Adds an edge; both nodes must exist.         |
-| `remove node <label>`           | `delete node`                                  | `remove node Cache`               | Removes the node, its edges, and its step.   |
-| `remove edge <A> to <B>`        | `delete edge`, `disconnect A from/and B`       | `remove edge Web Server to Cache` | Removes the edge.                            |
-| `rename node <A> to <B>`        | `relabel node A to B`                          | `rename node Cache to Redis`      | Renames the node everywhere it's referenced. |
-| `move node <label> to step <n>` | `reorder node`                                 | `move node Cache to step 2`       | Reorders the node's simulation step.         |
+| Command                         | Aliases                                        | Example                           | Effect                                                                                                                                 |
+| ------------------------------- | ---------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `add node <label>`              | `create node`, `new node`, `add a node called` | `add node Cache`                  | Adds a node as the next simulation step.                                                                                               |
+| `connect <A> to <B>`            | `connect A and B`, `link A to/and B`           | `connect Web Server to Cache`     | Adds an edge; both nodes must exist, each node allows only one outgoing/incoming edge, and cycles (including self-loops) are rejected. |
+| `remove node <label>`           | `delete node`                                  | `remove node Cache`               | Removes the node, its edges, and its step.                                                                                             |
+| `remove edge <A> to <B>`        | `delete edge`, `disconnect A from/and B`       | `remove edge Web Server to Cache` | Removes the edge.                                                                                                                      |
+| `rename node <A> to <B>`        | `relabel node A to B`                          | `rename node Cache to Redis`      | Renames the node everywhere it's referenced.                                                                                           |
+| `move node <label> to step <n>` | `reorder node`                                 | `move node Cache to step 2`       | Reorders the node's simulation step.                                                                                                   |
 
 Nodes are also draggable on the canvas (positions persist), double-click to
 rename, drag from a node's edge to connect another, and a hover-revealed ×
@@ -82,7 +82,9 @@ run the same `move node ... to step ...` command shown above.
 - The autocomplete's command patterns live in `lib/node-reference.ts`, shared with the parser, so the two never diverge.
 - `onNodesChange` only applies `"position"` changes; `deleteKeyCode={null}` backs it up, keeping removal text-only.
 - Multi-tab sync relies on `storage` events firing only in _other_ tabs; `interpretStorageEvent` (pure, tested) classifies each event, and a ref tracking the last-written JSON stops tabs from re-triggering each other's writes once they converge.
+- Edges are constrained to a single linear path: each node allows at most one outgoing and one incoming edge, and a `connect` that would close a cycle (including a self-loop) is rejected - this keeps the simulation trace a straight walk instead of a general graph, and the cycle check itself is a single forward walk (no branching search) since fan-out is already capped at one.
+- `move node ... to step ...` re-lays out every node's x position to match its new step order (y is left untouched), so reordering a step visually repositions it on the canvas instead of only reordering the sidebar list; edges aren't rewired, since they follow whatever positions their endpoints currently have.
 
 ## What I'd improve with more time
 
-- The `connect` command's "already connected" check is still an O(edges) scan per call; an adjacency-list data model would make it constant-time, but wasn't worth the added complexity at this app's scale.
+- Node matching's substring fallback (`findNodeOrAmbiguity`) is still an O(nodes) scan when a reference isn't an exact label match; a trigram or prefix index would make it faster, but wasn't worth the added complexity at this app's scale.
