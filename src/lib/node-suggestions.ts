@@ -1,4 +1,9 @@
 import {
+    buildNodeIndex,
+    findNodesBySubstring,
+    type NodeIndex,
+} from "@/lib/architecture-commands";
+import {
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
@@ -22,26 +27,30 @@ export type NodeSuggestion = {
 
 const DEFAULT_LIMIT = 8;
 
+// An empty needle matches every node (no substring to narrow the trie walk
+// to), so there's nothing to rank - just list them alphabetically.
 function rankMatches(
     partial: string,
-    nodes: ArchitectureNode[],
+    nodeIndex: NodeIndex,
     limit: number,
 ): ArchitectureNode[] {
     const needle = normalizeLabel(partial).toLowerCase();
-    return nodes
+    if (needle.length === 0) {
+        return Array.from(nodeIndex.byLabel.values())
+            .sort((a, b) => a.data.label.localeCompare(b.data.label))
+            .slice(0, Math.max(0, limit));
+    }
+
+    // findNodesBySubstring costs O(needle length), not O(nodes), and every
+    // node it returns already contains needle somewhere in its label - only
+    // exact-vs-prefix-vs-elsewhere remains to be ranked among those matches.
+    return findNodesBySubstring(nodeIndex, needle)
         .map((node) => {
             const label = node.data.label.normalize("NFC").toLowerCase();
             const rank =
-                label === needle
-                    ? 0
-                    : label.startsWith(needle)
-                      ? 1
-                      : label.includes(needle)
-                        ? 2
-                        : -1;
+                label === needle ? 0 : label.startsWith(needle) ? 1 : 2;
             return { node, rank };
         })
-        .filter((entry) => entry.rank >= 0)
         .sort(
             (a, b) =>
                 a.rank - b.rank ||
@@ -55,29 +64,21 @@ function rankMatches(
 function singleSlotSuggestion(
     input: string,
     rest: string | undefined,
-    architecture: Architecture,
+    nodeIndex: NodeIndex,
     limit: number,
 ): NodeSuggestion {
     const partial = rest ?? "";
     return {
         replaceFrom: input.length - partial.length,
         replaceTo: input.length,
-        matches: rankMatches(partial, architecture.nodes, limit),
+        matches: rankMatches(partial, nodeIndex, limit),
     };
 }
 
-function buildLabelSet(architecture: Architecture): Set<string> {
-    return new Set(
-        architecture.nodes.map((node) =>
-            node.data.label.normalize("NFC").toLowerCase(),
-        ),
-    );
-}
-
-function isCompleteNodeLabel(text: string, labelSet: Set<string>): boolean {
+function isCompleteNodeLabel(text: string, nodeIndex: NodeIndex): boolean {
     const needle = normalizeLabel(text).toLowerCase();
     if (needle.length === 0) return false;
-    return labelSet.has(needle);
+    return nodeIndex.byLabel.has(needle);
 }
 
 // every occurrence of every separator word, left to right within each word
@@ -103,20 +104,18 @@ function candidateSeparatorSplits(
 function bestSeparatorSplit(
     rest: string,
     separators: string[],
-    architecture: Architecture,
+    nodeIndex: NodeIndex,
     cursorInRest: number,
 ): { index: number; length: number } | null {
     const splits = candidateSeparatorSplits(rest, separators);
     if (splits.length === 0) return null;
 
-    // Built once per call, not once per split
-    const labelSet = buildLabelSet(architecture);
     const anchored = splits.find((split) => {
         const cursorInSource = cursorInRest <= split.index;
         const fixedLabel = cursorInSource
             ? rest.slice(split.index + split.length).trim()
             : rest.slice(0, split.index).trim();
-        return isCompleteNodeLabel(fixedLabel, labelSet);
+        return isCompleteNodeLabel(fixedLabel, nodeIndex);
     });
     if (anchored) return anchored;
 
@@ -129,7 +128,7 @@ function twoSlotSuggestion(
     input: string,
     rest: string,
     separators: string[],
-    architecture: Architecture,
+    nodeIndex: NodeIndex,
     limit: number,
     cursor: number,
 ): NodeSuggestion {
@@ -137,14 +136,14 @@ function twoSlotSuggestion(
     const split = bestSeparatorSplit(
         rest,
         separators,
-        architecture,
+        nodeIndex,
         cursor - restStart,
     );
     if (!split) {
         return {
             replaceFrom: restStart,
             replaceTo: input.length,
-            matches: rankMatches(rest, architecture.nodes, limit),
+            matches: rankMatches(rest, nodeIndex, limit),
         };
     }
 
@@ -157,7 +156,7 @@ function twoSlotSuggestion(
             replaceTo: separatorStart,
             matches: rankMatches(
                 input.slice(restStart, separatorStart),
-                architecture.nodes,
+                nodeIndex,
                 limit,
             ),
         };
@@ -166,11 +165,7 @@ function twoSlotSuggestion(
     return {
         replaceFrom: separatorEnd,
         replaceTo: input.length,
-        matches: rankMatches(
-            input.slice(separatorEnd),
-            architecture.nodes,
-            limit,
-        ),
+        matches: rankMatches(input.slice(separatorEnd), nodeIndex, limit),
     };
 }
 
@@ -179,7 +174,7 @@ function renameNodeSuggestion(
     input: string,
     rest: string,
     separators: string[],
-    architecture: Architecture,
+    nodeIndex: NodeIndex,
     limit: number,
     cursor: number,
 ): NodeSuggestion | null {
@@ -187,11 +182,11 @@ function renameNodeSuggestion(
     const split = bestSeparatorSplit(
         rest,
         separators,
-        architecture,
+        nodeIndex,
         cursor - restStart,
     );
     if (!split) {
-        return singleSlotSuggestion(input, rest, architecture, limit);
+        return singleSlotSuggestion(input, rest, nodeIndex, limit);
     }
 
     const separatorStart = restStart + split.index;
@@ -201,18 +196,25 @@ function renameNodeSuggestion(
         replaceTo: separatorStart,
         matches: rankMatches(
             input.slice(restStart, separatorStart),
-            architecture.nodes,
+            nodeIndex,
             limit,
         ),
     };
 }
 
-// Live-typing completion hint for the node-reference argument(s) of a command
+// Live-typing completion hint for the node-reference argument(s) of a command.
+// nodeIndex defaults to a fresh build so callers without a memoized one (e.g.
+// tests) don't need to construct it; a real UI caller passes its own index
+// (already memoized per architecture change) so a keystroke never rebuilds it.
 export function suggestNodeReference(
     input: string,
     architecture: Architecture,
     cursor: number = input.length,
     limit: number = DEFAULT_LIMIT,
+    nodeIndex: NodeIndex = buildNodeIndex(
+        architecture.nodes,
+        architecture.edges,
+    ),
 ): NodeSuggestion | null {
     const connectMatch = matchFirst(CONNECT_PATTERNS, input);
     if (connectMatch) {
@@ -220,7 +222,7 @@ export function suggestNodeReference(
             input,
             connectMatch[1],
             CONNECT_SEPARATORS,
-            architecture,
+            nodeIndex,
             limit,
             cursor,
         );
@@ -232,7 +234,7 @@ export function suggestNodeReference(
             input,
             removeEdgeMatch[1],
             DISCONNECT_SEPARATORS,
-            architecture,
+            nodeIndex,
             limit,
             cursor,
         );
@@ -243,7 +245,7 @@ export function suggestNodeReference(
         return singleSlotSuggestion(
             input,
             removeNodeMatch[1],
-            architecture,
+            nodeIndex,
             limit,
         );
     }
@@ -254,7 +256,7 @@ export function suggestNodeReference(
             input,
             renameNodeMatch[1],
             RENAME_SEPARATORS,
-            architecture,
+            nodeIndex,
             limit,
             cursor,
         );
@@ -268,7 +270,7 @@ export function suggestNodeReference(
             input,
             moveNodeMatch[1],
             MOVE_NODE_SEPARATORS,
-            architecture,
+            nodeIndex,
             limit,
             cursor,
         );

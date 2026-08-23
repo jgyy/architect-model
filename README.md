@@ -82,11 +82,13 @@ running `move node ... to step ...`.
 - Node reference lookup's substring fallback (when a typed name isn't an exact match) is indexed
   by a trie over every label's suffixes, built once per command alongside the rest of `NodeIndex`
     - a lookup costs O(query length), not O(nodes), however large the architecture gets.
+- The live-typing autocomplete dropdown (`node-suggestions.ts`) now ranks matches by querying that
+  same trie (`findNodesBySubstring`) instead of scanning every node - a keystroke costs O(query
+  length + matches), not O(nodes). `CommandInput` takes the workspace's already-memoized
+  `NodeIndex` as a prop, so typing never rebuilds it; `suggestNodeReference` still defaults to
+  building one when a caller (e.g. a test) doesn't have one handy.
 
 ## What I'd improve with more time
 
 - Merge has no subset picker - bringing in only part of a file means merging all of it, then
   pruning with `remove node`.
-- The live-typing autocomplete dropdown (`node-suggestions.ts`) still ranks matches with an
-  O(nodes) scan per keystroke; it wasn't folded into the substring-index fix above since it needs
-  ranked results, not just membership.

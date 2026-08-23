@@ -523,6 +523,7 @@ export function ArchitectureWorkspace({
                     onInputChange={setInput}
                     onSubmit={handleSubmit}
                     architecture={architecture}
+                    nodeIndex={nodeIndex}
                     canUndo={undoRedo.undoStack.length > 0}
                     canRedo={undoRedo.redoStack.length > 0}
                     onUndo={() => runCommand("undo")}

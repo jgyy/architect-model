@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { parseCommand } from "@/lib/architecture-commands";
+import {
+    buildNodeIndex,
+    findNodesBySubstring,
+    parseCommand,
+} from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
 
 const emptyArchitecture: Architecture = { nodes: [], edges: [] };
@@ -667,5 +671,38 @@ describe("parseCommand - node commands", () => {
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.architecture.nodes[0].data.label).toBe("Frontend");
+    });
+});
+
+describe("findNodesBySubstring", () => {
+    const architecture: Architecture = {
+        nodes: [
+            {
+                id: "node-web-server",
+                position: { x: 0, y: 0 },
+                data: { label: "Web Server" },
+            },
+            {
+                id: "node-database",
+                position: { x: 0, y: 0 },
+                data: { label: "Database" },
+            },
+        ],
+        edges: [],
+    };
+    const nodeIndex = buildNodeIndex(architecture.nodes, architecture.edges);
+
+    test("returns every node whose label contains the needle anywhere", () => {
+        const matches = findNodesBySubstring(nodeIndex, "erv");
+        expect(matches.map((node) => node.data.label)).toEqual(["Web Server"]);
+    });
+
+    test("matches a needle that only appears at the end of a label", () => {
+        const matches = findNodesBySubstring(nodeIndex, "base");
+        expect(matches.map((node) => node.data.label)).toEqual(["Database"]);
+    });
+
+    test("returns an empty array when no label contains the needle", () => {
+        expect(findNodesBySubstring(nodeIndex, "xyz")).toEqual([]);
     });
 });

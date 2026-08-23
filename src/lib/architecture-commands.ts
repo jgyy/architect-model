@@ -124,6 +124,16 @@ function querySubstringIndex(
     return Array.from(current.matches);
 }
 
+// Public substring lookup for callers outside this module (e.g. ranked
+// autocomplete in node-suggestions.ts) that need matches without depending
+// on the trie's internal node shape.
+export function findNodesBySubstring(
+    nodeIndex: NodeIndex,
+    needle: string,
+): ArchitectureNode[] {
+    return querySubstringIndex(nodeIndex.substringIndex, needle);
+}
+
 export function buildNodeIndex(
     nodes: ArchitectureNode[],
     edges: ArchitectureEdge[] = [],
