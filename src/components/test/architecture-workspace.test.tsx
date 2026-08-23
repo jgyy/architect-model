@@ -623,6 +623,9 @@ describe("ArchitectureWorkspace", () => {
             screen.getByLabelText("Merge architecture file"),
             file,
         );
+        await user.click(
+            await screen.findByRole("button", { name: /Merge \d+ node/ }),
+        );
 
         expect(await screen.findByText("Message Queue")).toBeInTheDocument();
         expect(screen.getByText("Web Server")).toBeInTheDocument();
@@ -636,6 +639,86 @@ describe("ArchitectureWorkspace", () => {
         await user.click(screen.getByTitle("Undo"));
         expect(screen.queryByText("Message Queue")).not.toBeInTheDocument();
         expect(screen.getByText("Web Server")).toBeInTheDocument();
+    });
+
+    test("the merge picker lets you bring in only a subset of the file's nodes", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                        {
+                            id: "cache",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Cache" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+        await user.click(
+            await screen.findByRole("checkbox", { name: /^Cache/ }),
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(screen.queryByText("Cache")).not.toBeInTheDocument();
+        expect(await screen.findByText("Message Queue")).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Merged 1 of 2 node(s) and 0 edge(s) from "extra.json" into the existing architecture.',
+            ),
+        ).toBeInTheDocument();
+    });
+
+    test("cancelling the merge picker leaves the architecture untouched", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+        await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+        expect(screen.queryByText("Message Queue")).not.toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeDisabled();
     });
 
     test("merging a file whose node label collides renames it and notes the rename in the log", async () => {
@@ -663,6 +746,9 @@ describe("ArchitectureWorkspace", () => {
         await user.upload(
             screen.getByLabelText("Merge architecture file"),
             file,
+        );
+        await user.click(
+            await screen.findByRole("button", { name: /Merge \d+ node/ }),
         );
 
         expect(await screen.findByText("Web Server (2)")).toBeInTheDocument();

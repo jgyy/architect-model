@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
     mergeImportedArchitecture,
+    mergeSelectedArchitecture,
     parseImportedArchitecture,
     serializeArchitecture,
 } from "@/lib/architecture-io";
@@ -348,6 +349,116 @@ describe("mergeImportedArchitecture", () => {
         expect(result).toEqual({
             ok: false,
             message: "That file isn't valid JSON.",
+        });
+    });
+});
+
+describe("mergeSelectedArchitecture", () => {
+    test("merges only the selected nodes, dropping the rest", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "Isolated One"), node("y", "Isolated Two")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x"]),
+        );
+
+        expect(result).toEqual({
+            ok: true,
+            architecture: {
+                nodes: [...chain.nodes, node("x", "Isolated One")],
+                edges: chain.edges,
+            },
+            nodeCount: 1,
+            edgeCount: 0,
+            renamedLabels: [],
+        });
+    });
+
+    test("drops an edge when either endpoint isn't selected", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "One"), node("y", "Two"), node("z", "Three")],
+            edges: [edge("x", "y"), edge("y", "z")],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x", "y"]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.edges).toEqual([
+                ...chain.edges,
+                edge("x", "y"),
+            ]);
+            expect(result.edgeCount).toBe(1);
+        }
+    });
+
+    test("keeps an edge when both endpoints are selected", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "One"), node("y", "Two")],
+            edges: [edge("x", "y")],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x", "y"]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.edges).toEqual([
+                ...chain.edges,
+                edge("x", "y"),
+            ]);
+            expect(result.edgeCount).toBe(1);
+        }
+    });
+
+    test("still remaps a colliding id/label within the selected subset", () => {
+        const incoming: Architecture = {
+            nodes: [node("a", "Cache"), node("z", "Other")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["a"]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            const mergedNode = result.architecture.nodes.at(-1);
+            expect(mergedNode?.id).toBe("node-cache");
+            expect(mergedNode?.data.label).toBe("Cache");
+            expect(result.architecture.nodes).toHaveLength(
+                chain.nodes.length + 1,
+            );
+        }
+    });
+
+    test("selecting no nodes merges nothing", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "Isolated")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(chain, incoming, new Set());
+
+        expect(result).toEqual({
+            ok: true,
+            architecture: { nodes: chain.nodes, edges: chain.edges },
+            nodeCount: 0,
+            edgeCount: 0,
+            renamedLabels: [],
         });
     });
 });

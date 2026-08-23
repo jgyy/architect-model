@@ -114,17 +114,20 @@ export function parseImportedArchitecture(
     };
 }
 
-export type MergeArchitectureResult =
-    | {
-          ok: true;
-          architecture: Architecture;
-          nodeCount: number;
-          edgeCount: number;
-          renamedLabels: string[];
-      }
-    | { ok: false; message: string };
+export type MergeArchitectureSuccess = {
+    ok: true;
+    architecture: Architecture;
+    nodeCount: number;
+    edgeCount: number;
+    renamedLabels: string[];
+};
 
-function foldLabel(label: string): string {
+export type MergeArchitectureResult =
+    MergeArchitectureSuccess | { ok: false; message: string };
+
+// Exported so callers (e.g. the merge picker) can preview a rename the
+// same way this module decides one, without re-implementing the folding.
+export function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
 
@@ -139,13 +142,23 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
-// Folds an incoming (already internally-valid) architecture into `current`
-export function mergeImportedArchitecture(
+// Folds a subset of an already-parsed, internally-valid incoming
+// architecture into `current`. Edges touching a node outside the
+// selection are dropped rather than reconnected around it.
+export function mergeSelectedArchitecture(
     current: Architecture,
-    raw: string,
-): MergeArchitectureResult {
-    const parsed = parseImportedArchitecture(raw);
-    if (!parsed.ok) return parsed;
+    incoming: Architecture,
+    selectedNodeIds: ReadonlySet<string>,
+): MergeArchitectureSuccess {
+    const selectedNodes = incoming.nodes.filter((node) =>
+        selectedNodeIds.has(node.id),
+    );
+    const selectedNodeIdSet = new Set(selectedNodes.map((node) => node.id));
+    const selectedEdges = incoming.edges.filter(
+        (edge) =>
+            selectedNodeIdSet.has(edge.source) &&
+            selectedNodeIdSet.has(edge.target),
+    );
 
     const index = buildNodeIndex(current.nodes, current.edges);
     const takenLabels = new Set(
@@ -154,7 +167,7 @@ export function mergeImportedArchitecture(
     const idRemap = new Map<string, string>();
     const renamedLabels: string[] = [];
 
-    const incomingNodes = parsed.architecture.nodes.map((node) => {
+    const incomingNodes = selectedNodes.map((node) => {
         let id = node.id;
         if (index.ids.has(id)) {
             id = uniqueNodeId(slugify(node.data.label), index);
@@ -173,7 +186,7 @@ export function mergeImportedArchitecture(
         return { ...node, id, data: { ...node.data, label } };
     });
 
-    const incomingEdges = parsed.architecture.edges.map((edge) => {
+    const incomingEdges = selectedEdges.map((edge) => {
         const source = idRemap.get(edge.source) ?? edge.source;
         const target = idRemap.get(edge.target) ?? edge.target;
         return { ...edge, id: `edge-${source}-${target}`, source, target };
@@ -185,8 +198,24 @@ export function mergeImportedArchitecture(
             nodes: [...current.nodes, ...incomingNodes],
             edges: [...current.edges, ...incomingEdges],
         },
-        nodeCount: parsed.nodeCount,
-        edgeCount: parsed.edgeCount,
+        nodeCount: incomingNodes.length,
+        edgeCount: incomingEdges.length,
         renamedLabels,
     };
+}
+
+// Folds an entire incoming (already internally-valid) architecture into
+// `current` - the "select everything" case of mergeSelectedArchitecture.
+export function mergeImportedArchitecture(
+    current: Architecture,
+    raw: string,
+): MergeArchitectureResult {
+    const parsed = parseImportedArchitecture(raw);
+    if (!parsed.ok) return parsed;
+
+    return mergeSelectedArchitecture(
+        current,
+        parsed.architecture,
+        new Set(parsed.architecture.nodes.map((node) => node.id)),
+    );
 }

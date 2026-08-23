@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArchitectureCanvas } from "@/components/architecture-canvas";
 import { ConsolePanel } from "@/components/console-panel";
+import { MergePickerDialog } from "@/components/merge-picker-dialog";
 import { SimulationPanel } from "@/components/simulation-panel";
 import {
     buildNodeIndex,
@@ -13,7 +14,8 @@ import {
 } from "@/lib/architecture-commands";
 import {
     ARCHITECTURE_EXPORT_FILENAME,
-    mergeImportedArchitecture,
+    foldLabel,
+    mergeSelectedArchitecture,
     parseImportedArchitecture,
     serializeArchitecture,
 } from "@/lib/architecture-io";
@@ -95,6 +97,11 @@ export function ArchitectureWorkspace({
     const [undoRedo, setUndoRedo] = useState<UndoRedoState>(
         EMPTY_UNDO_REDO_STATE,
     );
+    // A merge file that's been parsed but not yet confirmed via the picker
+    const [pendingMerge, setPendingMerge] = useState<{
+        fileName: string;
+        incoming: Architecture;
+    } | null>(null);
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
     // This tab's own latest known-good state, kept alongside lastPersistedRef
@@ -473,20 +480,77 @@ export function ArchitectureWorkspace({
         [runFileImport],
     );
 
-    const handleMergeFile = useCallback(
-        (file: File) =>
-            runFileImport(
-                file,
-                `merge "${file.name}"`,
-                (raw) => mergeImportedArchitecture(architecture, raw),
-                (result) => {
-                    const base = `Merged ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}" into the existing architecture.`;
-                    return result.renamedLabels?.length
-                        ? `${base} Renamed to avoid duplicates: ${result.renamedLabels.join(", ")}.`
-                        : base;
-                },
-            ),
-        [architecture, runFileImport],
+    // Only parses and opens the picker; the actual merge happens on confirm
+    const handleMergeFile = useCallback((file: File) => {
+        file.text()
+            .then((raw) => {
+                const parsed = parseImportedArchitecture(raw);
+                if (!parsed.ok) {
+                    const id = nextLogId();
+                    setLog((entries) =>
+                        appendLogEntry(entries, {
+                            id,
+                            input: `merge "${file.name}"`,
+                            ok: false,
+                            message: parsed.message,
+                        }),
+                    );
+                    return;
+                }
+                setPendingMerge({
+                    fileName: file.name,
+                    incoming: parsed.architecture,
+                });
+            })
+            .catch(() => {
+                const id = nextLogId();
+                setLog((entries) =>
+                    appendLogEntry(entries, {
+                        id,
+                        input: `merge "${file.name}"`,
+                        ok: false,
+                        message: "Couldn't read that file.",
+                    }),
+                );
+            });
+    }, []);
+
+    const handleCancelMerge = useCallback(() => setPendingMerge(null), []);
+
+    const handleConfirmMerge = useCallback(
+        (selectedNodeIds: Set<string>) => {
+            if (!pendingMerge) return;
+            const label = `merge "${pendingMerge.fileName}"`;
+            const result = mergeSelectedArchitecture(
+                architecture,
+                pendingMerge.incoming,
+                selectedNodeIds,
+            );
+            const id = nextLogId();
+            setUndoRedo((current) =>
+                recordCommand(current, label, architecture),
+            );
+            setArchitecture(result.architecture);
+            const totalAvailable = pendingMerge.incoming.nodes.length;
+            const countPhrase =
+                result.nodeCount === totalAvailable
+                    ? `${result.nodeCount} node(s)`
+                    : `${result.nodeCount} of ${totalAvailable} node(s)`;
+            const base = `Merged ${countPhrase} and ${result.edgeCount} edge(s) from "${pendingMerge.fileName}" into the existing architecture.`;
+            const message = result.renamedLabels.length
+                ? `${base} Renamed to avoid duplicates: ${result.renamedLabels.join(", ")}.`
+                : base;
+            setLog((entries) =>
+                appendLogEntry(entries, {
+                    id,
+                    input: label,
+                    ok: true,
+                    message,
+                }),
+            );
+            setPendingMerge(null);
+        },
+        [architecture, pendingMerge],
     );
 
     return (
@@ -533,6 +597,21 @@ export function ArchitectureWorkspace({
                     onMerge={handleMergeFile}
                 />
             </aside>
+            {pendingMerge && (
+                <MergePickerDialog
+                    fileName={pendingMerge.fileName}
+                    incoming={pendingMerge.incoming}
+                    existingFoldedLabels={
+                        new Set(
+                            architecture.nodes.map((node) =>
+                                foldLabel(node.data.label),
+                            ),
+                        )
+                    }
+                    onConfirm={handleConfirmMerge}
+                    onCancel={handleCancelMerge}
+                />
+            )}
         </div>
     );
 }
