@@ -431,9 +431,7 @@ export function parseCommand(
         architecture.edges,
     ),
 ): CommandResult {
-    // Strip before trimming: an invisible character sitting right at either
-    // end isn't whitespace, so trim() alone wouldn't remove it, and left in
-    // place it can silently break a keyword/separator match further down.
+    // Strip before trimming
     const trimmed = stripInvisibleChars(input).trim();
 
     if (trimmed.length > MAX_COMMAND_LENGTH) {
