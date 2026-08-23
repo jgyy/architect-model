@@ -445,6 +445,26 @@ describe("mergeSelectedArchitecture", () => {
         }
     });
 
+    test("drops an explicitly excluded edge even when both endpoints are selected", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "One"), node("y", "Two")],
+            edges: [edge("x", "y")],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x", "y"]),
+            new Set(["edge-x-y"]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.edges).toEqual(chain.edges);
+            expect(result.edgeCount).toBe(0);
+        }
+    });
+
     test("selecting no nodes merges nothing", () => {
         const incoming: Architecture = {
             nodes: [node("x", "Isolated")],

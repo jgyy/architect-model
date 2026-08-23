@@ -47,10 +47,11 @@ Nodes are also draggable (positions persist), double-click to rename, drag from 
 connect, and a hover-revealed × deletes - each mirrors the command above. A "?" button explains the
 mouse gestures. **Import** replaces the whole architecture with a chosen JSON file, rejecting
 anything malformed or invariant-violating and leaving the current architecture untouched. **Merge**
-instead opens a picker to choose which of the file's nodes to bring in (all checked by default,
-with a live node/edge count and a "will be renamed" hint on any label collision) before adding them
-alongside the existing architecture: a colliding incoming id or label is renamed (`"Cache (2)"`) so
-every node stays addressable, and the log notes any renames.
+instead opens a picker to choose which of the file's nodes (and, independently, which of its
+edges) to bring in (all checked by default, with a live node/edge count and a "will be renamed"
+hint on any label collision) before adding them alongside the existing architecture: a colliding
+incoming id or label is renamed (`"Cache (2)"`) so every node stays addressable, and the log notes
+any renames.
 
 ## History, simulation & multi-tab sync
 
@@ -76,25 +77,20 @@ running `move node ... to step ...`.
 - Merge remaps a colliding incoming id/label rather than rejecting the file, reusing `add node`'s
   own disambiguation - since the two node sets never share an id, the merged graph can't violate
   the invariants above.
-- The merge picker's selection is node-only: an incoming edge is included automatically when both
-  its endpoints are selected, dropped otherwise - deselecting a node in the middle of an incoming
-  chain splits it rather than reconnecting around the gap.
+- The merge picker's edge checkboxes default to "included" when both endpoints are selected, but
+  unchecking one drops just that edge while keeping both nodes - a choice that sticks even if a
+  node is toggled off and back on. It can only drop an edge the file already has, not add one it
+  doesn't; that still needs a follow-up `connect`.
 - `move node ... to step ...` re-lays out node x-positions to match the new step order; edges
   aren't rewired.
 - `undo`/`redo` are two stacks of `{ command, snapshot }` pairs, pushed to by every mutating
   command including import/merge; a fresh command clears the redo branch, and the whole history
   clears on hydration, a cross-tab sync, or "Clear history".
-- Node reference lookup's substring fallback (when a typed name isn't an exact match) is indexed
-  by a trie over every label's suffixes, built once per command alongside the rest of `NodeIndex`
-    - a lookup costs O(query length), not O(nodes), however large the architecture gets.
-- The live-typing autocomplete dropdown (`node-suggestions.ts`) now ranks matches by querying that
-  same trie (`findNodesBySubstring`) instead of scanning every node - a keystroke costs O(query
-  length + matches), not O(nodes). `CommandInput` takes the workspace's already-memoized
-  `NodeIndex` as a prop, so typing never rebuilds it; `suggestNodeReference` still defaults to
-  building one when a caller (e.g. a test) doesn't have one handy.
+- Node reference lookup's substring fallback is indexed by a suffix trie over every label
+  (`NodeIndex`), so a lookup costs O(query length) rather than O(nodes); the live-typing
+  autocomplete dropdown queries that same trie for the same reason.
 
 ## What I'd improve with more time
 
-- The merge picker only selects nodes; you can't keep two selected nodes but drop just the edge
-  between them (or add one back that the file didn't have) without a follow-up `remove edge` /
-  `connect`.
+- The merge picker can drop an edge the incoming file already has, but can't add one it doesn't -
+  connecting two merged nodes that the file left unconnected still needs a follow-up `connect`.

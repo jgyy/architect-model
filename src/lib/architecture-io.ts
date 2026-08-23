@@ -19,11 +19,11 @@ export function serializeArchitecture(architecture: Architecture): string {
 
 export type ImportArchitectureResult =
     | {
-          ok: true;
-          architecture: Architecture;
-          nodeCount: number;
-          edgeCount: number;
-      }
+        ok: true;
+        architecture: Architecture;
+        nodeCount: number;
+        edgeCount: number;
+    }
     | { ok: false; message: string };
 
 // Detects a node stuck in a cycle.
@@ -125,8 +125,7 @@ export type MergeArchitectureSuccess = {
 export type MergeArchitectureResult =
     MergeArchitectureSuccess | { ok: false; message: string };
 
-// Exported so callers (e.g. the merge picker) can preview a rename the
-// same way this module decides one, without re-implementing the folding.
+// Exported so callers (e.g. the merge picker)
 export function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
@@ -142,13 +141,12 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
-// Folds a subset of an already-parsed, internally-valid incoming
-// architecture into `current`. Edges touching a node outside the
-// selection are dropped rather than reconnected around it.
+// Folds a subset of an already-parsed
 export function mergeSelectedArchitecture(
     current: Architecture,
     incoming: Architecture,
     selectedNodeIds: ReadonlySet<string>,
+    excludedEdgeIds: ReadonlySet<string> = new Set(),
 ): MergeArchitectureSuccess {
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedNodeIds.has(node.id),
@@ -157,7 +155,8 @@ export function mergeSelectedArchitecture(
     const selectedEdges = incoming.edges.filter(
         (edge) =>
             selectedNodeIdSet.has(edge.source) &&
-            selectedNodeIdSet.has(edge.target),
+            selectedNodeIdSet.has(edge.target) &&
+            !excludedEdgeIds.has(edge.id),
     );
 
     const index = buildNodeIndex(current.nodes, current.edges);
@@ -204,8 +203,7 @@ export function mergeSelectedArchitecture(
     };
 }
 
-// Folds an entire incoming (already internally-valid) architecture into
-// `current` - the "select everything" case of mergeSelectedArchitecture.
+// Folds an entire incoming (already internally-valid)
 export function mergeImportedArchitecture(
     current: Architecture,
     raw: string,
