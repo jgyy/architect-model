@@ -88,12 +88,7 @@ const REACT_FLOW_THEME_VARS: Record<string, string> = {
     "--xy-minimap-node-background-color": "var(--border-strong)",
 };
 
-// Reconciles the canvas's own live render state against a fresh
-// `architecture.nodes` reference from the parent (e.g. after a command run
-// from another tab, or from this tab's own console/undo). Preserves the
-// currently-dragged node's in-flight position rather than letting a stale,
-// pre-drag position from the incoming array snap it back mid-drag - every
-// other field (and every other node) still adopts the incoming value.
+// Reconciles the canvas's own live render state
 export function reconcileRenderNodes(
     current: ArchitectureNode[],
     incoming: ArchitectureNode[],
@@ -254,10 +249,10 @@ export function ArchitectureCanvas({
             architecture.edges.map((edge) =>
                 traversedEdgeIds.has(edge.id)
                     ? {
-                          ...edge,
-                          style: TRAVERSED_EDGE_STYLE,
-                          markerEnd: TRAVERSED_EDGE_MARKER,
-                      }
+                        ...edge,
+                        style: TRAVERSED_EDGE_STYLE,
+                        markerEnd: TRAVERSED_EDGE_MARKER,
+                    }
                     : edge,
             ),
         [architecture.edges, traversedEdgeIds],
@@ -303,8 +298,8 @@ export function ArchitectureCanvas({
                             {/* The minimap redraws every node's position */}
                             {architecture.nodes.length <=
                                 MINIMAP_NODE_LIMIT && (
-                                <MiniMap pannable zoomable />
-                            )}
+                                    <MiniMap pannable zoomable />
+                                )}
                             <Panel
                                 position="top-left"
                                 className="flex items-center gap-2"

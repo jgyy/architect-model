@@ -6,6 +6,8 @@ runs the same command a typed instruction would.
 
 ## Demo proof
 
+https://www.youtube.com/watch?v=ILF7BVzN8e8
+
 ```mermaid
 graph LR
     Internet:::done -->|traversed| WebServer["Web Server"]:::done -->|traversed| Database:::current
@@ -35,6 +37,8 @@ npm run dev
 
 Open http://localhost:3000. `npm test` runs the unit tests; `npm run check` runs lint, typecheck,
 format, and tests together.
+
+There are sample json files in docs directory to test import export and merge features
 
 ## Supported commands
 
@@ -89,7 +93,6 @@ nodes/edges red. Steps can be dragged or reordered, both running `move node ... 
 
 - A cross-tab `storage` event can overwrite local state with a remote snapshot mid-autosave; a real fix needs synchronous persistence or version tracking - out of proportion for this app's size.
 - The page paints the seed architecture first, then swaps in localStorage's saved state on mount -
-  a visible flash. A synchronous read would remove it but risks hydration-mismatch warnings, judged
-  worse than the flash.
+  a visible flash. A synchronous read would remove it but risks hydration-mismatch warnings.
 - A proper user story on how users could actually benefit from this visualization.
 - More robust implementation of the merging feature.
