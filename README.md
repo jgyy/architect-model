@@ -26,11 +26,11 @@ Red = traversed, amber = current, dashed green = added; five real screenshots of
 saved to `docs/demo/`:
 
 <table>
-<tr><td><img src="docs/demo/1-before.png" width="230"></td><td><b>1. Before</b> - the seeded architecture, step 1 of 3.</td></tr>
-<tr><td><img src="docs/demo/2-after.png" width="230"></td><td><b>2. After</b> - <code>add node Cache</code> + <code>connect Database to Cache</code>.</td></tr>
-<tr><td><img src="docs/demo/3-invalid-command.png" width="230"></td><td><b>3. Validation</b> - an invalid command rejected inline; architecture unchanged.</td></tr>
-<tr><td><img src="docs/demo/4-simulation-mid.png" width="230"></td><td><b>4. Simulating</b> - current step ringed amber, traversed nodes/edges red.</td></tr>
-<tr><td><img src="docs/demo/5-simulation-final.png" width="230"></td><td><b>5. Full trace</b> - final step; the whole attacker path traversed.</td></tr>
+<tr><td align="center"><img src="docs/demo/1-before.png" width="100%"><br><b>1. Before</b> - the seeded architecture, step 1 of 3.</td></tr>
+<tr><td align="center"><img src="docs/demo/2-after.png" width="100%"><br><b>2. After</b> - <code>add node Cache</code> + <code>connect Database to Cache</code>.</td></tr>
+<tr><td align="center"><img src="docs/demo/3-invalid-command.png" width="100%"><br><b>3. Validation</b> - an invalid command rejected inline; architecture unchanged.</td></tr>
+<tr><td align="center"><img src="docs/demo/4-simulation-mid.png" width="100%"><br><b>4. Simulating</b> - current step ringed amber, traversed nodes/edges red.</td></tr>
+<tr><td align="center"><img src="docs/demo/5-simulation-final.png" width="100%"><br><b>5. Full trace</b> - final step; the whole attacker path traversed.</td></tr>
 </table>
 
 ## Run locally
