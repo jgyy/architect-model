@@ -52,7 +52,7 @@ export function SimulationPanel({
         <div className="border-b border-border p-3 font-sans">
             <div className="flex items-center justify-between">
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Simulation
+                    3 · Simulate
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">
                     Step {currentStepIndex + 1} / {stepCount}
@@ -110,7 +110,7 @@ export function SimulationPanel({
             </div>
             <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-accent" />
+                    <span className="h-2 w-2 rounded-full bg-current-step" />
                     current
                 </span>
                 <span className="flex items-center gap-1.5">

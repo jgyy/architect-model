@@ -60,9 +60,7 @@ function maxLogId(entries: LogEntry[]): number {
 // Bounds the console's scrollback
 const MAX_LOG_ENTRIES = 5000;
 
-// A Blob + temporary <a download> is the standard no-backend way to hand the
-// browser a file to save; the object URL only needs to live long enough for
-// the synchronous click() below to pick it up
+// A Blob + temporary <a download> is the standard no-backend way to hand the browser
 function downloadJsonFile(json: string, filename: string): void {
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -93,19 +91,13 @@ export function ArchitectureWorkspace({
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
     const [hydrated, setHydrated] = useState(false);
-    // Ephemeral, per-tab command history for undo/redo - not persisted, and
-    // cleared whenever the architecture changes from outside runCommand
-    // (hydration, a cross-tab sync, or "Clear history"), since a stack of
-    // snapshots from one architecture stops making sense against another.
+    // Ephemeral, per-tab command history for undo/redo
     const [undoRedo, setUndoRedo] = useState<UndoRedoState>(
         EMPTY_UNDO_REDO_STATE,
     );
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
     // This tab's own latest known-good state, kept alongside lastPersistedRef
-    // so an invalid write from elsewhere (e.g. another tab, a stale schema)
-    // can be overwritten with something valid instead of sitting there to
-    // trip up the next reload
     const latestStateRef = useRef<PersistedState | null>(null);
     // Next id to hand out via nextLogId()
     const nextLogIdRef = useRef(1);
@@ -141,8 +133,6 @@ export function ArchitectureWorkspace({
         if (persisted) {
             applyPersisted(persisted);
             // Matches the shape the autosave effect below will independently
-            // recompute on its very next run, so that run correctly no-ops
-            // instead of writing back the exact state we just read
             lastPersistedRef.current = JSON.stringify(persisted);
         }
         setHydrated(true);
@@ -160,10 +150,7 @@ export function ArchitectureWorkspace({
                 lastPersistedRef.current = null;
                 resetToInitial();
             } else if (change.type === "invalid" && latestStateRef.current) {
-                // Something unreadable landed in storage (e.g. another tab
-                // mid-write, a stale/foreign schema). Leave this tab's UI
-                // alone and overwrite it with our own known-good state so a
-                // later reload doesn't fall back to initialArchitecture.
+                // Something unreadable landed in storage
                 savePersistedState(window.localStorage, latestStateRef.current);
                 lastPersistedRef.current = JSON.stringify(
                     latestStateRef.current,
@@ -234,9 +221,7 @@ export function ArchitectureWorkspace({
             const trimmed = text.trim();
             if (!trimmed) return null;
 
-            // help/export/undo/redo are non-mutating or history operations,
-            // not architecture-mutating regex commands - they never reach
-            // parseCommand
+            // help/export/undo/redo are non-mutating or history operations
             const lower = trimmed.toLowerCase();
 
             if (lower === "help" || trimmed === "?") {
@@ -382,11 +367,7 @@ export function ArchitectureWorkspace({
 
     const handleStepReorder = useCallback(
         (nodeId: string, toIndex: number) => {
-            // Reordering shifts every node between the old and new position,
-            // so whichever node the user was currently on may no longer sit
-            // at the same index - follow it, rather than letting "current"
-            // silently jump to a different node purely because it shifted
-            // into that slot
+            // Reordering shifts every node between the old and new position
             const currentNodeId = architecture.nodes[safeStepIndex]?.id;
             const command = buildMoveNodeCommand(
                 nodeId,
@@ -418,9 +399,6 @@ export function ArchitectureWorkspace({
     );
 
     // A whole-architecture replacement, so it's recorded like any other
-    // mutating command (undoable) rather than treated as a persisted-state
-    // hydration - unlike undo/redo, reading the file is async, so this can't
-    // go through runCommand's synchronous, single-return-value shape
     const runFileImport = useCallback(
         (
             file: File,

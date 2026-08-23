@@ -83,10 +83,10 @@ describe("SimulationTimeline", () => {
         const currentText = screen.getByText("2. Handles the request.");
         const currentButton = currentText.closest("button");
         expect(currentButton).toHaveAttribute("aria-current", "true");
-        expect(currentButton).toHaveClass("bg-accent/10");
-        expect(currentText).toHaveClass("text-accent");
+        expect(currentButton).toHaveClass("bg-current-step/10");
+        expect(currentText).toHaveClass("text-current-step");
         const dot = currentButton?.querySelector("span");
-        expect(dot).toHaveClass("bg-accent");
+        expect(dot).toHaveClass("bg-current-step");
     });
 
     test("items before currentStepIndex get the traversed styling instead of the current styling", () => {
@@ -94,8 +94,8 @@ describe("SimulationTimeline", () => {
         const traversedText = screen.getByText("1. Sends the request.");
         const traversedButton = traversedText.closest("button");
         expect(traversedButton).toHaveAttribute("aria-current", "false");
-        expect(traversedButton).not.toHaveClass("bg-accent/10");
-        expect(traversedText).not.toHaveClass("text-accent");
+        expect(traversedButton).not.toHaveClass("bg-current-step/10");
+        expect(traversedText).not.toHaveClass("text-current-step");
         expect(traversedText).toHaveClass("text-foreground");
         const dot = traversedButton?.querySelector("span");
         expect(dot).toHaveClass("bg-danger");
@@ -106,8 +106,8 @@ describe("SimulationTimeline", () => {
         const upcomingText = screen.getByText("3. Persists the result.");
         const upcomingButton = upcomingText.closest("button");
         expect(upcomingButton).toHaveAttribute("aria-current", "false");
-        expect(upcomingButton).not.toHaveClass("bg-accent/10");
-        expect(upcomingText).not.toHaveClass("text-accent");
+        expect(upcomingButton).not.toHaveClass("bg-current-step/10");
+        expect(upcomingText).not.toHaveClass("text-current-step");
         expect(upcomingText).toHaveClass("text-foreground");
         const dot = upcomingButton?.querySelector("span");
         expect(dot).not.toHaveClass("bg-danger");

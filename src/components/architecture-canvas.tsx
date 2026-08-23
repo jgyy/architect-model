@@ -274,7 +274,13 @@ export function ArchitectureCanvas({
                                 MINIMAP_NODE_LIMIT && (
                                 <MiniMap pannable zoomable />
                             )}
-                            <Panel position="top-left">
+                            <Panel
+                                position="top-left"
+                                className="flex items-center gap-2"
+                            >
+                                <span className="flex h-8 items-center rounded-full border border-border bg-chrome px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                    2 · Architecture
+                                </span>
                                 <button
                                     type="button"
                                     onClick={handleAddNodeClick}

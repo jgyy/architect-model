@@ -221,6 +221,9 @@ export function CommandInput({
                     )}
                 </div>
             </div>
+            <p className="mt-1 pl-5 text-[11px] text-muted-foreground">
+                ↑↓ history · Tab to complete
+            </p>
         </form>
     );
 }

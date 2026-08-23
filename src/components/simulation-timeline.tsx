@@ -73,13 +73,13 @@ export function SimulationTimeline({
                             onClick={() => onStepChange(index)}
                             aria-current={isCurrent}
                             className={`flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs hover:bg-border/40 ${
-                                isCurrent ? "bg-accent/10" : ""
+                                isCurrent ? "bg-current-step/10" : ""
                             } ${draggedIndex === index ? "opacity-40" : ""}`}
                         >
                             <span
                                 className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
                                     isCurrent
-                                        ? "bg-accent"
+                                        ? "bg-current-step"
                                         : isTraversed
                                           ? "bg-danger"
                                           : "bg-border-strong"
@@ -88,7 +88,7 @@ export function SimulationTimeline({
                             <span
                                 className={`min-w-0 flex-1 truncate font-mono ${
                                     isCurrent
-                                        ? "text-accent"
+                                        ? "text-current-step"
                                         : "text-foreground"
                                 }`}
                             >
