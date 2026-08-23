@@ -7,10 +7,31 @@ runs the same command a typed instruction would.
 ## Who this is for
 
 As a security engineer reviewing a proposed design, I want to sketch an architecture in plain text
-and step through a simulated attacker's path across it, to see what's reachable, in what order, and
-where the blast radius stops. The seed data (`src/data/example-architecture.ts`) tells that story:
-"Internet → Web Server → Database". A node's position in `architecture.nodes` _is_ its simulation
-step - no separate step list to sync.
+and step through a simulated attacker's path, to see what's reachable, in what order, and where the
+blast radius stops. The seed data (`src/data/example-architecture.ts`) tells that story: "Internet →
+Web Server → Database" - a node's position in `architecture.nodes` _is_ its simulation step.
+
+## Demo proof
+
+```mermaid
+graph LR
+    Internet:::done -->|traversed| WebServer["Web Server"]:::done -->|traversed| Database:::current
+    Database -.->|"add node Cache<br/>connect Database to Cache"| Cache:::added
+    classDef done stroke:#dc2626,color:#dc2626,stroke-width:2px
+    classDef current fill:#f59e0b,stroke:#d97706,color:#fff,stroke-width:3px
+    classDef added fill:#22c55e,stroke:#16a34a,color:#fff
+```
+
+Red = traversed, amber = current, dashed green = added; five real screenshots of the same app,
+saved to `docs/demo/`:
+
+<table>
+<tr><td><img src="docs/demo/1-before.png" width="230"></td><td><b>1. Before</b> - the seeded architecture, step 1 of 3.</td></tr>
+<tr><td><img src="docs/demo/2-after.png" width="230"></td><td><b>2. After</b> - <code>add node Cache</code> + <code>connect Database to Cache</code>.</td></tr>
+<tr><td><img src="docs/demo/3-invalid-command.png" width="230"></td><td><b>3. Validation</b> - an invalid command rejected inline; architecture unchanged.</td></tr>
+<tr><td><img src="docs/demo/4-simulation-mid.png" width="230"></td><td><b>4. Simulating</b> - current step ringed amber, traversed nodes/edges red.</td></tr>
+<tr><td><img src="docs/demo/5-simulation-final.png" width="230"></td><td><b>5. Full trace</b> - final step; the whole attacker path traversed.</td></tr>
+</table>
 
 ## Run locally
 
@@ -39,27 +60,22 @@ autocompletes node names as you type.
 | `export`                        | -                                        | `export`                          | Downloads the architecture as `architecture.json`.            |
 | `undo` / `redo`                 | -                                        | `undo`                            | Reverts / re-applies the last command.                        |
 
-Undo/redo also have toolbar buttons; they cover every command-driven change (typed or
-canvas-driven) but not raw node-position dragging. History is per-tab, and clears on
-"Clear history" or a cross-tab sync.
+Undo/redo also have toolbar buttons, covering every command-driven change (typed or canvas-driven)
+but not raw dragging; history is per-tab and clears on "Clear history" or a cross-tab sync.
 
-Nodes are also draggable (positions persist), double-click to rename, drag from an edge handle to
-connect, and a hover-revealed × deletes - each mirrors the command above. **Import** replaces the
-whole architecture with a chosen JSON file, validating it first. **Merge** opens a picker to choose
-which of the file's nodes/edges to bring in, an **Insert at step** control for where the merged
-block lands in the simulation order, plus a **Connect** control to wire a picked node - from the
-file or already in the existing architecture - to another before confirming.
+Nodes are draggable (positions persist), double-click to rename, drag from an edge handle to
+connect, and a hover-revealed × deletes - each mirrors a command above. **Import** replaces the
+architecture with a validated JSON file; **Merge** picks nodes/edges, an insert step, and connects
+two before confirming.
 
 ## History, simulation & multi-tab sync
 
 The command log, architecture, current step, and playback speed persist to `localStorage` and
-restore on reload (always paused). **Clear history** resets to the seeded example. Two tabs stay
-in sync via the browser's native `storage` event.
+restore on reload (paused). **Clear history** resets to the seed; tabs sync via `storage` events.
 
 The Simulation panel steps through `architecture.nodes` in order: **Prev**/**Next** navigate
-manually; **Play**/**Pause** auto-advance at 0.5x-4x speed. The current step's node is ringed in
-accent; crossed nodes/edges turn red. Steps can be dragged or reordered, both running
-`move node ... to step ...`.
+manually, **Play**/**Pause** auto-advance at 0.5x-4x speed, current node ringed in accent, crossed
+nodes/edges red. Steps can be dragged or reordered, both running `move node ... to step ...`.
 
 ## Key design decisions and assumptions
 
@@ -69,30 +85,16 @@ accent; crossed nodes/edges turn red. Steps can be dragged or reordered, both ru
 - Node matching is case-insensitive substring; duplicate-label rejection is exact-match.
 - The command log doubles as the validation UI - every command is appended with its outcome.
 - Every canvas mouse action synthesizes and runs the same command text a user would type.
-- Edges form a single linear path (one outgoing/incoming edge per node, no cycles); Import
-  re-validates the same invariants against an untrusted file.
-- Merge remaps a colliding incoming id/label rather than rejecting the file, reusing `add node`'s
-  own disambiguation. Its Connect control adds a manual edge under the same invariant as `connect`;
-  From/To span both the incoming file and the existing architecture (grouped in each dropdown), so
-  incoming ids (deterministic slugs of the label) are namespaced (`current:<id>` / `incoming:<id>`)
-  to stay distinguishable if one collides with an existing node's id before the merge remaps it.
-  Insert at step splices the incoming block into `current.nodes` at the chosen index and re-lays
-  out x-positions for the block plus everything after it; earlier nodes keep their position.
-- `move node ... to step ...` re-lays out node x-positions to match the new step order; edges
-  aren't rewired.
-- `undo`/`redo` are two stacks of `{ command, snapshot }` pairs, pushed to by every mutating
-  command including import/merge; a fresh command clears the redo branch, and the whole history
-  clears on hydration, a cross-tab sync, or "Clear history".
-- Node reference lookup's substring fallback is indexed by a suffix trie over every label, so a
-  lookup costs O(query length) rather than O(nodes); the autocomplete dropdown reuses it.
+- Edges form a single linear path (one outgoing/incoming edge per node, no cycles); Import re-validates the same invariants against an untrusted file.
+- Merge remaps a colliding incoming id/label rather than rejecting the file, reusing `add node`'s own disambiguation; From/To are namespaced `current:<id>`/`incoming:<id>` pre-remap.
+  Insert at step splices the incoming block into `current.nodes`, re-laying out positions after it.
+- `move node ... to step ...` re-lays out node x-positions to match the new step order; edges aren't rewired.
+- `undo`/`redo` are two stacks of `{ command, snapshot }` pairs pushed by every mutating command; a fresh command clears redo, and history clears on hydration, cross-tab sync, or "Clear history".
+- Node reference lookup's substring fallback is indexed by a suffix trie over every label, so a lookup costs O(query length) rather than O(nodes); the autocomplete dropdown reuses it.
 
 ## What I'd improve with more time
 
-- A cross-tab `storage` event can overwrite local React state with a remote snapshot if it arrives
-  in the narrow window between a local update and the next autosave flush (autosave runs in a
-  separate effect, not synchronously). A real fix needs synchronous persistence or version
-  tracking; judged out of proportion for this app's size.
-- The page always paints the seed architecture first, then swaps in localStorage's persisted state
-  once the client mounts - a visible flash for a returning user with a different saved session. A
-  synchronous localStorage read in the initial `useState` would remove the flash but risks
-  reintroducing hydration-mismatch warnings, which felt worse than the cosmetic issue.
+- A cross-tab `storage` event can overwrite local state with a remote snapshot mid-autosave; a real fix needs synchronous persistence or version tracking - out of proportion for this app's size.
+- The page paints the seed architecture first, then swaps in localStorage's saved state on mount -
+  a visible flash. A synchronous read would remove it but risks hydration-mismatch warnings, judged
+  worse than the flash.

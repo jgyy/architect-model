@@ -281,9 +281,5 @@ describe("ArchitectureCanvas", () => {
         });
 
         // A real drag-to-reposition gesture goes through @xyflow/react's
-        // d3-drag-based pointer system, which is too fragile to simulate
-        // reliably in jsdom (see the connection-drag recipe for why); the
-        // higher-value create/connect/rename/delete wiring above covers
-        // onNodesChange's actual call sites well enough.
     });
 });
