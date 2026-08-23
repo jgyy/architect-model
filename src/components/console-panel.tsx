@@ -3,6 +3,7 @@
 import {
     CheckCircle2,
     Download,
+    Merge,
     Redo2,
     Trash2,
     Undo2,
@@ -28,6 +29,7 @@ type ConsolePanelProps = {
     onRedo: () => void;
     onExport: () => void;
     onImport: (file: File) => void;
+    onMerge: (file: File) => void;
 };
 
 // A REPL-style console: scrolling command/output history with a live prompt
@@ -44,9 +46,11 @@ export function ConsolePanel({
     onRedo,
     onExport,
     onImport,
+    onMerge,
 }: ConsolePanelProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const mergeInputRef = useRef<HTMLInputElement>(null);
     // Whether the user was already at (or near) the bottom before this log
     // change, kept up to date by handleScroll independently of the log
     // itself settling this only once per user scroll, not once per log
@@ -76,6 +80,12 @@ export function ConsolePanel({
         // reset so choosing the same file again still fires this handler
         event.target.value = "";
         if (file) onImport(file);
+    }
+
+    function handleMergeFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (file) onMerge(file);
     }
 
     return (
@@ -125,6 +135,22 @@ export function ConsolePanel({
                         accept="application/json,.json"
                         onChange={handleFileChange}
                         aria-label="Import architecture file"
+                        className="hidden"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => mergeInputRef.current?.click()}
+                        title="Merge architecture"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
+                    >
+                        <Merge size={14} />
+                    </button>
+                    <input
+                        ref={mergeInputRef}
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={handleMergeFileChange}
+                        aria-label="Merge architecture file"
                         className="hidden"
                     />
                     <button

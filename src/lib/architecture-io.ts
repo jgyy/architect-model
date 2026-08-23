@@ -1,3 +1,8 @@
+import {
+    buildNodeIndex,
+    slugify,
+    uniqueNodeId,
+} from "@/lib/architecture-commands";
 import { isValidArchitecture } from "@/lib/persistence";
 import type { Architecture } from "@/types/architecture";
 
@@ -21,13 +26,7 @@ export type ImportArchitectureResult =
       }
     | { ok: false; message: string };
 
-// Detects a node stuck in a cycle. Fan-out is already capped at one edge per
-// source (checked by the caller before this runs), so every node reachable
-// from an in-degree-0 root sits on a simple path - walk once from each root
-// and whatever's left unvisited afterwards must belong to a cycle instead.
-// A self-loop (source === target) falls out of this for free: that node's
-// only in-edge is its own out-edge, so it never has in-degree 0 and is never
-// visited by any root walk.
+// Detects a node stuck in a cycle.
 function findCyclicNodeId(
     nodeIds: string[],
     outgoingBySource: Map<string, string>,
@@ -48,11 +47,7 @@ function findCyclicNodeId(
     return nodeIds.find((id) => !visited.has(id)) ?? null;
 }
 
-// Re-checks the invariants the rest of the app assumes already hold (see
-// connect() in architecture-commands.ts): unique node ids, edges that only
-// reference real nodes, at most one outgoing/incoming edge per node, and no
-// cycles. localStorage's own writes can be trusted to already satisfy these;
-// an imported file can't be.
+// Re-checks the invariants the rest of the app assumes already hold
 function validateImportedArchitecture(
     architecture: Architecture,
 ): string | null {
@@ -116,5 +111,87 @@ export function parseImportedArchitecture(
         architecture: parsed,
         nodeCount: parsed.nodes.length,
         edgeCount: parsed.edges.length,
+    };
+}
+
+export type MergeArchitectureResult =
+    | {
+          ok: true;
+          architecture: Architecture;
+          nodeCount: number;
+          edgeCount: number;
+          renamedLabels: string[];
+      }
+    | { ok: false; message: string };
+
+function foldLabel(label: string): string {
+    return label.normalize("NFC").toLowerCase();
+}
+
+// Disambiguates a label against the folded labels already in use, mirroring
+// uniqueNodeId's "-2, -3, ..." scheme
+function uniqueLabel(label: string, takenFolded: Set<string>): string {
+    let candidate = label;
+    let suffix = 2;
+    while (takenFolded.has(foldLabel(candidate))) {
+        candidate = `${label} (${suffix})`;
+        suffix += 1;
+    }
+    return candidate;
+}
+
+// Folds an incoming (already internally-valid) architecture into `current`,
+// renaming any id/label that collides so every node stays uniquely
+// addressable. The two node sets never end up sharing an id, so the merged
+// graph can't violate the app's single-in/single-out/no-cycle invariants -
+// there's nothing left to re-validate once the remap is done.
+export function mergeImportedArchitecture(
+    current: Architecture,
+    raw: string,
+): MergeArchitectureResult {
+    const parsed = parseImportedArchitecture(raw);
+    if (!parsed.ok) return parsed;
+
+    const index = buildNodeIndex(current.nodes, current.edges);
+    const takenLabels = new Set(
+        current.nodes.map((node) => foldLabel(node.data.label)),
+    );
+    const idRemap = new Map<string, string>();
+    const renamedLabels: string[] = [];
+
+    const incomingNodes = parsed.architecture.nodes.map((node) => {
+        let id = node.id;
+        if (index.ids.has(id)) {
+            id = uniqueNodeId(slugify(node.data.label), index);
+            idRemap.set(node.id, id);
+        }
+        index.ids.add(id);
+
+        let label = node.data.label;
+        if (takenLabels.has(foldLabel(label))) {
+            const renamed = uniqueLabel(label, takenLabels);
+            renamedLabels.push(`"${label}" renamed to "${renamed}"`);
+            label = renamed;
+        }
+        takenLabels.add(foldLabel(label));
+
+        return { ...node, id, data: { ...node.data, label } };
+    });
+
+    const incomingEdges = parsed.architecture.edges.map((edge) => {
+        const source = idRemap.get(edge.source) ?? edge.source;
+        const target = idRemap.get(edge.target) ?? edge.target;
+        return { ...edge, id: `edge-${source}-${target}`, source, target };
+    });
+
+    return {
+        ok: true,
+        architecture: {
+            nodes: [...current.nodes, ...incomingNodes],
+            edges: [...current.edges, ...incomingEdges],
+        },
+        nodeCount: parsed.nodeCount,
+        edgeCount: parsed.edgeCount,
+        renamedLabels,
     };
 }

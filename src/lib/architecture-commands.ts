@@ -36,7 +36,7 @@ function isBlankLabel(label: string): boolean {
     return label.length === 0;
 }
 
-function slugify(label: string): string {
+export function slugify(label: string): string {
     return label
         .trim()
         .toLowerCase()
@@ -44,7 +44,7 @@ function slugify(label: string): string {
         .replace(/(^-|-$)/g, "");
 }
 
-function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
+export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     let id = `node-${slug}`;
     let suffix = 2;
     while (nodeIndex.ids.has(id)) {

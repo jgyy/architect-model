@@ -13,6 +13,7 @@ import {
 } from "@/lib/architecture-commands";
 import {
     ARCHITECTURE_EXPORT_FILENAME,
+    mergeImportedArchitecture,
     parseImportedArchitecture,
     serializeArchitecture,
 } from "@/lib/architecture-io";
@@ -420,12 +421,28 @@ export function ArchitectureWorkspace({
     // mutating command (undoable) rather than treated as a persisted-state
     // hydration - unlike undo/redo, reading the file is async, so this can't
     // go through runCommand's synchronous, single-return-value shape
-    const handleImportFile = useCallback(
-        (file: File) => {
-            const label = `import "${file.name}"`;
+    const runFileImport = useCallback(
+        (
+            file: File,
+            label: string,
+            parse: (raw: string) =>
+                | {
+                      ok: true;
+                      architecture: Architecture;
+                      nodeCount: number;
+                      edgeCount: number;
+                      renamedLabels?: string[];
+                  }
+                | { ok: false; message: string },
+            buildMessage: (result: {
+                nodeCount: number;
+                edgeCount: number;
+                renamedLabels?: string[];
+            }) => string,
+        ) => {
             file.text()
                 .then((raw) => {
-                    const result = parseImportedArchitecture(raw);
+                    const result = parse(raw);
                     const id = nextLogId();
                     if (!result.ok) {
                         setLog((entries) =>
@@ -447,7 +464,7 @@ export function ArchitectureWorkspace({
                             id,
                             input: label,
                             ok: true,
-                            message: `Imported ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}".`,
+                            message: buildMessage(result),
                         }),
                     );
                 })
@@ -464,6 +481,34 @@ export function ArchitectureWorkspace({
                 });
         },
         [architecture],
+    );
+
+    const handleImportFile = useCallback(
+        (file: File) =>
+            runFileImport(
+                file,
+                `import "${file.name}"`,
+                parseImportedArchitecture,
+                (result) =>
+                    `Imported ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}".`,
+            ),
+        [runFileImport],
+    );
+
+    const handleMergeFile = useCallback(
+        (file: File) =>
+            runFileImport(
+                file,
+                `merge "${file.name}"`,
+                (raw) => mergeImportedArchitecture(architecture, raw),
+                (result) => {
+                    const base = `Merged ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}" into the existing architecture.`;
+                    return result.renamedLabels?.length
+                        ? `${base} Renamed to avoid duplicates: ${result.renamedLabels.join(", ")}.`
+                        : base;
+                },
+            ),
+        [architecture, runFileImport],
     );
 
     return (
@@ -506,6 +551,7 @@ export function ArchitectureWorkspace({
                     onRedo={() => runCommand("redo")}
                     onExport={() => runCommand("export")}
                     onImport={handleImportFile}
+                    onMerge={handleMergeFile}
                 />
             </aside>
         </div>

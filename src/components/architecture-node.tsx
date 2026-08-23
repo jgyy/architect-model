@@ -17,12 +17,9 @@ const EMPTY_HIGHLIGHT: SimulationHighlight = { traversedNodeIds: new Set() };
 export const HighlightedNodeContext =
     createContext<SimulationHighlight>(EMPTY_HIGHLIGHT);
 
-// Mouse-driven mutations, wired up by ArchitectureCanvas - mirrors how edges
-// get their own delete callback via EdgeDeleteContext
+// Mouse-driven mutations, wired up by ArchitectureCanvas
 export type NodeActions = {
-    // Returns whether the rename was accepted (e.g. false on a duplicate
-    // label), so the node can stay in edit mode instead of silently
-    // reverting the user's input with no visible feedback
+    // Returns whether the rename was accepted
     onRename: (nodeId: string, newLabel: string) => boolean;
     onDelete: (nodeId: string) => void;
     // Id of a just-created node that should open straight into edit mode
@@ -56,9 +53,7 @@ export function ArchitectureNode({
     const [draft, setDraft] = useState(data.label);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Enter edit mode the first render a just-created node sees itself as
-    // the auto-edit target - a render-time state adjustment (not an effect)
-    // so the input is already showing on the node's very first paint
+    // Enter edit mode the first render a just-created node
     const [consumedAutoEditFor, setConsumedAutoEditFor] = useState<
         string | null
     >(null);
@@ -68,7 +63,7 @@ export function ArchitectureNode({
         setIsEditing(true);
     }
 
-    // Tells the canvas the auto-edit hand-off is done, once
+    // Tells the canvas the auto-edit hand-off is done
     useEffect(() => {
         if (autoEditNodeId === id) onAutoEditConsumed();
     }, [autoEditNodeId, id, onAutoEditConsumed]);
@@ -88,12 +83,7 @@ export function ArchitectureNode({
             setIsEditing(false);
             return;
         }
-        // A blank draft is passed through too (rather than silently
-        // cancelled here) so it hits the same "cannot be blank" rejection
-        // parseCommand already gives the typed `rename node` path - and
-        // stays in edit mode on rejection (e.g. that, or a duplicate label)
-        // instead of silently reverting - the only other trace of the
-        // failure is a console log entry the user may not be looking at
+        // A blank draft is passed through too
         if (onRename(id, trimmed)) {
             setIsEditing(false);
         } else {
@@ -119,9 +109,7 @@ export function ArchitectureNode({
                         : "border-border"
             }`}
         >
-            {/* Color alone (the ring/border) isn't a reliable signal for
-            colorblind or screen-reader users - this backs it with text and,
-            for traversed, a dashed rather than solid border too */}
+            {/* A dashed rather than solid border too */}
             {(current || traversed) && (
                 <span className="sr-only">
                     {current
