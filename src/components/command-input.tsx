@@ -87,6 +87,8 @@ export function CommandInput({
         onChange(applied.value);
         pendingCursorRef.current = applied.cursor;
         setDismissed(true);
+        // Otherwise a stale recall from before the suggestion was accepted
+        setHistoryState(IDLE_HISTORY);
         inputRef.current?.focus();
     }
 
@@ -178,8 +180,13 @@ export function CommandInput({
                         role="combobox"
                         aria-expanded={options.length > 0}
                         aria-controls="command-suggestions"
+                        aria-activedescendant={
+                            options.length > 0
+                                ? `command-suggestion-${options[activeOptionIndex].id}`
+                                : undefined
+                        }
                         style={{ caretColor: "var(--accent)" }}
-                        className="w-full bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                        className="w-full rounded-sm bg-transparent font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                     {options.length > 0 && (
                         <ul
@@ -190,6 +197,7 @@ export function CommandInput({
                             {options.map((node, index) => (
                                 <li
                                     key={node.id}
+                                    id={`command-suggestion-${node.id}`}
                                     role="option"
                                     aria-selected={index === activeOptionIndex}
                                 >

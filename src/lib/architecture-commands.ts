@@ -206,6 +206,17 @@ function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
     return match !== null && !Array.isArray(match);
 }
 
+// True when sourceLabel is the resolved node's whole label, not merely a
+// substring match of it - lets resolveRenameArgs/resolveMoveNodeArgs prefer
+// this split over an earlier " to "/" to step " occurrence that happens to
+// fall inside the node's own label (e.g. renaming "Point to Point Link")
+function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
+    return (
+        isSingleNode(match) &&
+        foldLabel(normalizeLabel(sourceLabel)) === foldLabel(match.data.label)
+    );
+}
+
 function resolveConnectionEndpoints(
     rest: string,
     architecture: Architecture,
@@ -234,6 +245,34 @@ type ResolvedRenameArgs = {
     source: EndpointMatch;
 };
 
+// A trailing " to " with nothing after it (a blank new label) never
+// survives as a real split: parseCommand's own leading trim() - and, for a
+// canvas-synthesized command, runCommand's trim() before that - strips the
+// separator's trailing space first, so by the time splitConnectionArgs runs
+// the string just ends in "...to" with no space left to match against.
+// Recognize that case explicitly instead of misreporting it as a missing
+// separator, so it reaches the real "label cannot be blank" rejection.
+function resolveTrailingSeparatorWithBlankTarget(
+    rest: string,
+    architecture: Architecture,
+    nodeIndex: NodeIndex,
+    separators: string[],
+): ResolvedRenameArgs | null {
+    const lower = rest.toLowerCase();
+    const trimmedSeparator = separators.find((separator) =>
+        lower.endsWith(separator.trimEnd()),
+    );
+    if (!trimmedSeparator) return null;
+    const sourceLabel = rest
+        .slice(0, rest.length - trimmedSeparator.trimEnd().length)
+        .trim();
+    return {
+        sourceLabel,
+        newLabel: "",
+        source: findNodeOrAmbiguity(sourceLabel, architecture, nodeIndex),
+    };
+}
+
 // Unlike resolveConnectionEndpoints, only the left side is a node reference
 function resolveRenameArgs(
     rest: string,
@@ -242,7 +281,13 @@ function resolveRenameArgs(
     separators: string[],
 ): ResolvedRenameArgs | null {
     const splits = splitConnectionArgs(rest, separators);
-    if (splits.length === 0) return null;
+    const trailingBlank = resolveTrailingSeparatorWithBlankTarget(
+        rest,
+        architecture,
+        nodeIndex,
+        separators,
+    );
+    if (splits.length === 0) return trailingBlank;
 
     const resolved = splits.map((split) => ({
         sourceLabel: split.sourceLabel,
@@ -250,7 +295,20 @@ function resolveRenameArgs(
         source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
     }));
 
-    return resolved.find((r) => isSingleNode(r.source)) ?? resolved[0];
+    return (
+        resolved.find((r) => isExactLabelMatch(r.sourceLabel, r.source)) ??
+        // A real (non-blank-target) split only ever wins here by matching a
+        // node as a mere substring of its label - if the label's own
+        // trailing " to " is the whole story (a blank rename attempt on a
+        // node whose label happens to contain a separator word), that's a
+        // truer read than treating the substring hit as the new label
+        (trailingBlank &&
+        isExactLabelMatch(trailingBlank.sourceLabel, trailingBlank.source)
+            ? trailingBlank
+            : null) ??
+        resolved.find((r) => isSingleNode(r.source)) ??
+        resolved[0]
+    );
 }
 
 type ResolvedMoveArgs = {
@@ -277,8 +335,14 @@ function resolveMoveNodeArgs(
 
     return (
         resolved.find(
+            (r) =>
+                isExactLabelMatch(r.sourceLabel, r.source) &&
+                /^\d+$/.test(r.positionText),
+        ) ??
+        resolved.find(
             (r) => isSingleNode(r.source) && /^\d+$/.test(r.positionText),
-        ) ?? resolved[0]
+        ) ??
+        resolved[0]
     );
 }
 

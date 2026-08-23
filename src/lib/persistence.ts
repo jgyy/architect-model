@@ -71,13 +71,7 @@ function isValidArchitecture(value: unknown): value is Architecture {
     );
 }
 
-// Sessions saved before stepIndex/speedIndex existed have neither field at
-// all; treat that (and only that) as the older schema and default them,
-// instead of discarding an otherwise-intact architecture + log. Any other
-// shape (e.g. only one of the two present, or one of the wrong type) is
-// genuinely corrupted data and is still rejected. A leftover top-level
-// `trace` array - from before simulation steps moved onto node data - is
-// simply not read here, so its presence or shape no longer matters.
+// Sessions saved before stepIndex/speedIndex existed
 function parsePersistedState(value: unknown): PersistedState | null {
     if (!isRecord(value)) return null;
     if (!isValidArchitecture(value.architecture)) return null;
@@ -135,18 +129,13 @@ export function savePersistedState(
 ): void {
     try {
         storage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // best-effort persistence: a full quota or a storage-restricted
-        // context (e.g. private browsing) shouldn't crash the app
-    }
+    } catch {}
 }
 
 export function clearPersistedState(storage: StorageLike): void {
     try {
         storage.removeItem(STORAGE_KEY);
-    } catch {
-        // see savePersistedState
-    }
+    } catch {}
 }
 
 export type PersistedStateChange =

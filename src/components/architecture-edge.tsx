@@ -5,6 +5,7 @@ import {
     BaseEdge,
     EdgeLabelRenderer,
     getBezierPath,
+    Position,
     type EdgeProps,
 } from "@xyflow/react";
 import { X } from "lucide-react";
@@ -45,18 +46,20 @@ export function ArchitectureEdge({
     markerEnd,
 }: EdgeProps<ArchitectureEdgeType>) {
     const onDelete = useContext(EdgeDeleteContext);
-    const [hovered, setHovered] = useState(false);
-    const [edgePath, labelX, labelY] =
-        source === target
-            ? getSelfLoopPath(sourceX, sourceY, targetX, targetY)
-            : getBezierPath({
-                  sourceX,
-                  sourceY,
-                  sourcePosition,
-                  targetX,
-                  targetY,
-                  targetPosition,
-              });
+    const [revealed, setRevealed] = useState(false);
+    // Handles are fixed
+    const isSelfLoop = source === target;
+    const reversed = !isSelfLoop && targetX < sourceX;
+    const [edgePath, labelX, labelY] = isSelfLoop
+        ? getSelfLoopPath(sourceX, sourceY, targetX, targetY)
+        : getBezierPath({
+              sourceX,
+              sourceY,
+              sourcePosition: reversed ? Position.Left : sourcePosition,
+              targetX,
+              targetY,
+              targetPosition: reversed ? Position.Right : targetPosition,
+          });
 
     return (
         <>
@@ -72,14 +75,16 @@ export function ArchitectureEdge({
                 fill="none"
                 stroke="transparent"
                 strokeWidth={20}
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => setHovered(false)}
+                onMouseEnter={() => setRevealed(true)}
+                onMouseLeave={() => setRevealed(false)}
             />
             <EdgeLabelRenderer>
                 <button
                     type="button"
-                    onMouseEnter={() => setHovered(true)}
-                    onMouseLeave={() => setHovered(false)}
+                    onMouseEnter={() => setRevealed(true)}
+                    onMouseLeave={() => setRevealed(false)}
+                    onFocus={() => setRevealed(true)}
+                    onBlur={() => setRevealed(false)}
                     onClick={(event) => {
                         event.stopPropagation();
                         onDelete(id);
@@ -88,10 +93,10 @@ export function ArchitectureEdge({
                     style={{
                         position: "absolute",
                         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                        pointerEvents: hovered ? "all" : "none",
+                        pointerEvents: revealed ? "all" : "none",
                     }}
                     className={`flex h-5 w-5 items-center justify-center rounded-full border border-danger bg-chrome text-danger shadow-sm transition-opacity ${
-                        hovered ? "opacity-100" : "opacity-0"
+                        revealed ? "opacity-100" : "opacity-0"
                     }`}
                 >
                     <X size={12} />

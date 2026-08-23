@@ -168,6 +168,36 @@ describe("CommandInput", () => {
             expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
         });
 
+        test("accepting a suggestion mid history-recall ends the recall, so a later ArrowDown doesn't snap back to the pre-recall draft", async () => {
+            const user = userEvent.setup();
+            const onChangeSpy = vi.fn();
+            const { input } = renderCommandInput({
+                commands: ["connect Ca"],
+                onChangeSpy,
+            });
+            await user.click(input);
+
+            // ArrowUp recalls "connect Ca" from history, opening the listbox
+            await user.keyboard("{ArrowUp}");
+            expect(input).toHaveValue("connect Ca");
+            expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+            // Accept the suggestion without typing anything else
+            await user.keyboard("{Enter}");
+            expect(input).toHaveValue("connect Cache ");
+
+            onChangeSpy.mockClear();
+            await user.keyboard("{ArrowDown}");
+
+            // Before the fix, historyState was untouched by accepting the
+            // suggestion, so this ArrowDown would still see the stale
+            // mid-recall state and reset the field to the empty pre-recall
+            // draft. With the recall properly ended, ArrowDown here is a
+            // plain no-op.
+            expect(onChangeSpy).not.toHaveBeenCalled();
+            expect(input).toHaveValue("connect Cache ");
+        });
+
         test("clicking an option selects it and calls onChange with the completed text", async () => {
             const user = userEvent.setup();
             const onChangeSpy = vi.fn();
@@ -180,6 +210,28 @@ describe("CommandInput", () => {
 
             expect(onChangeSpy).toHaveBeenCalledWith("connect Cache ");
             expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+        });
+
+        test("aria-activedescendant tracks the active option so screen readers announce it", async () => {
+            const user = userEvent.setup();
+            const { input } = renderCommandInput();
+            await user.type(input, "connect c");
+
+            expect(input).toHaveAttribute(
+                "aria-activedescendant",
+                "command-suggestion-n-cache",
+            );
+
+            await user.keyboard("{ArrowDown}");
+            expect(input).toHaveAttribute(
+                "aria-activedescendant",
+                "command-suggestion-n-cluster",
+            );
+        });
+
+        test("aria-activedescendant is absent when there's no listbox open", () => {
+            const { input } = renderCommandInput();
+            expect(input).not.toHaveAttribute("aria-activedescendant");
         });
 
         test("Escape dismisses the suggestion list", async () => {

@@ -458,8 +458,7 @@ describe("parseCommand - node commands", () => {
             edges: [],
         };
 
-        // trailing zero-width space so a "to" separator is still found but
-        // the label normalizes to blank, mirroring the add-node blank test
+        // trailing zero-width space so a "to" separator is still found
         const result = parseCommand(
             `rename node Web Server to ${"​"}`,
             architecture,
@@ -469,6 +468,69 @@ describe("parseCommand - node commands", () => {
         if (result.ok)
             throw new Error("expected blank new label to be rejected");
         expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("rejects a plain trailing 'to' with nothing after it (no zero-width space) as a blank label, not a missing separator", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        // The outer trim()
+        const result = parseCommand("rename node Web Server to", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected blank new label to be rejected");
+        expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("rejects a plain trailing 'to' for a source label that itself contains a separator word", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-point-to-point-link",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Point to Point Link" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Point to Point Link to",
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected blank new label to be rejected");
+        expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("rejects a plain trailing 'to' when the source doesn't reference any node", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("rename node Ghost to", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected a no-such-node failure");
+        expect(result.message).toBe('No node named "Ghost".');
     });
 
     test("rejects renaming a node to a label already used by a different node", () => {
@@ -519,6 +581,28 @@ describe("parseCommand - node commands", () => {
         expect(result.ok).toBe(false);
         if (result.ok) throw new Error("expected no-op rename to be rejected");
         expect(result.message).toBe('"Web Server" is already named that.');
+    });
+
+    test('renaming a node whose own label contains a " to " separator uses the whole label, not a truncated prefix', () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-point-to-point-link",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Point to Point Link" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(
+            "rename node Point to Point Link to New Name",
+            architecture,
+        );
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.nodes[0].data.label).toBe("New Name");
     });
 
     test('accepts "relabel node ... to ..." as an alias for rename node', () => {

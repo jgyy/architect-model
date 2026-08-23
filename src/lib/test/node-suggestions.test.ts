@@ -266,6 +266,30 @@ describe("suggestNodeReference", () => {
 
         expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
     });
+
+    test("suggests the node being moved for the first argument of 'move node'", () => {
+        const suggestion = suggestNodeReference("move node We", architecture);
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+        expect(suggestion!.replaceFrom).toBe("move node ".length);
+        expect(suggestion!.replaceTo).toBe("move node We".length);
+    });
+
+    test("suggests nothing for the step-number argument of 'move node A to step B', since it isn't a node reference", () => {
+        const input = "move node Web Server to step 1";
+        const suggestion = suggestNodeReference(input, architecture);
+
+        expect(suggestion).toBeNull();
+    });
+
+    test('suggests the node being moved for "reorder node", the move alias', () => {
+        const suggestion = suggestNodeReference(
+            "reorder node We",
+            architecture,
+        );
+
+        expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+    });
 });
 
 describe("applyNodeSuggestion", () => {

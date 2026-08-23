@@ -9,7 +9,11 @@ type GuideTip = { title: string; description: string };
 const TIPS: GuideTip[] = [
     { title: "Pan", description: "Drag empty canvas space to move around." },
     { title: "Zoom", description: "Scroll, pinch, or use the +/− controls." },
-    { title: "Add a node", description: "Double-click empty canvas space." },
+    {
+        title: "Add a node",
+        description:
+            'Double-click empty canvas space, or use the "Add node" button.',
+    },
     {
         title: "Connect nodes",
         description:

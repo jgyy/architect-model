@@ -69,6 +69,11 @@ export function ArchitectureWorkspace({
     const [hydrated, setHydrated] = useState(false);
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
+    // This tab's own latest known-good state, kept alongside lastPersistedRef
+    // so an invalid write from elsewhere (e.g. another tab, a stale schema)
+    // can be overwritten with something valid instead of sitting there to
+    // trip up the next reload
+    const latestStateRef = useRef<PersistedState | null>(null);
     // Next id to hand out via nextLogId()
     const nextLogIdRef = useRef(1);
 
@@ -98,7 +103,13 @@ export function ArchitectureWorkspace({
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const persisted = loadPersistedState(window.localStorage);
-        if (persisted) applyPersisted(persisted);
+        if (persisted) {
+            applyPersisted(persisted);
+            // Matches the shape the autosave effect below will independently
+            // recompute on its very next run, so that run correctly no-ops
+            // instead of writing back the exact state we just read
+            lastPersistedRef.current = JSON.stringify(persisted);
+        }
         setHydrated(true);
     }, [applyPersisted]);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -113,6 +124,15 @@ export function ArchitectureWorkspace({
             } else if (change.type === "cleared") {
                 lastPersistedRef.current = null;
                 resetToInitial();
+            } else if (change.type === "invalid" && latestStateRef.current) {
+                // Something unreadable landed in storage (e.g. another tab
+                // mid-write, a stale/foreign schema). Leave this tab's UI
+                // alone and overwrite it with our own known-good state so a
+                // later reload doesn't fall back to initialArchitecture.
+                savePersistedState(window.localStorage, latestStateRef.current);
+                lastPersistedRef.current = JSON.stringify(
+                    latestStateRef.current,
+                );
             }
         }
         window.addEventListener("storage", handleStorage);
@@ -133,6 +153,7 @@ export function ArchitectureWorkspace({
             stepIndex: safeStepIndex,
             speedIndex,
         };
+        latestStateRef.current = nextState;
         const raw = JSON.stringify(nextState);
         if (raw === lastPersistedRef.current) return;
         savePersistedState(window.localStorage, nextState);
@@ -242,13 +263,14 @@ export function ArchitectureWorkspace({
     );
 
     const handleNodeRename = useCallback(
-        (nodeId: string, newLabel: string) => {
+        (nodeId: string, newLabel: string): boolean => {
             const command = buildRenameNodeCommand(
                 nodeId,
                 newLabel,
                 architecture,
             );
-            if (command) runCommand(command);
+            if (!command) return false;
+            return runCommand(command)?.ok ?? false;
         },
         [architecture, runCommand],
     );
@@ -263,14 +285,28 @@ export function ArchitectureWorkspace({
 
     const handleStepReorder = useCallback(
         (nodeId: string, toIndex: number) => {
+            // Reordering shifts every node between the old and new position,
+            // so whichever node the user was currently on may no longer sit
+            // at the same index - follow it, rather than letting "current"
+            // silently jump to a different node purely because it shifted
+            // into that slot
+            const currentNodeId = architecture.nodes[safeStepIndex]?.id;
             const command = buildMoveNodeCommand(
                 nodeId,
                 toIndex + 1,
                 architecture,
             );
-            if (command) runCommand(command);
+            if (!command) return;
+            const result = runCommand(command);
+            if (!result?.ok || !currentNodeId) return;
+            const newIndex = result.architecture.nodes.findIndex(
+                (node) => node.id === currentNodeId,
+            );
+            if (newIndex !== -1 && newIndex !== safeStepIndex) {
+                setCurrentStepIndex(newIndex);
+            }
         },
-        [architecture, runCommand],
+        [architecture, safeStepIndex, runCommand],
     );
 
     const handleNodeCreate = useCallback(
@@ -285,8 +321,8 @@ export function ArchitectureWorkspace({
     );
 
     return (
-        <div className="flex h-full w-full">
-            <div className="min-w-0 flex-1">
+        <div className="flex h-full w-full flex-col md:flex-row">
+            <div className="min-h-0 min-w-0 flex-1">
                 <ArchitectureCanvas
                     architecture={architecture}
                     highlightedNodeId={highlightedNodeId}
@@ -300,7 +336,7 @@ export function ArchitectureWorkspace({
                     onEdgeDelete={handleEdgeDelete}
                 />
             </div>
-            <aside className="flex w-[80ch] max-w-[min(80ch,70vw)] shrink-0 flex-col border-l border-border bg-chrome font-mono text-sm">
+            <aside className="flex h-[45vh] w-full shrink-0 flex-col border-t border-border bg-chrome font-mono text-sm md:h-auto md:w-[80ch] md:max-w-[min(80ch,70vw)] md:border-t-0 md:border-l">
                 {architecture.nodes.length > 0 && (
                     <SimulationPanel
                         architecture={architecture}

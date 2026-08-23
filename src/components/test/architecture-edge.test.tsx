@@ -98,4 +98,78 @@ describe("ArchitectureEdge", () => {
         fireEvent.click(screen.getByTitle("Remove edge"));
         expect(onEdgeDelete).toHaveBeenCalledWith("edge-self-loop");
     });
+
+    test("a normal left-to-right edge bows away from its own node (the standard, expected shape)", async () => {
+        // a (x:0) -> b (x:200): b sits to the right of a, the normal case
+        const { container } = await renderCanvas(NORMAL_EDGE_ONLY);
+        const d = container
+            .querySelector('[data-id="edge-normal"] path')
+            ?.getAttribute("d");
+        expect(d).toBeTruthy();
+
+        const match = d!.match(
+            /^M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)$/,
+        );
+        expect(match).not.toBeNull();
+        const [, sourceX, , sourceControlX, , targetControlX, , targetX] =
+            match!.map(Number);
+
+        // source's control point bows right (away from target), target's
+        // bows left (away from source) - the standard left-to-right sweep
+        expect(sourceControlX).toBeGreaterThan(sourceX);
+        expect(targetControlX).toBeLessThan(targetX);
+    });
+
+    test("an edge whose target has been reordered to the left of its source bows inward instead of looping around", async () => {
+        // c (x:-200) sits to the LEFT of a (x:0), its source - as can happen
+        // after "move node ... to step N" reorders nodes without touching
+        // edges (see architecture-commands.ts's move-node handler)
+        const reversedArchitecture: Architecture = {
+            nodes: [
+                NODE_A,
+                {
+                    id: "c",
+                    type: "default",
+                    position: { x: -200, y: 0 },
+                    data: { label: "Cache" },
+                },
+            ],
+            edges: [{ id: "edge-reversed", source: "a", target: "c" }],
+        };
+        const { container } = await renderCanvas(reversedArchitecture);
+        const d = container
+            .querySelector('[data-id="edge-reversed"] path')
+            ?.getAttribute("d");
+        expect(d).toBeTruthy();
+
+        const match = d!.match(
+            /^M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)$/,
+        );
+        expect(match).not.toBeNull();
+        const [, sourceX, , sourceControlX, , targetControlX, , targetX] =
+            match!.map(Number);
+
+        // Without the fix these would flip: the source's control point
+        // would bow right (away from target, which is now on the left) and
+        // the target's would bow left (away from source, now on the right)
+        // - producing a huge loop instead of this tight, inward-bowing curve
+        expect(sourceControlX).toBeLessThan(sourceX);
+        expect(targetControlX).toBeGreaterThan(targetX);
+    });
+
+    test("keyboard-focusing the Remove edge button reveals and enables it, not just hovering does", async () => {
+        await renderCanvas(NORMAL_EDGE_ONLY);
+        const button = screen.getByTitle("Remove edge");
+
+        expect(button).toHaveClass("opacity-0");
+        expect(button).toHaveStyle({ pointerEvents: "none" });
+
+        fireEvent.focus(button);
+        expect(button).toHaveClass("opacity-100");
+        expect(button).toHaveStyle({ pointerEvents: "all" });
+
+        fireEvent.blur(button);
+        expect(button).toHaveClass("opacity-0");
+        expect(button).toHaveStyle({ pointerEvents: "none" });
+    });
 });

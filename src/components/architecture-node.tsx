@@ -20,7 +20,10 @@ export const HighlightedNodeContext =
 // Mouse-driven mutations, wired up by ArchitectureCanvas - mirrors how edges
 // get their own delete callback via EdgeDeleteContext
 export type NodeActions = {
-    onRename: (nodeId: string, newLabel: string) => void;
+    // Returns whether the rename was accepted (e.g. false on a duplicate
+    // label), so the node can stay in edit mode instead of silently
+    // reverting the user's input with no visible feedback
+    onRename: (nodeId: string, newLabel: string) => boolean;
     onDelete: (nodeId: string) => void;
     // Id of a just-created node that should open straight into edit mode
     autoEditNodeId: string | null;
@@ -28,7 +31,7 @@ export type NodeActions = {
 };
 
 const NOOP_NODE_ACTIONS: NodeActions = {
-    onRename: () => {},
+    onRename: () => true,
     onDelete: () => {},
     autoEditNodeId: null,
     onAutoEditConsumed: () => {},
@@ -80,9 +83,22 @@ export function ArchitectureNode({
     }
 
     function commitEditing() {
-        setIsEditing(false);
         const trimmed = draft.trim();
-        if (trimmed && trimmed !== data.label) onRename(id, trimmed);
+        if (trimmed === data.label) {
+            setIsEditing(false);
+            return;
+        }
+        // A blank draft is passed through too (rather than silently
+        // cancelled here) so it hits the same "cannot be blank" rejection
+        // parseCommand already gives the typed `rename node` path - and
+        // stays in edit mode on rejection (e.g. that, or a duplicate label)
+        // instead of silently reverting - the only other trace of the
+        // failure is a console log entry the user may not be looking at
+        if (onRename(id, trimmed)) {
+            setIsEditing(false);
+        } else {
+            inputRef.current?.focus();
+        }
     }
 
     function cancelEditing() {
@@ -92,16 +108,27 @@ export function ArchitectureNode({
 
     return (
         <div
+            aria-current={current ? "step" : undefined}
             className={`group relative max-w-64 rounded-lg border bg-chrome px-3 py-2 text-sm font-medium break-words text-chrome-foreground shadow-sm transition-shadow hover:shadow-md ${
                 current
                     ? "border-accent ring-2 ring-accent/30"
                     : traversed
-                      ? "border-danger ring-2 ring-danger/30"
+                      ? "border-danger border-dashed ring-2 ring-danger/30"
                       : selected
                         ? "border-accent/60 ring-1 ring-accent/20"
                         : "border-border"
             }`}
         >
+            {/* Color alone (the ring/border) isn't a reliable signal for
+            colorblind or screen-reader users - this backs it with text and,
+            for traversed, a dashed rather than solid border too */}
+            {(current || traversed) && (
+                <span className="sr-only">
+                    {current
+                        ? ", current simulation step"
+                        : ", already traversed"}
+                </span>
+            )}
             <Handle type="target" position={Position.Left} />
             {isEditing ? (
                 <input
@@ -140,7 +167,7 @@ export function ArchitectureNode({
                     onDelete(id);
                 }}
                 title="Remove node"
-                className="nodrag nopan absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-danger bg-chrome text-danger opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                className="nodrag nopan absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-danger bg-chrome text-danger opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
             >
                 <X size={12} />
             </button>

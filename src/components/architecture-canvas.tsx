@@ -16,6 +16,7 @@ import {
     Controls,
     MarkerType,
     MiniMap,
+    Panel,
     ReactFlow,
     useReactFlow,
     type Connection,
@@ -23,6 +24,7 @@ import {
     type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { Plus } from "lucide-react";
 
 import {
     ArchitectureEdge as ArchitectureEdgeCard,
@@ -50,7 +52,7 @@ type ArchitectureCanvasProps = {
     traversedEdgeIds?: Set<string>;
     onNodesChange: (nodes: ArchitectureNode[]) => void;
     onNodeCreate: (position: { x: number; y: number }) => string | null;
-    onNodeRename: (nodeId: string, newLabel: string) => void;
+    onNodeRename: (nodeId: string, newLabel: string) => boolean;
     onNodeDelete: (nodeId: string) => void;
     onEdgeCreate: (sourceId: string, targetId: string) => void;
     onEdgeDelete: (edgeId: string) => void;
@@ -92,7 +94,6 @@ const DEFAULT_EDGE_OPTIONS = {
     markerEnd: { type: MarkerType.ArrowClosed },
 };
 // Above this many nodes the minimap's per-mutation redraw cost dominates
-// command latency, and the overview itself is too dense to read anyway
 const MINIMAP_NODE_LIMIT = 300;
 
 // The `fitView` prop on <ReactFlow> only runs once, on mount
@@ -105,9 +106,7 @@ function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
             isFirstRun.current = false;
             return;
         }
-        // Coalesces a burst of rapid mutations (e.g. many console commands
-        // submitted back to back) into a single fit once they settle,
-        // instead of animating the viewport on every single one
+        // Coalesces a burst of rapid mutations
         const timer = setTimeout(() => fitView({ duration: 300 }), 300);
         return () => clearTimeout(timer);
     }, [nodeIds, fitView]);
@@ -134,8 +133,7 @@ export function ArchitectureCanvas({
         setSyncedFrom(architecture.nodes);
         setRenderNodes((current) => {
             const byId = new Map(current.map((node) => [node.id, node]));
-            // Reuse the existing object when nothing changed instead of
-            // reallocating every node on every mutation
+            // Reuse the existing object when nothing changed
             return architecture.nodes.map((node) => {
                 const existing = byId.get(node.id);
                 return existing === node ? node : { ...existing, ...node };
@@ -172,6 +170,7 @@ export function ArchitectureCanvas({
         ArchitectureNode,
         ArchitectureEdge
     > | null>(null);
+    const canvasWrapperRef = useRef<HTMLDivElement>(null);
     const lastPaneClickRef = useRef<ClickPoint | null>(null);
     const [autoEditNodeId, setAutoEditNodeId] = useState<string | null>(null);
 
@@ -196,6 +195,19 @@ export function ArchitectureCanvas({
         },
         [onNodeCreate],
     );
+
+    // Touch/keyboard-reachable equivalent of double-clicking the pane, for
+    // devices where that gesture doesn't exist
+    const handleAddNodeClick = useCallback(() => {
+        const instance = reactFlowInstanceRef.current;
+        const rect = canvasWrapperRef.current?.getBoundingClientRect();
+        if (!instance || !rect) return;
+        const position = instance.screenToFlowPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+        });
+        setAutoEditNodeId(onNodeCreate(position));
+    }, [onNodeCreate]);
 
     const nodeActions = useMemo<NodeActions>(
         () => ({
@@ -230,43 +242,54 @@ export function ArchitectureCanvas({
         <HighlightedNodeContext.Provider value={highlight}>
             <NodeActionsContext.Provider value={nodeActions}>
                 <EdgeDeleteContext.Provider value={onEdgeDelete}>
-                    <ReactFlow
-                        nodes={renderNodes}
-                        edges={renderEdges}
-                        nodeTypes={NODE_TYPES}
-                        edgeTypes={EDGE_TYPES}
-                        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
-                        connectionLineStyle={{
-                            stroke: "var(--accent)",
-                            strokeWidth: 2,
-                        }}
-                        colorMode="system"
-                        style={REACT_FLOW_THEME_VARS as CSSProperties}
-                        onInit={(instance) => {
-                            reactFlowInstanceRef.current = instance;
-                        }}
-                        onNodesChange={handleNodesChange}
-                        onConnect={handleConnect}
-                        onPaneClick={handlePaneClick}
-                        deleteKeyCode={null}
-                        fitView
-                        onlyRenderVisibleElements
-                    >
-                        <Background variant={BackgroundVariant.Dots} gap={20} />
-                        <Controls />
-                        {/* The minimap redraws every node's position on every
-                            single mutation and (unlike the canvas) never
-                            skips off-screen nodes, so it's the single most
-                            expensive thing on the page once a graph gets
-                            large - and by then it's just a gray smear of
-                            overlapping dots anyway, so hiding it costs
-                            nothing real. */}
-                        {architecture.nodes.length <= MINIMAP_NODE_LIMIT && (
-                            <MiniMap pannable zoomable />
-                        )}
-                        <DiagramGuide />
-                        <FitViewOnNodesChange nodeIds={nodeIds} />
-                    </ReactFlow>
+                    <div ref={canvasWrapperRef} className="h-full w-full">
+                        <ReactFlow
+                            nodes={renderNodes}
+                            edges={renderEdges}
+                            nodeTypes={NODE_TYPES}
+                            edgeTypes={EDGE_TYPES}
+                            defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+                            connectionLineStyle={{
+                                stroke: "var(--accent)",
+                                strokeWidth: 2,
+                            }}
+                            colorMode="system"
+                            style={REACT_FLOW_THEME_VARS as CSSProperties}
+                            onInit={(instance) => {
+                                reactFlowInstanceRef.current = instance;
+                            }}
+                            onNodesChange={handleNodesChange}
+                            onConnect={handleConnect}
+                            onPaneClick={handlePaneClick}
+                            deleteKeyCode={null}
+                            fitView
+                            onlyRenderVisibleElements
+                        >
+                            <Background
+                                variant={BackgroundVariant.Dots}
+                                gap={20}
+                            />
+                            <Controls />
+                            {/* The minimap redraws every node's position */}
+                            {architecture.nodes.length <=
+                                MINIMAP_NODE_LIMIT && (
+                                <MiniMap pannable zoomable />
+                            )}
+                            <Panel position="top-left">
+                                <button
+                                    type="button"
+                                    onClick={handleAddNodeClick}
+                                    title="Add node"
+                                    className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-chrome px-3 text-xs font-medium text-foreground shadow-sm hover:bg-border/40"
+                                >
+                                    <Plus size={14} />
+                                    Add node
+                                </button>
+                            </Panel>
+                            <DiagramGuide />
+                            <FitViewOnNodesChange nodeIds={nodeIds} />
+                        </ReactFlow>
+                    </div>
                 </EdgeDeleteContext.Provider>
             </NodeActionsContext.Provider>
         </HighlightedNodeContext.Provider>
