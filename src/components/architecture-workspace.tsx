@@ -607,6 +607,7 @@ export function ArchitectureWorkspace({
                 <MergePickerDialog
                     fileName={pendingMerge.fileName}
                     incoming={pendingMerge.incoming}
+                    current={architecture}
                     existingFoldedLabels={
                         new Set(
                             architecture.nodes.map((node) =>
