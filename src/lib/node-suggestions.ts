@@ -27,8 +27,7 @@ export type NodeSuggestion = {
 
 const DEFAULT_LIMIT = 8;
 
-// An empty needle matches every node (no substring to narrow the trie walk
-// to), so there's nothing to rank - just list them alphabetically.
+// An empty needle matches every node
 function rankMatches(
     partial: string,
     nodeIndex: NodeIndex,
@@ -41,9 +40,7 @@ function rankMatches(
             .slice(0, Math.max(0, limit));
     }
 
-    // findNodesBySubstring costs O(needle length), not O(nodes), and every
-    // node it returns already contains needle somewhere in its label - only
-    // exact-vs-prefix-vs-elsewhere remains to be ranked among those matches.
+    // findNodesBySubstring costs O(needle length), not O(nodes)
     return findNodesBySubstring(nodeIndex, needle)
         .map((node) => {
             const label = node.data.label.normalize("NFC").toLowerCase();
@@ -203,9 +200,6 @@ function renameNodeSuggestion(
 }
 
 // Live-typing completion hint for the node-reference argument(s) of a command.
-// nodeIndex defaults to a fresh build so callers without a memoized one (e.g.
-// tests) don't need to construct it; a real UI caller passes its own index
-// (already memoized per architecture change) so a keystroke never rebuilds it.
 export function suggestNodeReference(
     input: string,
     architecture: Architecture,
@@ -262,8 +256,7 @@ export function suggestNodeReference(
         );
     }
 
-    // "move node <A> to step <n>" has only one node reference (A) - the step
-    // number isn't one, same shape as rename's new-label argument
+    // "move node <A> to step <n>" has only one node reference (A)
     const moveNodeMatch = matchFirst(MOVE_NODE_PATTERNS, input);
     if (moveNodeMatch) {
         return renameNodeSuggestion(

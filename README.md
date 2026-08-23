@@ -46,8 +46,9 @@ canvas-driven) but not raw node-position dragging. History is per-tab, and clear
 Nodes are also draggable (positions persist), double-click to rename, drag from an edge handle to
 connect, and a hover-revealed × deletes - each mirrors the command above. **Import** replaces the
 whole architecture with a chosen JSON file, validating it first. **Merge** opens a picker to choose
-which of the file's nodes/edges to bring in, plus a **Connect** control to wire a picked node -
-from the file or already in the existing architecture - to another before confirming.
+which of the file's nodes/edges to bring in, an **Insert at step** control for where the merged
+block lands in the simulation order, plus a **Connect** control to wire a picked node - from the
+file or already in the existing architecture - to another before confirming.
 
 ## History, simulation & multi-tab sync
 
@@ -75,6 +76,8 @@ accent; crossed nodes/edges turn red. Steps can be dragged or reordered, both ru
   From/To span both the incoming file and the existing architecture (grouped in each dropdown), so
   incoming ids (deterministic slugs of the label) are namespaced (`current:<id>` / `incoming:<id>`)
   to stay distinguishable if one collides with an existing node's id before the merge remaps it.
+  Insert at step splices the incoming block into `current.nodes` at the chosen index and re-lays
+  out x-positions for the block plus everything after it; earlier nodes keep their position.
 - `move node ... to step ...` re-lays out node x-positions to match the new step order; edges
   aren't rewired.
 - `undo`/`redo` are two stacks of `{ command, snapshot }` pairs, pushed to by every mutating

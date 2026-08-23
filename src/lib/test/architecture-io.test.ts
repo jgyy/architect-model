@@ -235,7 +235,17 @@ describe("mergeImportedArchitecture", () => {
         expect(result).toEqual({
             ok: true,
             architecture: {
-                nodes: [...chain.nodes, ...incoming.nodes],
+                nodes: [
+                    ...chain.nodes,
+                    {
+                        ...node("x", "Isolated One"),
+                        position: { x: 750, y: 0 },
+                    },
+                    {
+                        ...node("y", "Isolated Two"),
+                        position: { x: 1000, y: 0 },
+                    },
+                ],
                 edges: [...chain.edges, ...incoming.edges],
             },
             nodeCount: 2,
@@ -359,7 +369,7 @@ describe("mergeImportedArchitecture", () => {
 });
 
 describe("mergeSelectedArchitecture", () => {
-    test("merges only the selected nodes, dropping the rest", () => {
+    test("merges only the selected nodes, dropping the rest, appended after the last step", () => {
         const incoming: Architecture = {
             nodes: [node("x", "Isolated One"), node("y", "Isolated Two")],
             edges: [],
@@ -374,7 +384,13 @@ describe("mergeSelectedArchitecture", () => {
         expect(result).toEqual({
             ok: true,
             architecture: {
-                nodes: [...chain.nodes, node("x", "Isolated One")],
+                nodes: [
+                    ...chain.nodes,
+                    {
+                        ...node("x", "Isolated One"),
+                        position: { x: 750, y: 0 },
+                    },
+                ],
                 edges: chain.edges,
             },
             nodeCount: 1,
@@ -566,6 +582,113 @@ describe("mergeSelectedArchitecture", () => {
             expect(result.architecture.edges).toEqual(chain.edges);
             expect(result.edgeCount).toBe(0);
         }
+    });
+
+    test("insertAtStep splices the incoming block before an existing step, shifting everything after it", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "New")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x"]),
+            new Set(),
+            [],
+            1,
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.nodes).toEqual([
+                chain.nodes[0],
+                { ...node("x", "New"), position: { x: 250, y: 0 } },
+                { ...chain.nodes[1], position: { x: 500, y: 0 } },
+                { ...chain.nodes[2], position: { x: 750, y: 0 } },
+            ]);
+        }
+    });
+
+    test("insertAtStep of 0 places the incoming block before every existing node", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "New")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x"]),
+            new Set(),
+            [],
+            0,
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.nodes).toEqual([
+                { ...node("x", "New"), position: { x: 0, y: 0 } },
+                { ...chain.nodes[0], position: { x: 250, y: 0 } },
+                { ...chain.nodes[1], position: { x: 500, y: 0 } },
+                { ...chain.nodes[2], position: { x: 750, y: 0 } },
+            ]);
+        }
+    });
+
+    test("leaves nodes before the insertion point at their existing (possibly hand-dragged) position", () => {
+        const draggedChain: Architecture = {
+            nodes: [
+                { ...node("a", "Internet"), position: { x: 42, y: 17 } },
+                node("b", "Web Server"),
+                node("c", "DB"),
+            ],
+            edges: chain.edges,
+        };
+        const incoming: Architecture = {
+            nodes: [node("x", "New")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            draggedChain,
+            incoming,
+            new Set(["x"]),
+            new Set(),
+            [],
+            1,
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.nodes[0].position).toEqual({
+                x: 42,
+                y: 17,
+            });
+        }
+    });
+
+    test("defaults insertAtStep to appending after the current last step", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "New")],
+            edges: [],
+        };
+
+        const withDefault = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x"]),
+        );
+        const withExplicitLength = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x"]),
+            new Set(),
+            [],
+            chain.nodes.length,
+        );
+
+        expect(withDefault).toEqual(withExplicitLength);
     });
 });
 

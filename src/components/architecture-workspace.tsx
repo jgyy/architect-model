@@ -522,6 +522,7 @@ export function ArchitectureWorkspace({
             selectedNodeIds: Set<string>,
             excludedEdgeIds: Set<string>,
             addedEdges: { source: string; target: string }[],
+            insertAtStep: number,
         ) => {
             if (!pendingMerge) return;
             const label = `merge "${pendingMerge.fileName}"`;
@@ -531,6 +532,7 @@ export function ArchitectureWorkspace({
                 selectedNodeIds,
                 excludedEdgeIds,
                 addedEdges,
+                insertAtStep,
             );
             const id = nextLogId();
             setUndoRedo((current) =>
@@ -542,7 +544,11 @@ export function ArchitectureWorkspace({
                 result.nodeCount === totalAvailable
                     ? `${result.nodeCount} node(s)`
                     : `${result.nodeCount} of ${totalAvailable} node(s)`;
-            const base = `Merged ${countPhrase} and ${result.edgeCount} edge(s) from "${pendingMerge.fileName}" into the existing architecture.`;
+            const placement =
+                insertAtStep === architecture.nodes.length
+                    ? ""
+                    : ` at step ${insertAtStep + 1}`;
+            const base = `Merged ${countPhrase} and ${result.edgeCount} edge(s) from "${pendingMerge.fileName}" into the existing architecture${placement}.`;
             const message = result.renamedLabels.length
                 ? `${base} Renamed to avoid duplicates: ${result.renamedLabels.join(", ")}.`
                 : base;
