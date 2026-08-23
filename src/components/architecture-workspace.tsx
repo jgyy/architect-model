@@ -33,6 +33,13 @@ import {
     getTraversedPath,
 } from "@/lib/simulation";
 import { HELP_MESSAGE } from "@/lib/supported-commands";
+import {
+    EMPTY_UNDO_REDO_STATE,
+    recordCommand,
+    redo as redoHistory,
+    undo as undoHistory,
+    type UndoRedoState,
+} from "@/lib/undo-history";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 // A plain loop (not Math.max(...ids))
@@ -67,6 +74,13 @@ export function ArchitectureWorkspace({
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [speedIndex, setSpeedIndex] = useState(DEFAULT_SPEED_INDEX);
     const [hydrated, setHydrated] = useState(false);
+    // Ephemeral, per-tab command history for undo/redo - not persisted, and
+    // cleared whenever the architecture changes from outside runCommand
+    // (hydration, a cross-tab sync, or "Clear history"), since a stack of
+    // snapshots from one architecture stops making sense against another.
+    const [undoRedo, setUndoRedo] = useState<UndoRedoState>(
+        EMPTY_UNDO_REDO_STATE,
+    );
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
     // This tab's own latest known-good state, kept alongside lastPersistedRef
@@ -82,6 +96,7 @@ export function ArchitectureWorkspace({
         setLog(state.log);
         setCurrentStepIndex(state.stepIndex);
         setSpeedIndex(state.speedIndex);
+        setUndoRedo(EMPTY_UNDO_REDO_STATE);
         nextLogIdRef.current = maxLogId(state.log) + 1;
     }, []);
 
@@ -90,6 +105,7 @@ export function ArchitectureWorkspace({
         setLog([]);
         setCurrentStepIndex(0);
         setSpeedIndex(DEFAULT_SPEED_INDEX);
+        setUndoRedo(EMPTY_UNDO_REDO_STATE);
         nextLogIdRef.current = 1;
     }, [initialArchitecture]);
 
@@ -212,6 +228,45 @@ export function ArchitectureWorkspace({
                 return { ok: true, architecture, message: HELP_MESSAGE };
             }
 
+            // undo/redo are history operations, not architecture-mutating
+            // regex commands - they never reach parseCommand
+            const lower = trimmed.toLowerCase();
+            if (lower === "undo" || lower === "redo") {
+                const outcome =
+                    lower === "undo"
+                        ? undoHistory(undoRedo, architecture)
+                        : redoHistory(undoRedo, architecture);
+                const id = nextLogId();
+                if (!outcome.ok) {
+                    const message = `Nothing to ${lower}.`;
+                    setLog((entries) =>
+                        appendLogEntry(entries, {
+                            id,
+                            input: trimmed,
+                            ok: false,
+                            message,
+                        }),
+                    );
+                    return { ok: false, message };
+                }
+                setArchitecture(outcome.architecture);
+                setUndoRedo(outcome.state);
+                const message = `${lower === "undo" ? "Undid" : "Redid"} "${outcome.command}".`;
+                setLog((entries) =>
+                    appendLogEntry(entries, {
+                        id,
+                        input: trimmed,
+                        ok: true,
+                        message,
+                    }),
+                );
+                return {
+                    ok: true,
+                    architecture: outcome.architecture,
+                    message,
+                };
+            }
+
             const result = parseCommand(
                 trimmed,
                 architecture,
@@ -219,6 +274,9 @@ export function ArchitectureWorkspace({
                 nodeIndex,
             );
             if (result.ok) {
+                setUndoRedo((current) =>
+                    recordCommand(current, trimmed, architecture),
+                );
                 setArchitecture(result.architecture);
             }
             const id = nextLogId();
@@ -232,7 +290,7 @@ export function ArchitectureWorkspace({
             );
             return result;
         },
-        [architecture, nodeIndex],
+        [architecture, nodeIndex, undoRedo],
     );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -354,6 +412,10 @@ export function ArchitectureWorkspace({
                     onInputChange={setInput}
                     onSubmit={handleSubmit}
                     architecture={architecture}
+                    canUndo={undoRedo.undoStack.length > 0}
+                    canRedo={undoRedo.redoStack.length > 0}
+                    onUndo={() => runCommand("undo")}
+                    onRedo={() => runCommand("redo")}
                 />
             </aside>
         </div>

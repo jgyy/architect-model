@@ -16,6 +16,10 @@ type PanelOverrides = {
     onInputChange?: (value: string) => void;
     onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture?: Architecture;
+    canUndo?: boolean;
+    canRedo?: boolean;
+    onUndo?: () => void;
+    onRedo?: () => void;
 };
 
 function emptyArchitecture(): Architecture {
@@ -40,6 +44,10 @@ function renderPanel(overrides: PanelOverrides = {}) {
         onInputChange: vi.fn(),
         onSubmit: vi.fn(),
         architecture: emptyArchitecture(),
+        canUndo: false,
+        canRedo: false,
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
         ...overrides,
     };
     const view = render(<ConsolePanel {...props} />);
@@ -124,6 +132,38 @@ describe("ConsolePanel", () => {
             await user.click(screen.getByTitle("Clear console"));
 
             expect(onClear).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("undo/redo", () => {
+        test("the undo button is disabled when canUndo is false", () => {
+            renderPanel({ canUndo: false });
+            expect(screen.getByTitle("Undo")).toBeDisabled();
+        });
+
+        test("clicking the undo button calls onUndo when enabled", async () => {
+            const user = userEvent.setup();
+            const onUndo = vi.fn();
+            renderPanel({ canUndo: true, onUndo });
+
+            await user.click(screen.getByTitle("Undo"));
+
+            expect(onUndo).toHaveBeenCalledTimes(1);
+        });
+
+        test("the redo button is disabled when canRedo is false", () => {
+            renderPanel({ canRedo: false });
+            expect(screen.getByTitle("Redo")).toBeDisabled();
+        });
+
+        test("clicking the redo button calls onRedo when enabled", async () => {
+            const user = userEvent.setup();
+            const onRedo = vi.fn();
+            renderPanel({ canRedo: true, onRedo });
+
+            await user.click(screen.getByTitle("Redo"));
+
+            expect(onRedo).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -216,6 +256,10 @@ describe("ConsolePanel", () => {
                         onInputChange: vi.fn(),
                         onSubmit: vi.fn(),
                         architecture: emptyArchitecture(),
+                        canUndo: false,
+                        canRedo: false,
+                        onUndo: vi.fn(),
+                        onRedo: vi.fn(),
                     }}
                 />,
             );
@@ -242,6 +286,10 @@ describe("ConsolePanel", () => {
                         onInputChange: vi.fn(),
                         onSubmit: vi.fn(),
                         architecture: emptyArchitecture(),
+                        canUndo: false,
+                        canRedo: false,
+                        onUndo: vi.fn(),
+                        onRedo: vi.fn(),
                     }}
                 />,
             );

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Redo2, Trash2, Undo2, XCircle } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { CommandInput } from "@/components/command-input";
@@ -14,6 +14,10 @@ type ConsolePanelProps = {
     onInputChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
+    canUndo: boolean;
+    canRedo: boolean;
+    onUndo: () => void;
+    onRedo: () => void;
 };
 
 // A REPL-style console: scrolling command/output history with a live prompt
@@ -24,6 +28,10 @@ export function ConsolePanel({
     onInputChange,
     onSubmit,
     architecture,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
 }: ConsolePanelProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     // Whether the user was already at (or near) the bottom before this log
@@ -56,14 +64,34 @@ export function ConsolePanel({
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Console
                 </span>
-                <button
-                    type="button"
-                    onClick={onClear}
-                    title="Clear console"
-                    className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
-                >
-                    <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        title="Undo"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                    >
+                        <Undo2 size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRedo}
+                        disabled={!canRedo}
+                        title="Redo"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                    >
+                        <Redo2 size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClear}
+                        title="Clear console"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
             </div>
             <div
                 ref={scrollRef}
