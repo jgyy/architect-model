@@ -4,13 +4,6 @@ A small web app for updating a system architecture (nodes + edges) via text inpu
 a simulation trace through it. Visual editing mirrors text editing exactly - every mouse action
 runs the same command a typed instruction would.
 
-## Who this is for
-
-As a security engineer reviewing a proposed design, I want to sketch an architecture in plain text
-and step through a simulated attacker's path, to see what's reachable, in what order, and where the
-blast radius stops. The seed data (`src/data/example-architecture.ts`) tells that story: "Internet →
-Web Server → Database" - a node's position in `architecture.nodes` _is_ its simulation step.
-
 ## Demo proof
 
 ```mermaid
@@ -98,3 +91,5 @@ nodes/edges red. Steps can be dragged or reordered, both running `move node ... 
 - The page paints the seed architecture first, then swaps in localStorage's saved state on mount -
   a visible flash. A synchronous read would remove it but risks hydration-mismatch warnings, judged
   worse than the flash.
+- A proper user story on how users could actually benefit from this visualization.
+- More robust implementation of the merging feature.

@@ -298,6 +298,51 @@ describe("parseCommand - node commands", () => {
         );
     });
 
+    test("rejects a label over the max length, so canvas-synthesized commands referencing it stay under MAX_COMMAND_LENGTH", () => {
+        const label = "x".repeat(201);
+        const result = parseCommand(`add node ${label}`, emptyArchitecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected an over-length label to be rejected");
+        expect(result.message).toBe(
+            "A node label can be at most 200 characters (got 201).",
+        );
+    });
+
+    test("accepts a label right at the max length", () => {
+        const label = "x".repeat(200);
+        const result = parseCommand(`add node ${label}`, emptyArchitecture);
+
+        expect(result.ok).toBe(true);
+    });
+
+    test("rejects renaming a node to a label over the max length", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-web-server",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Web Server" },
+                },
+            ],
+            edges: [],
+        };
+        const longLabel = "x".repeat(201);
+
+        const result = parseCommand(
+            `rename node Web Server to ${longLabel}`,
+            architecture,
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected an over-length label to be rejected");
+        expect(result.message).toBe(
+            "A node label can be at most 200 characters (got 201).",
+        );
+    });
+
     test("collapses repeated internal whitespace when storing a new node's label", () => {
         const result = parseCommand("add node Foo   Bar", emptyArchitecture);
 
@@ -577,6 +622,67 @@ describe("parseCommand - node commands", () => {
         expect(result.ok).toBe(false);
         if (result.ok) throw new Error("expected a no-such-node failure");
         expect(result.message).toBe('No node named "Ghost".');
+    });
+
+    test("does not falsely report ambiguity for a rename reference whose full label happens to end in the separator word", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-say-to",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Say To" },
+                },
+                {
+                    id: "node-sayonara",
+                    position: { x: 250, y: 0 },
+                    data: { label: "Sayonara" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("rename node Say To", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected a missing-separator failure");
+        expect(result.message).toContain('Couldn\'t find a "to" separator');
+        expect(result.message).not.toContain("multiple nodes");
+    });
+
+    test("a trailing 'to' still resolves as a blank-target rename when the label really is just the part before it", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-say",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Say" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("rename node Say to", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok)
+            throw new Error("expected blank new label to be rejected");
+        expect(result.message).toBe("A node label cannot be blank.");
+    });
+
+    test("finds the separator even when a zero-width character lands inside the separator token itself", () => {
+        const architecture: Architecture = {
+            nodes: [
+                { id: "a", position: { x: 0, y: 0 }, data: { label: "A" } },
+                { id: "b", position: { x: 0, y: 0 }, data: { label: "B" } },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand(`connect A to${"​"} B`, architecture);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.architecture.edges).toHaveLength(1);
     });
 
     test("rejects renaming a node to a label already used by a different node", () => {

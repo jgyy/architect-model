@@ -196,6 +196,113 @@ describe("parseImportedArchitecture", () => {
         });
     });
 
+    test("rejects a node with a blank label", () => {
+        const architecture: Architecture = {
+            nodes: [node("a", "Internet"), { ...node("b", "  "), id: "b" }],
+            edges: [],
+        };
+
+        const result = parseImportedArchitecture(
+            serializeArchitecture(architecture),
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            message: 'Node "b" has a blank label.',
+        });
+    });
+
+    test("rejects two nodes sharing the same label", () => {
+        const architecture: Architecture = {
+            nodes: [node("a", "Cache"), node("b", "Cache")],
+            edges: [],
+        };
+
+        const result = parseImportedArchitecture(
+            serializeArchitecture(architecture),
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            message: 'Two nodes share the label "Cache".',
+        });
+    });
+
+    test("rejects two nodes sharing a label that only differs by case/whitespace", () => {
+        const architecture: Architecture = {
+            nodes: [node("a", "Cache"), node("b", "  cache  ")],
+            edges: [],
+        };
+
+        const result = parseImportedArchitecture(
+            serializeArchitecture(architecture),
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.message).toMatch(/share the label/);
+        }
+    });
+
+    test("rejects a node with a non-finite position", () => {
+        // 1e400 is valid JSON number syntax that overflows to Infinity on
+        // parse - JSON.stringify(Infinity) itself would serialize to null,
+        // so this has to be a raw string to actually exercise the bug.
+        const raw = JSON.stringify({
+            nodes: [
+                { id: "a", position: { x: 0, y: 0 }, data: { label: "A" } },
+            ],
+            edges: [],
+        }).replace('"x":0', '"x":1e400');
+
+        const result = parseImportedArchitecture(raw);
+
+        expect(result).toEqual({
+            ok: false,
+            message: 'Node "a" has a non-finite position.',
+        });
+    });
+
+    test("rejects a node whose label exceeds the max length", () => {
+        const architecture: Architecture = {
+            nodes: [node("a", "x".repeat(201))],
+            edges: [],
+        };
+
+        const result = parseImportedArchitecture(
+            serializeArchitecture(architecture),
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            message: 'Node "a"\'s label is longer than 200 characters.',
+        });
+    });
+
+    test("rejects two edges sharing the same id", () => {
+        const architecture: Architecture = {
+            nodes: [
+                node("a", "A"),
+                node("b", "B"),
+                node("c", "C"),
+                node("d", "D"),
+            ],
+            edges: [
+                { id: "e1", source: "a", target: "b" },
+                { id: "e1", source: "c", target: "d" },
+            ],
+        };
+
+        const result = parseImportedArchitecture(
+            serializeArchitecture(architecture),
+        );
+
+        expect(result).toEqual({
+            ok: false,
+            message: 'Two edges share the id "e1".',
+        });
+    });
+
     test("accepts several disjoint chains in one architecture", () => {
         const architecture: Architecture = {
             nodes: [
@@ -384,9 +491,7 @@ describe("mergeSelectedArchitecture", () => {
     });
 
     test("resolves a manual edge's \"current\" endpoint literally, even when an incoming node's original id collides with it", () => {
-        // chain's "c" (DB) has no outgoing edge yet; the incoming file
-        // separately has its own node whose original id is also "c" - it
-        // collides and gets remapped to "node-cache" during the merge.
+        // chain's "c" (DB) has no outgoing edge yet;
         const incoming: Architecture = {
             nodes: [node("c", "Cache")],
             edges: [],

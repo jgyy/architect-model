@@ -12,6 +12,7 @@ import {
     foldLabel,
     matchFirst,
     normalizeLabel,
+    stripInvisibleChars,
 } from "@/lib/node-reference";
 import { COMMAND_USAGE } from "@/lib/supported-commands";
 import type {
@@ -36,6 +37,16 @@ export type CommandResult =
 // callers always pass a normalizeLabel()'d string
 function isBlankLabel(label: string): boolean {
     return label.length === 0;
+}
+
+// Keeps a label short enough that every canvas-synthesized command
+// referencing it (e.g. "rename node <old> to <new>") still fits under
+// MAX_COMMAND_LENGTH - otherwise a node created via a long typed label
+// becomes unreachable from the canvas's mouse-driven rename/remove/move.
+export const MAX_LABEL_LENGTH = 200;
+
+function isTooLongLabel(label: string): boolean {
+    return label.length > MAX_LABEL_LENGTH;
 }
 
 export function slugify(label: string): string {
@@ -311,6 +322,13 @@ function resolveTrailingSeparatorWithBlankTarget(
         lower.endsWith(separator.trimEnd()),
     );
     if (!trimmedSeparator) return null;
+    // The whole (untouched) rest is itself a real, complete label - it
+    // legitimately ends in the separator word (e.g. a node named "Say To"
+    // referenced with no new name given at all), so stripping the trailing
+    // "to" here would truncate that label rather than find a separator.
+    if (isExactLabelMatch(rest, findNodeOrAmbiguity(rest, nodeIndex))) {
+        return null;
+    }
     const sourceLabel = rest
         .slice(0, rest.length - trimmedSeparator.trimEnd().length)
         .trim();
@@ -413,7 +431,10 @@ export function parseCommand(
         architecture.edges,
     ),
 ): CommandResult {
-    const trimmed = input.trim();
+    // Strip before trimming: an invisible character sitting right at either
+    // end isn't whitespace, so trim() alone wouldn't remove it, and left in
+    // place it can silently break a keyword/separator match further down.
+    const trimmed = stripInvisibleChars(input).trim();
 
     if (trimmed.length > MAX_COMMAND_LENGTH) {
         return {
@@ -427,6 +448,12 @@ export function parseCommand(
         const label = normalizeLabel(addNodeMatch[1] ?? "");
         if (isBlankLabel(label)) {
             return { ok: false, message: "A node label cannot be blank." };
+        }
+        if (isTooLongLabel(label)) {
+            return {
+                ok: false,
+                message: `A node label can be at most ${MAX_LABEL_LENGTH} characters (got ${label.length}).`,
+            };
         }
         const duplicateError = duplicateLabelError(label, nodeIndex);
         if (duplicateError) return duplicateError;
@@ -602,6 +629,12 @@ export function parseCommand(
         const normalizedNewLabel = normalizeLabel(newLabel);
         if (isBlankLabel(normalizedNewLabel)) {
             return { ok: false, message: "A node label cannot be blank." };
+        }
+        if (isTooLongLabel(normalizedNewLabel)) {
+            return {
+                ok: false,
+                message: `A node label can be at most ${MAX_LABEL_LENGTH} characters (got ${normalizedNewLabel.length}).`,
+            };
         }
         if (foldLabel(normalizedNewLabel) === foldLabel(source.data.label)) {
             return {

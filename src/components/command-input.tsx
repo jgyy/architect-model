@@ -135,6 +135,17 @@ export function CommandInput({
                     event.preventDefault();
                     selectSuggestion(options[activeOptionIndex]);
                     return;
+                case "Tab":
+                    // matches the "Tab to complete" hint below the input
+                    if (
+                        suggestion &&
+                        suggestionIsCompleteMatch(value, suggestion)
+                    ) {
+                        return;
+                    }
+                    event.preventDefault();
+                    selectSuggestion(options[activeOptionIndex]);
+                    return;
                 case "Escape":
                     setDismissed(true);
                     return;

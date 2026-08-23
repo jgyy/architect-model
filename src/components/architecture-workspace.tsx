@@ -80,6 +80,18 @@ function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
         : next;
 }
 
+// Keeps the simulation's "current" step pointing at the same node
+function nextStepIndexForSameNode(
+    before: Architecture,
+    stepIndex: number,
+    after: Architecture,
+): number {
+    const currentNodeId = before.nodes[stepIndex]?.id;
+    if (!currentNodeId) return stepIndex;
+    const newIndex = after.nodes.findIndex((node) => node.id === currentNodeId);
+    return newIndex === -1 ? stepIndex : newIndex;
+}
+
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
 };
@@ -97,11 +109,13 @@ export function ArchitectureWorkspace({
     const [undoRedo, setUndoRedo] = useState<UndoRedoState>(
         EMPTY_UNDO_REDO_STATE,
     );
-    // A merge file that's been parsed but not yet confirmed via the picker
+    // A merge file that's been parsed but not yet confirmed via the picker.
     const [pendingMerge, setPendingMerge] = useState<{
+        key: number;
         fileName: string;
         incoming: Architecture;
     } | null>(null);
+    const nextMergeKeyRef = useRef(1);
     // Tracks the JSON we know is in localStorage
     const lastPersistedRef = useRef<string | null>(null);
     // This tab's own latest known-good state, kept alongside lastPersistedRef
@@ -133,9 +147,7 @@ export function ArchitectureWorkspace({
         return id;
     }
 
-    // Every logged command allocates its id and appends in one step. The id
-    // is allocated outside the updater since setLog's updater must stay pure
-    // (React can invoke it more than once per call in dev).
+    // Every logged command allocates its id and appends in one step.
     const logResult = useCallback(
         (input: string, ok: boolean, message: string) => {
             const id = nextLogId();
@@ -146,7 +158,6 @@ export function ArchitectureWorkspace({
         [],
     );
 
-    // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const persisted = loadPersistedState(window.localStorage);
@@ -161,14 +172,26 @@ export function ArchitectureWorkspace({
 
     // Reacts to storage changes made by *other* tabs
     useEffect(() => {
+        function cancelStalePendingMerge() {
+            // The merge picker's selection/added-edges
+            if (!pendingMerge) return;
+            setPendingMerge(null);
+            logResult(
+                `merge "${pendingMerge.fileName}"`,
+                false,
+                "Cancelled: the architecture changed in another tab while the merge picker was open.",
+            );
+        }
         function handleStorage(event: StorageEvent) {
             const change = interpretStorageEvent(event.key, event.newValue);
             if (change.type === "updated") {
                 lastPersistedRef.current = event.newValue;
                 applyPersisted(change.state);
+                cancelStalePendingMerge();
             } else if (change.type === "cleared") {
                 lastPersistedRef.current = null;
                 resetToInitial();
+                cancelStalePendingMerge();
             } else if (change.type === "invalid" && latestStateRef.current) {
                 // Something unreadable landed in storage
                 savePersistedState(window.localStorage, latestStateRef.current);
@@ -179,13 +202,16 @@ export function ArchitectureWorkspace({
         }
         window.addEventListener("storage", handleStorage);
         return () => window.removeEventListener("storage", handleStorage);
-    }, [applyPersisted, resetToInitial]);
+    }, [applyPersisted, resetToInitial, pendingMerge, logResult]);
 
     // a remove-node command can shrink the simulation trace out from under it
     const safeStepIndex = clampStepIndex(
         currentStepIndex,
         architecture.nodes.length,
     );
+
+    // Whether the user has already been warned this "outage"
+    const persistenceWarnedRef = useRef(false);
 
     useEffect(() => {
         if (!hydrated) return;
@@ -198,14 +224,30 @@ export function ArchitectureWorkspace({
         latestStateRef.current = nextState;
         const raw = JSON.stringify(nextState);
         if (raw === lastPersistedRef.current) return;
-        savePersistedState(window.localStorage, nextState);
-        lastPersistedRef.current = raw;
-    }, [architecture, log, safeStepIndex, speedIndex, hydrated]);
+        if (savePersistedState(window.localStorage, nextState)) {
+            lastPersistedRef.current = raw;
+            persistenceWarnedRef.current = false;
+        } else if (!persistenceWarnedRef.current) {
+            persistenceWarnedRef.current = true;
+            logResult(
+                "(autosave)",
+                false,
+                "Couldn't save to this browser's local storage (it may be full, or you're in private browsing) - your changes may not survive closing this tab.",
+            );
+        }
+    }, [architecture, log, safeStepIndex, speedIndex, hydrated, logResult]);
 
     function handleClearHistory() {
-        clearPersistedState(window.localStorage);
+        const cleared = clearPersistedState(window.localStorage);
         lastPersistedRef.current = null;
         resetToInitial();
+        if (!cleared) {
+            logResult(
+                "(clear console)",
+                false,
+                "Couldn't clear this browser's local storage - the previous session may reappear after a reload.",
+            );
+        }
     }
 
     const highlightedNodeId = architecture.nodes[safeStepIndex]?.id;
@@ -269,6 +311,13 @@ export function ArchitectureWorkspace({
                     logResult(trimmed, false, message);
                     return { ok: false, message };
                 }
+                setCurrentStepIndex((index) =>
+                    nextStepIndexForSameNode(
+                        architecture,
+                        index,
+                        outcome.architecture,
+                    ),
+                );
                 setArchitecture(outcome.architecture);
                 setUndoRedo(outcome.state);
                 const message = `${lower === "undo" ? "Undid" : "Redid"} "${outcome.command}".`;
@@ -289,6 +338,13 @@ export function ArchitectureWorkspace({
             if (result.ok) {
                 setUndoRedo((current) =>
                     recordCommand(current, trimmed, architecture),
+                );
+                setCurrentStepIndex((index) =>
+                    nextStepIndexForSameNode(
+                        architecture,
+                        index,
+                        result.architecture,
+                    ),
                 );
                 setArchitecture(result.architecture);
             }
@@ -348,24 +404,15 @@ export function ArchitectureWorkspace({
 
     const handleStepReorder = useCallback(
         (nodeId: string, toIndex: number) => {
-            // Reordering shifts every node between the old and new position
-            const currentNodeId = architecture.nodes[safeStepIndex]?.id;
+            // runCommand itself keeps the current step's identity stable
             const command = buildMoveNodeCommand(
                 nodeId,
                 toIndex + 1,
                 architecture,
             );
-            if (!command) return;
-            const result = runCommand(command);
-            if (!result?.ok || !currentNodeId) return;
-            const newIndex = result.architecture.nodes.findIndex(
-                (node) => node.id === currentNodeId,
-            );
-            if (newIndex !== -1 && newIndex !== safeStepIndex) {
-                setCurrentStepIndex(newIndex);
-            }
+            if (command) runCommand(command);
         },
-        [architecture, safeStepIndex, runCommand],
+        [architecture, runCommand],
     );
 
     const handleNodeCreate = useCallback(
@@ -393,6 +440,8 @@ export function ArchitectureWorkspace({
                     setUndoRedo((current) =>
                         recordCommand(current, label, architecture),
                     );
+                    // A whole-architecture replacement has no "current node"
+                    setCurrentStepIndex(0);
                     setArchitecture(result.architecture);
                     logResult(
                         label,
@@ -422,6 +471,7 @@ export function ArchitectureWorkspace({
                         return;
                     }
                     setPendingMerge({
+                        key: nextMergeKeyRef.current++,
                         fileName: file.name,
                         incoming: parsed.architecture,
                     });
@@ -458,6 +508,13 @@ export function ArchitectureWorkspace({
             );
             setUndoRedo((current) =>
                 recordCommand(current, label, architecture),
+            );
+            setCurrentStepIndex((index) =>
+                nextStepIndexForSameNode(
+                    architecture,
+                    index,
+                    result.architecture,
+                ),
             );
             setArchitecture(result.architecture);
             const totalAvailable = pendingMerge.incoming.nodes.length;
@@ -525,6 +582,7 @@ export function ArchitectureWorkspace({
             </aside>
             {pendingMerge && (
                 <MergePickerDialog
+                    key={pendingMerge.key}
                     fileName={pendingMerge.fileName}
                     incoming={pendingMerge.incoming}
                     current={architecture}

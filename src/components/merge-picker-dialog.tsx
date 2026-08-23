@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
     buildConnectGraph,
@@ -48,6 +48,7 @@ export function MergePickerDialog({
     const [pendingTarget, setPendingTarget] = useState("");
     // Splice index into current.nodes; defaults to appending at the end
     const [insertAtStep, setInsertAtStep] = useState(current.nodes.length);
+    const dialogRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
@@ -57,8 +58,19 @@ export function MergePickerDialog({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [onCancel]);
 
-    // Deselecting a node also drops any added connection that touched it,
-    // the same way it drops an incoming file edge - see toggleEdge below.
+    // Moves keyboard focus into the dialog on open, and back to whatever
+    // triggered it (the toolbar's Merge button) once it closes - otherwise
+    // a keyboard user tabbing after opening it keeps reaching the
+    // still-focusable console/canvas controls sitting behind the overlay.
+    useEffect(() => {
+        const previouslyFocused = document.activeElement as HTMLElement | null;
+        dialogRef.current?.focus();
+        return () => {
+            previouslyFocused?.focus();
+        };
+    }, []);
+
+    // Deselecting a node also drops any added connection that touched it
     function toggle(nodeId: string) {
         setSelectedIds((current) => {
             const next = new Set(current);
@@ -101,7 +113,6 @@ export function MergePickerDialog({
         incoming.nodes.map((node) => [node.id, node.data.label]),
     );
     // Covers both origins for the Connect control, whose option/added-edge
-    // values are connectOptionKey-namespaced (see buildConnectGraph below).
     const labelByKey = new Map<string, string>([
         ...current.nodes.map(
             (node) =>
@@ -125,9 +136,7 @@ export function MergePickerDialog({
         return ids.filter((id) => decodeConnectOptionKey(id).origin === origin);
     }
 
-    // Shared by the "Connect from"/"Connect to" selects below - both list the
-    // same two origin-grouped optgroups, differing only in which id list and
-    // change handler they're bound to.
+    // Shared by the "Connect from"/"Connect to" selects below
     function renderConnectSelect(
         ariaLabel: string,
         value: string,
@@ -207,11 +216,13 @@ export function MergePickerDialog({
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         >
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Merge nodes from "${fileName}"`}
+                tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
-                className="flex max-h-[80vh] w-96 max-w-full flex-col gap-3 rounded-lg border border-border bg-chrome p-4 font-mono text-sm text-chrome-foreground shadow-md"
+                className="flex max-h-[80vh] w-96 max-w-full flex-col gap-3 rounded-lg border border-border bg-chrome p-4 font-mono text-sm text-chrome-foreground shadow-md outline-none"
             >
                 <div>
                     <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

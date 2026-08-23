@@ -88,6 +88,28 @@ const REACT_FLOW_THEME_VARS: Record<string, string> = {
     "--xy-minimap-node-background-color": "var(--border-strong)",
 };
 
+// Reconciles the canvas's own live render state against a fresh
+// `architecture.nodes` reference from the parent (e.g. after a command run
+// from another tab, or from this tab's own console/undo). Preserves the
+// currently-dragged node's in-flight position rather than letting a stale,
+// pre-drag position from the incoming array snap it back mid-drag - every
+// other field (and every other node) still adopts the incoming value.
+export function reconcileRenderNodes(
+    current: ArchitectureNode[],
+    incoming: ArchitectureNode[],
+    draggingNodeId: string | null,
+): ArchitectureNode[] {
+    const byId = new Map(current.map((node) => [node.id, node]));
+    return incoming.map((node) => {
+        const existing = byId.get(node.id);
+        if (existing === node) return node;
+        if (existing && node.id === draggingNodeId) {
+            return { ...existing, ...node, position: existing.position };
+        }
+        return { ...existing, ...node };
+    });
+}
+
 const NODE_TYPES = { default: ArchitectureNodeCard };
 const EDGE_TYPES = { default: ArchitectureEdgeCard };
 const DEFAULT_EDGE_OPTIONS = {
@@ -129,16 +151,17 @@ export function ArchitectureCanvas({
     // https://react.dev/learn/you-might-not-need-an-effect
     const [renderNodes, setRenderNodes] = useState(architecture.nodes);
     const [syncedFrom, setSyncedFrom] = useState(architecture.nodes);
+    // Id of the node currently mid-drag, if any - see reconcileRenderNodes.
+    const draggingNodeIdRef = useRef<string | null>(null);
     if (architecture.nodes !== syncedFrom) {
         setSyncedFrom(architecture.nodes);
-        setRenderNodes((current) => {
-            const byId = new Map(current.map((node) => [node.id, node]));
-            // Reuse the existing object when nothing changed
-            return architecture.nodes.map((node) => {
-                const existing = byId.get(node.id);
-                return existing === node ? node : { ...existing, ...node };
-            });
-        });
+        setRenderNodes((current) =>
+            reconcileRenderNodes(
+                current,
+                architecture.nodes,
+                draggingNodeIdRef.current,
+            ),
+        );
     }
 
     const nodeIds = useMemo(
@@ -148,6 +171,14 @@ export function ArchitectureCanvas({
 
     const handleNodesChange = useCallback(
         (changes: NodeChange<ArchitectureNode>[]) => {
+            const positionChange = changes.find(
+                (change) => change.type === "position",
+            );
+            if (positionChange) {
+                draggingNodeIdRef.current = positionChange.dragging
+                    ? positionChange.id
+                    : null;
+            }
             setRenderNodes((current) => applyNodeChanges(changes, current));
             const nextNodes = applyPersistableNodeChanges(
                 changes,

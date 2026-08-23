@@ -194,6 +194,22 @@ describe("CommandInput", () => {
             expect(input).toHaveValue("connect Cache ");
         });
 
+        test("Tab selects the active option, matching the on-screen 'Tab to complete' hint", async () => {
+            const user = userEvent.setup();
+            const onChangeSpy = vi.fn();
+            const { input } = renderCommandInput({ onChangeSpy });
+            await user.type(input, "connect c");
+            onChangeSpy.mockClear();
+
+            // move active option from Cache to Cluster, then complete
+            await user.keyboard("{ArrowDown}{Tab}");
+
+            expect(onChangeSpy).toHaveBeenCalledWith("connect Cluster ");
+            expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+            // Tab's default focus-move behavior didn't fire on top of it
+            expect(input).toHaveFocus();
+        });
+
         test("clicking an option selects it and calls onChange with the completed text", async () => {
             const user = userEvent.setup();
             const onChangeSpy = vi.fn();

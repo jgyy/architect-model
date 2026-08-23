@@ -77,7 +77,14 @@ export function ArchitectureNode({
         setIsEditing(true);
     }
 
-    function commitEditing() {
+    // onBlur passes cancelOnReject: true - blur is a low-commitment "I'm
+    // done with this box" gesture (clicking another node, the canvas, a
+    // toolbar button), so a rejection there should just cancel the edit
+    // rather than keep re-submitting the same rejected value and refocusing
+    // out from under the click, which would otherwise trap the user unable
+    // to leave except via Escape. Enter is the opposite: an explicit retry
+    // request, so it keeps the current (invalid) text in place to fix.
+    function commitEditing(cancelOnReject = false) {
         const trimmed = draft.trim();
         if (trimmed === data.label) {
             setIsEditing(false);
@@ -86,6 +93,8 @@ export function ArchitectureNode({
         // A blank draft is passed through too
         if (onRename(id, trimmed)) {
             setIsEditing(false);
+        } else if (cancelOnReject) {
+            cancelEditing();
         } else {
             inputRef.current?.focus();
         }
@@ -123,7 +132,7 @@ export function ArchitectureNode({
                     ref={inputRef}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    onBlur={commitEditing}
+                    onBlur={() => commitEditing(true)}
                     onKeyDown={(event) => {
                         if (event.key === "Enter") {
                             event.preventDefault();

@@ -123,19 +123,28 @@ export function loadPersistedState(
     }
 }
 
+// Returns whether the write actually succeeded (e.g. false on a quota
+// error or Safari private-browsing's SecurityError), so a caller can warn
+// the user instead of assuming a silently-swallowed failure means success.
 export function savePersistedState(
     storage: StorageLike,
     state: PersistedState,
-): void {
+): boolean {
     try {
         storage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {}
+        return true;
+    } catch {
+        return false;
+    }
 }
 
-export function clearPersistedState(storage: StorageLike): void {
+export function clearPersistedState(storage: StorageLike): boolean {
     try {
         storage.removeItem(STORAGE_KEY);
-    } catch {}
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export type PersistedStateChange =
