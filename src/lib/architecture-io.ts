@@ -146,6 +146,62 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
+export type ConnectOrigin = "current" | "incoming";
+
+// Namespaces a raw node id by which side of a merge it came from. Incoming
+// node ids are deterministic slugs of their label (e.g. "node-cache"), so an
+// existing node and an incoming node can genuinely collide on id before the
+// merge remaps it - this keeps the two distinguishable while the Connect
+// control computes eligibility and records a manual edge.
+export function connectOptionKey(origin: ConnectOrigin, id: string): string {
+    return `${origin}:${id}`;
+}
+
+export function decodeConnectOptionKey(key: string): {
+    origin: ConnectOrigin;
+    id: string;
+} {
+    const separatorIndex = key.indexOf(":");
+    return {
+        origin: key.slice(0, separatorIndex) as ConnectOrigin,
+        id: key.slice(separatorIndex + 1),
+    };
+}
+
+// Node/edge lists for the Connect control's cycle/degree checks, spanning
+// both `current` and the incoming file's (already selected/kept) nodes and
+// edges - ids namespaced via connectOptionKey so a real id collision between
+// the two can't merge two distinct nodes into one during the check.
+export function buildConnectGraph(
+    current: Architecture,
+    incomingNodes: ArchitectureNode[],
+    incomingEdges: ArchitectureEdge[],
+): { nodes: ArchitectureNode[]; edges: ArchitectureEdge[] } {
+    const nodes = [
+        ...current.nodes.map((node) => ({
+            ...node,
+            id: connectOptionKey("current", node.id),
+        })),
+        ...incomingNodes.map((node) => ({
+            ...node,
+            id: connectOptionKey("incoming", node.id),
+        })),
+    ];
+    const edges = [
+        ...current.edges.map((edge) => ({
+            ...edge,
+            source: connectOptionKey("current", edge.source),
+            target: connectOptionKey("current", edge.target),
+        })),
+        ...incomingEdges.map((edge) => ({
+            ...edge,
+            source: connectOptionKey("incoming", edge.source),
+            target: connectOptionKey("incoming", edge.target),
+        })),
+    ];
+    return { nodes, edges };
+}
+
 // Ids of `nodes` with no outgoing edge in `edges` yet - eligible as the
 // source of a manually-added connection
 export function connectableSourceIds(
@@ -178,13 +234,27 @@ export function connectableTargetIds(
     return ids;
 }
 
+// source/target are connect option keys (see connectOptionKey): "current:<id>"
+// for a node already in `current` (used as-is - current ids never change),
+// or "incoming:<id>" for one of `incoming`'s own nodes using its original,
+// pre-remap id (resolved through the same id remap as everything else).
+export type AddedConnectEdge = { source: string; target: string };
+
+function resolveConnectEndpoint(
+    key: string,
+    idRemap: ReadonlyMap<string, string>,
+): string {
+    const { origin, id } = decodeConnectOptionKey(key);
+    return origin === "current" ? id : (idRemap.get(id) ?? id);
+}
+
 // Folds a subset of an already-parsed
 export function mergeSelectedArchitecture(
     current: Architecture,
     incoming: Architecture,
     selectedNodeIds: ReadonlySet<string>,
     excludedEdgeIds: ReadonlySet<string> = new Set(),
-    addedEdges: ReadonlyArray<{ source: string; target: string }> = [],
+    addedEdges: ReadonlyArray<AddedConnectEdge> = [],
 ): MergeArchitectureSuccess {
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedNodeIds.has(node.id),
@@ -231,8 +301,8 @@ export function mergeSelectedArchitecture(
 
     const manualEdges = addedEdges.map(
         ({ source: rawSource, target: rawTarget }) => {
-            const source = idRemap.get(rawSource) ?? rawSource;
-            const target = idRemap.get(rawTarget) ?? rawTarget;
+            const source = resolveConnectEndpoint(rawSource, idRemap);
+            const target = resolveConnectEndpoint(rawTarget, idRemap);
             return { id: `edge-${source}-${target}`, source, target };
         },
     );

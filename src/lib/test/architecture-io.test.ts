@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import {
+    buildConnectGraph,
     connectableSourceIds,
     connectableTargetIds,
+    connectOptionKey,
+    decodeConnectOptionKey,
     mergeImportedArchitecture,
     mergeSelectedArchitecture,
     parseImportedArchitecture,
@@ -495,7 +498,12 @@ describe("mergeSelectedArchitecture", () => {
             incoming,
             new Set(["a", "y"]),
             new Set(),
-            [{ source: "a", target: "y" }],
+            [
+                {
+                    source: connectOptionKey("incoming", "a"),
+                    target: connectOptionKey("incoming", "y"),
+                },
+            ],
         );
 
         expect(result.ok).toBe(true);
@@ -505,6 +513,39 @@ describe("mergeSelectedArchitecture", () => {
                 { id: "edge-node-cache-y", source: "node-cache", target: "y" },
             ]);
             expect(result.edgeCount).toBe(1);
+        }
+    });
+
+    test("resolves a manual edge's \"current\" endpoint literally, even when an incoming node's original id collides with it", () => {
+        // chain's "c" (DB) has no outgoing edge yet; the incoming file
+        // separately has its own node whose original id is also "c" - it
+        // collides and gets remapped to "node-cache" during the merge.
+        const incoming: Architecture = {
+            nodes: [node("c", "Cache")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["c"]),
+            new Set(),
+            [
+                {
+                    source: connectOptionKey("current", "c"),
+                    target: connectOptionKey("incoming", "c"),
+                },
+            ],
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            const addedEdge = result.architecture.edges.at(-1);
+            expect(addedEdge).toEqual({
+                id: "edge-c-node-cache",
+                source: "c",
+                target: "node-cache",
+            });
         }
     });
 
@@ -584,5 +625,52 @@ describe("connectableTargetIds", () => {
         );
 
         expect(ids).toEqual(new Set(["x"]));
+    });
+});
+
+describe("connectOptionKey / decodeConnectOptionKey", () => {
+    test("round-trips the origin and raw id", () => {
+        expect(
+            decodeConnectOptionKey(connectOptionKey("current", "a")),
+        ).toEqual({ origin: "current", id: "a" });
+        expect(
+            decodeConnectOptionKey(connectOptionKey("incoming", "node-cache")),
+        ).toEqual({ origin: "incoming", id: "node-cache" });
+    });
+});
+
+describe("buildConnectGraph", () => {
+    test("namespaces current and incoming node/edge ids by origin", () => {
+        const current: Architecture = {
+            nodes: [node("a", "Internet"), node("b", "Web Server")],
+            edges: [edge("a", "b")],
+        };
+        const incomingNodes = [node("x", "Cache")];
+        const incomingEdges: Architecture["edges"] = [];
+
+        const graph = buildConnectGraph(current, incomingNodes, incomingEdges);
+
+        expect(graph.nodes.map((n) => n.id)).toEqual([
+            "current:a",
+            "current:b",
+            "incoming:x",
+        ]);
+        expect(graph.edges).toEqual([
+            { id: "edge-a-b", source: "current:a", target: "current:b" },
+        ]);
+    });
+
+    test("keeps a current node and a colliding incoming node distinct for connectability", () => {
+        const current: Architecture = {
+            nodes: [node("a", "Internet"), node("b", "Web Server")],
+            edges: [edge("a", "b")],
+        };
+        // Same raw id "a" as current's Internet node
+        const incomingNodes = [node("a", "Cache")];
+
+        const graph = buildConnectGraph(current, incomingNodes, []);
+        const sourceIds = connectableSourceIds(graph.nodes, graph.edges);
+
+        expect(sourceIds).toEqual(new Set(["current:b", "incoming:a"]));
     });
 });

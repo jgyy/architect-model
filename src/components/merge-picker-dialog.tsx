@@ -3,22 +3,26 @@
 import { useEffect, useState } from "react";
 
 import {
+    buildConnectGraph,
     connectableSourceIds,
     connectableTargetIds,
+    connectOptionKey,
+    decodeConnectOptionKey,
     foldLabel,
+    type AddedConnectEdge,
+    type ConnectOrigin,
 } from "@/lib/architecture-io";
 import type { Architecture } from "@/types/architecture";
-
-type AddedEdge = { source: string; target: string };
 
 type MergePickerDialogProps = {
     fileName: string;
     incoming: Architecture;
+    current: Architecture;
     existingFoldedLabels: ReadonlySet<string>;
     onConfirm: (
         selectedNodeIds: Set<string>,
         excludedEdgeIds: Set<string>,
-        addedEdges: AddedEdge[],
+        addedEdges: AddedConnectEdge[],
     ) => void;
     onCancel: () => void;
 };
@@ -27,6 +31,7 @@ type MergePickerDialogProps = {
 export function MergePickerDialog({
     fileName,
     incoming,
+    current,
     existingFoldedLabels,
     onConfirm,
     onCancel,
@@ -37,7 +42,7 @@ export function MergePickerDialog({
     const [excludedEdgeIds, setExcludedEdgeIds] = useState<Set<string>>(
         () => new Set(),
     );
-    const [addedEdges, setAddedEdges] = useState<AddedEdge[]>([]);
+    const [addedEdges, setAddedEdges] = useState<AddedConnectEdge[]>([]);
     const [pendingSource, setPendingSource] = useState("");
     const [pendingTarget, setPendingTarget] = useState("");
 
@@ -61,9 +66,10 @@ export function MergePickerDialog({
             }
             return next;
         });
+        const key = connectOptionKey("incoming", nodeId);
         setAddedEdges((current) =>
             current.filter(
-                (added) => added.source !== nodeId && added.target !== nodeId,
+                (added) => added.source !== key && added.target !== key,
             ),
         );
     }
@@ -91,6 +97,31 @@ export function MergePickerDialog({
     const labelById = new Map(
         incoming.nodes.map((node) => [node.id, node.data.label]),
     );
+    // Covers both origins for the Connect control, whose option/added-edge
+    // values are connectOptionKey-namespaced (see buildConnectGraph below).
+    const labelByKey = new Map<string, string>([
+        ...current.nodes.map(
+            (node) =>
+                [
+                    connectOptionKey("current", node.id),
+                    node.data.label,
+                ] as const,
+        ),
+        ...incoming.nodes.map(
+            (node) =>
+                [
+                    connectOptionKey("incoming", node.id),
+                    node.data.label,
+                ] as const,
+        ),
+    ]);
+    function labelForKey(key: string): string {
+        return labelByKey.get(key) ?? decodeConnectOptionKey(key).id;
+    }
+    function optionsByOrigin(ids: string[], origin: ConnectOrigin): string[] {
+        return ids.filter((id) => decodeConnectOptionKey(id).origin === origin);
+    }
+
     const eligibleEdges = incoming.edges.filter(
         (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target),
     );
@@ -102,21 +133,31 @@ export function MergePickerDialog({
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedIds.has(node.id),
     );
+    const connectGraph = buildConnectGraph(current, selectedNodes, keptEdges);
     const netEdges = [
-        ...keptEdges,
+        ...connectGraph.edges,
         ...addedEdges.map((added) => ({ id: "", ...added })),
     ];
-    const sourceOptionIds = [...connectableSourceIds(selectedNodes, netEdges)];
+    const sourceOptionIds = [
+        ...connectableSourceIds(connectGraph.nodes, netEdges),
+    ];
     const effectiveSource = sourceOptionIds.includes(pendingSource)
         ? pendingSource
         : (sourceOptionIds[0] ?? "");
     const targetOptionIds = effectiveSource
-        ? [...connectableTargetIds(effectiveSource, selectedNodes, netEdges)]
+        ? [
+              ...connectableTargetIds(
+                  effectiveSource,
+                  connectGraph.nodes,
+                  netEdges,
+              ),
+          ]
         : [];
     const effectiveTarget = targetOptionIds.includes(pendingTarget)
         ? pendingTarget
         : (targetOptionIds[0] ?? "");
     const canAddConnection = effectiveSource !== "" && effectiveTarget !== "";
+    const canShowConnect = current.nodes.length + selectedNodes.length >= 2;
 
     return (
         <div
@@ -230,7 +271,7 @@ export function MergePickerDialog({
                         })}
                     </ul>
                 )}
-                {selectedNodes.length >= 2 && (
+                {canShowConnect && (
                     <div className="space-y-2 border-t border-border pt-2">
                         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                             Connect
@@ -244,11 +285,32 @@ export function MergePickerDialog({
                                 }
                                 className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
                             >
-                                {sourceOptionIds.map((id) => (
-                                    <option key={id} value={id}>
-                                        {labelById.get(id) ?? id}
-                                    </option>
-                                ))}
+                                {optionsByOrigin(sourceOptionIds, "current")
+                                    .length > 0 && (
+                                    <optgroup label="Existing architecture">
+                                        {optionsByOrigin(
+                                            sourceOptionIds,
+                                            "current",
+                                        ).map((key) => (
+                                            <option key={key} value={key}>
+                                                {labelForKey(key)}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {optionsByOrigin(sourceOptionIds, "incoming")
+                                    .length > 0 && (
+                                    <optgroup label={fileName}>
+                                        {optionsByOrigin(
+                                            sourceOptionIds,
+                                            "incoming",
+                                        ).map((key) => (
+                                            <option key={key} value={key}>
+                                                {labelForKey(key)}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                             <span aria-hidden className="text-muted-foreground">
                                 →
@@ -261,11 +323,32 @@ export function MergePickerDialog({
                                 }
                                 className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
                             >
-                                {targetOptionIds.map((id) => (
-                                    <option key={id} value={id}>
-                                        {labelById.get(id) ?? id}
-                                    </option>
-                                ))}
+                                {optionsByOrigin(targetOptionIds, "current")
+                                    .length > 0 && (
+                                    <optgroup label="Existing architecture">
+                                        {optionsByOrigin(
+                                            targetOptionIds,
+                                            "current",
+                                        ).map((key) => (
+                                            <option key={key} value={key}>
+                                                {labelForKey(key)}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {optionsByOrigin(targetOptionIds, "incoming")
+                                    .length > 0 && (
+                                    <optgroup label={fileName}>
+                                        {optionsByOrigin(
+                                            targetOptionIds,
+                                            "incoming",
+                                        ).map((key) => (
+                                            <option key={key} value={key}>
+                                                {labelForKey(key)}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                             <button
                                 type="button"
@@ -287,12 +370,8 @@ export function MergePickerDialog({
                         {addedEdges.length > 0 && (
                             <ul className="space-y-1">
                                 {addedEdges.map((added) => {
-                                    const fromLabel =
-                                        labelById.get(added.source) ??
-                                        added.source;
-                                    const toLabel =
-                                        labelById.get(added.target) ??
-                                        added.target;
+                                    const fromLabel = labelForKey(added.source);
+                                    const toLabel = labelForKey(added.target);
                                     return (
                                         <li
                                             key={`${added.source}-${added.target}`}

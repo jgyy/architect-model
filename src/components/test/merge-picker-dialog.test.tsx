@@ -29,6 +29,8 @@ const disjointThree: Architecture = {
     edges: [],
 };
 
+const emptyArchitecture: Architecture = { nodes: [], edges: [] };
+
 function renderDialog(
     overrides: {
         onConfirm?: (
@@ -39,6 +41,7 @@ function renderDialog(
         onCancel?: () => void;
         existingFoldedLabels?: ReadonlySet<string>;
         architecture?: Architecture;
+        current?: Architecture;
     } = {},
 ) {
     const onConfirm = overrides.onConfirm ?? vi.fn();
@@ -47,6 +50,7 @@ function renderDialog(
         <MergePickerDialog
             fileName="extra.json"
             incoming={overrides.architecture ?? incoming}
+            current={overrides.current ?? emptyArchitecture}
             existingFoldedLabels={overrides.existingFoldedLabels ?? new Set()}
             onConfirm={onConfirm}
             onCancel={onCancel}
@@ -250,10 +254,10 @@ describe("MergePickerDialog", () => {
 
         expect(
             screen.getByRole("combobox", { name: "Connect from" }),
-        ).toHaveValue("a");
+        ).toHaveValue("incoming:a");
         expect(
             screen.getByRole("combobox", { name: "Connect to" }),
-        ).toHaveValue("b");
+        ).toHaveValue("incoming:b");
     });
 
     test("adding a connection lists it and counts it as an included edge", async () => {
@@ -284,7 +288,7 @@ describe("MergePickerDialog", () => {
         expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
             new Set(["a", "b", "c"]),
             new Set(),
-            [{ source: "a", target: "b" }],
+            [{ source: "incoming:a", target: "incoming:b" }],
         );
     });
 
@@ -356,5 +360,128 @@ describe("MergePickerDialog", () => {
         expect(
             within(toSelect).getByRole("option", { name: /^Gamma/ }),
         ).toBeInTheDocument();
+    });
+
+    const existingWithRoom: Architecture = {
+        nodes: [
+            {
+                id: "web",
+                position: { x: 0, y: 0 },
+                data: { label: "Web Server" },
+            },
+        ],
+        edges: [],
+    };
+
+    const existingChain: Architecture = {
+        nodes: [
+            {
+                id: "internet",
+                position: { x: 0, y: 0 },
+                data: { label: "Internet" },
+            },
+            {
+                id: "web",
+                position: { x: 0, y: 0 },
+                data: { label: "Web Server" },
+            },
+        ],
+        edges: [{ id: "edge-internet-web", source: "internet", target: "web" }],
+    };
+
+    const collidingCurrent: Architecture = {
+        nodes: [
+            {
+                id: "cache",
+                position: { x: 0, y: 0 },
+                data: { label: "Old Cache" },
+            },
+        ],
+        edges: [],
+    };
+
+    test("an existing node appears as a Connect option, grouped separately from the incoming file", () => {
+        renderDialog({ current: existingWithRoom });
+
+        const fromSelect = screen.getByRole("combobox", {
+            name: "Connect from",
+        });
+        expect(
+            within(fromSelect).getByRole("group", {
+                name: "Existing architecture",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            within(fromSelect).getByRole("option", { name: "Web Server" }),
+        ).toBeInTheDocument();
+    });
+
+    test("Connect can link an existing node to an incoming node; onConfirm reports the current-origin key literally", async () => {
+        const user = userEvent.setup();
+        const { onConfirm } = renderDialog({ current: existingWithRoom });
+
+        expect(
+            screen.getByRole("combobox", { name: "Connect from" }),
+        ).toHaveValue("current:web");
+        expect(
+            screen.getByRole("combobox", { name: "Connect to" }),
+        ).toHaveValue("incoming:queue");
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
+            new Set(["queue", "cache"]),
+            new Set(),
+            [{ source: "current:web", target: "incoming:queue" }],
+        );
+    });
+
+    test("an existing node with an outgoing edge is excluded from Connect From options", () => {
+        renderDialog({ current: existingChain });
+
+        const fromSelect = screen.getByRole("combobox", {
+            name: "Connect from",
+        });
+        expect(
+            within(fromSelect).queryByRole("option", { name: "Internet" }),
+        ).not.toBeInTheDocument();
+        expect(
+            within(fromSelect).getByRole("option", { name: "Web Server" }),
+        ).toBeInTheDocument();
+    });
+
+    test("an existing node and a colliding incoming node (same raw id) both appear as distinct Connect options", () => {
+        renderDialog({ current: collidingCurrent });
+
+        const fromSelect = screen.getByRole("combobox", {
+            name: "Connect from",
+        });
+        expect(
+            within(fromSelect).getByRole("option", { name: "Old Cache" }),
+        ).toBeInTheDocument();
+        expect(
+            within(fromSelect).getByRole("option", { name: "Cache" }),
+        ).toBeInTheDocument();
+    });
+
+    test("deselecting an incoming node also drops an added connection to an existing node", async () => {
+        const user = userEvent.setup();
+        renderDialog({ current: existingWithRoom });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+        await user.click(
+            screen.getByRole("checkbox", { name: "Message Queue queue" }),
+        );
+
+        expect(
+            screen.queryByText("Web Server → Message Queue"),
+        ).not.toBeInTheDocument();
     });
 });
