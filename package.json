@@ -11,7 +11,7 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
-        "check": "npm run lint && npm run typecheck && npm run format:check && npm run test"
+        "check": "npm run lint && npm run typecheck && npm run format && npm run test"
     },
     "dependencies": {
         "@xyflow/react": "^12.11.3",

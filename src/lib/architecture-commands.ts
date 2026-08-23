@@ -66,10 +66,62 @@ export type NodeIndex = {
     edgesBySourceTarget: Map<string, ArchitectureEdge>;
     outgoingBySource: Map<string, ArchitectureEdge>;
     incomingByTarget: Map<string, ArchitectureEdge>;
+    substringIndex: SubstringTrieNode;
 };
 
 function edgeKey(sourceId: string, targetId: string): string {
     return `${sourceId}::${targetId}`;
+}
+
+// A trie over every suffix of every folded label: walking it by the query's
+// characters costs O(query length), replacing an O(nodes) scan for the
+// substring fallback in findNodeOrAmbiguity, however many nodes exist.
+type SubstringTrieNode = {
+    children: Map<string, SubstringTrieNode>;
+    matches: Set<ArchitectureNode>;
+};
+
+function createSubstringTrieNode(): SubstringTrieNode {
+    return { children: new Map(), matches: new Set() };
+}
+
+function insertSuffixes(root: SubstringTrieNode, node: ArchitectureNode): void {
+    const folded = foldLabel(node.data.label);
+    for (let start = 0; start < folded.length; start += 1) {
+        let current = root;
+        for (let i = start; i < folded.length; i += 1) {
+            const char = folded[i];
+            let child = current.children.get(char);
+            if (!child) {
+                child = createSubstringTrieNode();
+                current.children.set(char, child);
+            }
+            current = child;
+            current.matches.add(node);
+        }
+    }
+}
+
+function buildSubstringIndex(nodes: ArchitectureNode[]): SubstringTrieNode {
+    const root = createSubstringTrieNode();
+    for (const node of nodes) {
+        insertSuffixes(root, node);
+    }
+    return root;
+}
+
+// Returns architecture.nodes-order matches for any substring, or [] if none.
+function querySubstringIndex(
+    root: SubstringTrieNode,
+    needle: string,
+): ArchitectureNode[] {
+    let current = root;
+    for (let i = 0; i < needle.length; i += 1) {
+        const next = current.children.get(needle[i]);
+        if (!next) return [];
+        current = next;
+    }
+    return Array.from(current.matches);
 }
 
 export function buildNodeIndex(
@@ -96,6 +148,7 @@ export function buildNodeIndex(
         edgesBySourceTarget,
         outgoingBySource,
         incomingByTarget,
+        substringIndex: buildSubstringIndex(nodes),
     };
 }
 
@@ -119,17 +172,13 @@ function wouldCreateCycle(
 
 function findNodeOrAmbiguity(
     label: string,
-    architecture: Architecture,
     nodeIndex: NodeIndex,
 ): ArchitectureNode | ArchitectureNode[] | null {
     const needle = normalizeLabel(label).toLowerCase();
     if (needle.length === 0) return null;
     const exact = nodeIndex.byLabel.get(needle);
     if (exact) return exact;
-    // no fast path for a substring match
-    const matches = architecture.nodes.filter((node) =>
-        foldLabel(node.data.label).includes(needle),
-    );
+    const matches = querySubstringIndex(nodeIndex.substringIndex, needle);
     if (matches.length === 0) return null;
     if (matches.length === 1) return matches[0];
     return matches;
@@ -203,7 +252,6 @@ function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
 
 function resolveConnectionEndpoints(
     rest: string,
-    architecture: Architecture,
     nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedEndpoints | null {
@@ -212,8 +260,8 @@ function resolveConnectionEndpoints(
 
     const resolved = splits.map((split) => ({
         ...split,
-        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
-        target: findNodeOrAmbiguity(split.targetLabel, architecture, nodeIndex),
+        source: findNodeOrAmbiguity(split.sourceLabel, nodeIndex),
+        target: findNodeOrAmbiguity(split.targetLabel, nodeIndex),
     }));
 
     return (
@@ -232,7 +280,6 @@ type ResolvedRenameArgs = {
 // A trailing " to " with nothing after it (a blank new label)
 function resolveTrailingSeparatorWithBlankTarget(
     rest: string,
-    architecture: Architecture,
     nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedRenameArgs | null {
@@ -247,21 +294,19 @@ function resolveTrailingSeparatorWithBlankTarget(
     return {
         sourceLabel,
         newLabel: "",
-        source: findNodeOrAmbiguity(sourceLabel, architecture, nodeIndex),
+        source: findNodeOrAmbiguity(sourceLabel, nodeIndex),
     };
 }
 
 // Unlike resolveConnectionEndpoints, only the left side is a node reference
 function resolveRenameArgs(
     rest: string,
-    architecture: Architecture,
     nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedRenameArgs | null {
     const splits = splitConnectionArgs(rest, separators);
     const trailingBlank = resolveTrailingSeparatorWithBlankTarget(
         rest,
-        architecture,
         nodeIndex,
         separators,
     );
@@ -270,7 +315,7 @@ function resolveRenameArgs(
     const resolved = splits.map((split) => ({
         sourceLabel: split.sourceLabel,
         newLabel: split.targetLabel,
-        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
+        source: findNodeOrAmbiguity(split.sourceLabel, nodeIndex),
     }));
 
     return (
@@ -294,7 +339,6 @@ type ResolvedMoveArgs = {
 // Unlike resolveConnectionEndpoints, the right side is a step number, not a node reference
 function resolveMoveNodeArgs(
     rest: string,
-    architecture: Architecture,
     nodeIndex: NodeIndex,
     separators: string[],
 ): ResolvedMoveArgs | null {
@@ -304,7 +348,7 @@ function resolveMoveNodeArgs(
     const resolved = splits.map((split) => ({
         sourceLabel: split.sourceLabel,
         positionText: split.targetLabel.trim(),
-        source: findNodeOrAmbiguity(split.sourceLabel, architecture, nodeIndex),
+        source: findNodeOrAmbiguity(split.sourceLabel, nodeIndex),
     }));
 
     return (
@@ -391,7 +435,6 @@ export function parseCommand(
     if (connectMatch) {
         const resolved = resolveConnectionEndpoints(
             connectMatch[1],
-            architecture,
             nodeIndex,
             CONNECT_SEPARATORS,
         );
@@ -476,7 +519,7 @@ export function parseCommand(
     const removeNodeMatch = matchFirst(REMOVE_NODE_PATTERNS, trimmed);
     if (removeNodeMatch) {
         const label = removeNodeMatch[1].trim();
-        const resolved = findNodeOrAmbiguity(label, architecture, nodeIndex);
+        const resolved = findNodeOrAmbiguity(label, nodeIndex);
         if (resolved === null) {
             return { ok: false, message: `No node named "${label}".` };
         }
@@ -504,7 +547,6 @@ export function parseCommand(
     if (removeEdgeMatch) {
         const resolved = resolveConnectionEndpoints(
             removeEdgeMatch[1],
-            architecture,
             nodeIndex,
             DISCONNECT_SEPARATORS,
         );
@@ -556,7 +598,6 @@ export function parseCommand(
     if (renameNodeMatch) {
         const resolved = resolveRenameArgs(
             renameNodeMatch[1],
-            architecture,
             nodeIndex,
             RENAME_SEPARATORS,
         );
@@ -616,7 +657,6 @@ export function parseCommand(
     if (moveNodeMatch) {
         const resolved = resolveMoveNodeArgs(
             moveNodeMatch[1],
-            architecture,
             nodeIndex,
             MOVE_NODE_SEPARATORS,
         );

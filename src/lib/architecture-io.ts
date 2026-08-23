@@ -128,8 +128,7 @@ function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
 
-// Disambiguates a label against the folded labels already in use, mirroring
-// uniqueNodeId's "-2, -3, ..." scheme
+// Disambiguates a label against the folded labels already in use
 function uniqueLabel(label: string, takenFolded: Set<string>): string {
     let candidate = label;
     let suffix = 2;
@@ -140,11 +139,7 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
-// Folds an incoming (already internally-valid) architecture into `current`,
-// renaming any id/label that collides so every node stays uniquely
-// addressable. The two node sets never end up sharing an id, so the merged
-// graph can't violate the app's single-in/single-out/no-cycle invariants -
-// there's nothing left to re-validate once the remap is done.
+// Folds an incoming (already internally-valid) architecture into `current`
 export function mergeImportedArchitecture(
     current: Architecture,
     raw: string,
