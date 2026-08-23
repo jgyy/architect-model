@@ -377,6 +377,133 @@ describe("ArchitectureWorkspace", () => {
         expect(screen.getByText('Reaches "Web Server".')).toBeInTheDocument();
     });
 
+    test('typing "undo" reverts the last command and logs what was undone', async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "add node Cache");
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+
+        await submitCommand(user, "undo");
+
+        await waitFor(() => {
+            expect(screen.queryByText("Cache")).not.toBeInTheDocument();
+        });
+        expect(screen.getByText('Undid "add node Cache".')).toBeInTheDocument();
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Web Server", "Database"]);
+        });
+    });
+
+    test('typing "undo" with nothing to undo logs a failure instead of touching the architecture', async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "undo");
+
+        expect(await screen.findByText("Nothing to undo.")).toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(screen.getByText("Database")).toBeInTheDocument();
+    });
+
+    test('typing "redo" re-applies an undone command and logs what was redone', async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "add node Cache");
+        await submitCommand(user, "undo");
+        await waitFor(() => {
+            expect(screen.queryByText("Cache")).not.toBeInTheDocument();
+        });
+
+        await submitCommand(user, "redo");
+
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.getByText('Redid "add node Cache".')).toBeInTheDocument();
+    });
+
+    test("the undo/redo toolbar buttons are disabled until there is something to undo/redo, and run the same commands as typing them", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        expect(screen.getByTitle("Undo")).toBeDisabled();
+        expect(screen.getByTitle("Redo")).toBeDisabled();
+
+        await submitCommand(user, "add node Cache");
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeEnabled();
+
+        await user.click(screen.getByTitle("Undo"));
+        await waitFor(() => {
+            expect(screen.queryByText("Cache")).not.toBeInTheDocument();
+        });
+        expect(screen.getByTitle("Undo")).toBeDisabled();
+        expect(screen.getByTitle("Redo")).toBeEnabled();
+
+        await user.click(screen.getByTitle("Redo"));
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.getByTitle("Redo")).toBeDisabled();
+    });
+
+    test("a cross-tab storage sync clears this tab's local undo history", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "add node Cache");
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeEnabled();
+
+        const otherTabState: PersistedState = {
+            architecture: {
+                nodes: [
+                    {
+                        id: "queue",
+                        position: { x: 0, y: 0 },
+                        data: { label: "Message Queue" },
+                    },
+                ],
+                edges: [],
+            },
+            log: [],
+            stepIndex: 0,
+            speedIndex: 1,
+        };
+        fireEvent(
+            window,
+            new StorageEvent("storage", {
+                key: STORAGE_KEY,
+                newValue: JSON.stringify(otherTabState),
+            }),
+        );
+
+        expect(await screen.findByText("Message Queue")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeDisabled();
+    });
+
+    test("clearing the console also clears the undo/redo history", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "add node Cache");
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeEnabled();
+
+        await user.click(screen.getByTitle("Clear console"));
+
+        await waitFor(() => {
+            expect(screen.getByTitle("Undo")).toBeDisabled();
+        });
+    });
+
     test("a storage event that clears the key resets the workspace back to initialArchitecture", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);

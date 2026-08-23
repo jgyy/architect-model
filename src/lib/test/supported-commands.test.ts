@@ -30,6 +30,8 @@ describe("SUPPORTED_COMMANDS", () => {
         "remove edge",
         "rename node",
         "move node <label> to step",
+        "undo",
+        "redo",
     ])("documents the '%s' command", (keyword) => {
         expect(
             SUPPORTED_COMMANDS.some((entry) => entry.includes(keyword)),
@@ -40,6 +42,14 @@ describe("SUPPORTED_COMMANDS", () => {
         for (const entry of SUPPORTED_COMMANDS) {
             for (const line of entry.split("\n")) {
                 expect(line.length).toBeLessThanOrEqual(CONSOLE_WIDTH);
+            }
+        }
+    });
+
+    test("omits the alias line entirely for a command with no aliases", () => {
+        for (const entry of SUPPORTED_COMMANDS) {
+            for (const line of entry.split("\n")) {
+                expect(line.trim()).not.toMatch(/^alias(es)?:\s*$/);
             }
         }
     });

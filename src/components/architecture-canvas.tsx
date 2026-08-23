@@ -196,8 +196,7 @@ export function ArchitectureCanvas({
         [onNodeCreate],
     );
 
-    // Touch/keyboard-reachable equivalent of double-clicking the pane, for
-    // devices where that gesture doesn't exist
+    // Touch/keyboard-reachable equivalent of double-clicking the pane
     const handleAddNodeClick = useCallback(() => {
         const instance = reactFlowInstanceRef.current;
         const rect = canvasWrapperRef.current?.getBoundingClientRect();

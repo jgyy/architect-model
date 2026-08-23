@@ -41,6 +41,18 @@ const COMMAND_DOCS: CommandDoc[] = [
         aliases: ["reorder node"],
         note: "shifts the surrounding steps to make room",
     },
+    {
+        usage: "undo",
+        example: 'e.g. "undo" after "add node Cache" removes it again',
+        aliases: [],
+        note: "reverts the last command; also a toolbar button",
+    },
+    {
+        usage: "redo",
+        example: 'e.g. "redo" re-applies the last undone command',
+        aliases: [],
+        note: "also a toolbar button",
+    },
 ];
 
 // Every command's plain usage line, in a fixed order
@@ -49,12 +61,11 @@ export const COMMAND_USAGE = COMMAND_DOCS.map((doc) => doc.usage);
 const INDENT = "    ";
 
 function formatCommandDoc(doc: CommandDoc): string {
-    const aliasWord = doc.aliases.length > 1 ? "aliases" : "alias";
-    const lines = [
-        doc.usage,
-        `${INDENT}${doc.example}`,
-        `${INDENT}${aliasWord}: ${doc.aliases.join(", ")}`,
-    ];
+    const lines = [doc.usage, `${INDENT}${doc.example}`];
+    if (doc.aliases.length > 0) {
+        const aliasWord = doc.aliases.length > 1 ? "aliases" : "alias";
+        lines.push(`${INDENT}${aliasWord}: ${doc.aliases.join(", ")}`);
+    }
     if (doc.note) lines.push(`${INDENT}${doc.note}`);
     return lines.join("\n");
 }
