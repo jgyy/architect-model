@@ -1,6 +1,14 @@
 "use client";
 
-import { CheckCircle2, Redo2, Trash2, Undo2, XCircle } from "lucide-react";
+import {
+    CheckCircle2,
+    Download,
+    Redo2,
+    Trash2,
+    Undo2,
+    Upload,
+    XCircle,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { CommandInput } from "@/components/command-input";
@@ -18,6 +26,8 @@ type ConsolePanelProps = {
     canRedo: boolean;
     onUndo: () => void;
     onRedo: () => void;
+    onExport: () => void;
+    onImport: (file: File) => void;
 };
 
 // A REPL-style console: scrolling command/output history with a live prompt
@@ -32,8 +42,11 @@ export function ConsolePanel({
     canRedo,
     onUndo,
     onRedo,
+    onExport,
+    onImport,
 }: ConsolePanelProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     // Whether the user was already at (or near) the bottom before this log
     // change, kept up to date by handleScroll independently of the log
     // itself settling this only once per user scroll, not once per log
@@ -56,6 +69,13 @@ export function ConsolePanel({
             el.scrollHeight - el.scrollTop - el.clientHeight;
         stickToBottomRef.current =
             distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+    }
+
+    function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        // reset so choosing the same file again still fires this handler
+        event.target.value = "";
+        if (file) onImport(file);
     }
 
     return (
@@ -83,6 +103,30 @@ export function ConsolePanel({
                     >
                         <Redo2 size={14} />
                     </button>
+                    <button
+                        type="button"
+                        onClick={onExport}
+                        title="Export architecture"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
+                    >
+                        <Download size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Import architecture"
+                        className="rounded p-1 text-muted-foreground hover:bg-border hover:text-foreground"
+                    >
+                        <Upload size={14} />
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={handleFileChange}
+                        aria-label="Import architecture file"
+                        className="hidden"
+                    />
                     <button
                         type="button"
                         onClick={onClear}

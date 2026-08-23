@@ -12,6 +12,11 @@ import {
     type ParseCommandOptions,
 } from "@/lib/architecture-commands";
 import {
+    ARCHITECTURE_EXPORT_FILENAME,
+    parseImportedArchitecture,
+    serializeArchitecture,
+} from "@/lib/architecture-io";
+import {
     buildConnectCommand,
     buildMoveNodeCommand,
     buildRemoveEdgeCommand,
@@ -53,6 +58,19 @@ function maxLogId(entries: LogEntry[]): number {
 
 // Bounds the console's scrollback
 const MAX_LOG_ENTRIES = 5000;
+
+// A Blob + temporary <a download> is the standard no-backend way to hand the
+// browser a file to save; the object URL only needs to live long enough for
+// the synchronous click() below to pick it up
+function downloadJsonFile(json: string, filename: string): void {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+}
 
 function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
     const next = [...entries, entry];
@@ -215,7 +233,12 @@ export function ArchitectureWorkspace({
             const trimmed = text.trim();
             if (!trimmed) return null;
 
-            if (trimmed.toLowerCase() === "help" || trimmed === "?") {
+            // help/export/undo/redo are non-mutating or history operations,
+            // not architecture-mutating regex commands - they never reach
+            // parseCommand
+            const lower = trimmed.toLowerCase();
+
+            if (lower === "help" || trimmed === "?") {
                 const id = nextLogId();
                 setLog((entries) =>
                     appendLogEntry(entries, {
@@ -228,9 +251,24 @@ export function ArchitectureWorkspace({
                 return { ok: true, architecture, message: HELP_MESSAGE };
             }
 
-            // undo/redo are history operations, not architecture-mutating
-            // regex commands - they never reach parseCommand
-            const lower = trimmed.toLowerCase();
+            if (lower === "export") {
+                downloadJsonFile(
+                    serializeArchitecture(architecture),
+                    ARCHITECTURE_EXPORT_FILENAME,
+                );
+                const id = nextLogId();
+                const message = `Exported ${architecture.nodes.length} node(s) and ${architecture.edges.length} edge(s) to "${ARCHITECTURE_EXPORT_FILENAME}".`;
+                setLog((entries) =>
+                    appendLogEntry(entries, {
+                        id,
+                        input: trimmed,
+                        ok: true,
+                        message,
+                    }),
+                );
+                return { ok: true, architecture, message };
+            }
+
             if (lower === "undo" || lower === "redo") {
                 const outcome =
                     lower === "undo"
@@ -378,6 +416,56 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    // A whole-architecture replacement, so it's recorded like any other
+    // mutating command (undoable) rather than treated as a persisted-state
+    // hydration - unlike undo/redo, reading the file is async, so this can't
+    // go through runCommand's synchronous, single-return-value shape
+    const handleImportFile = useCallback(
+        (file: File) => {
+            const label = `import "${file.name}"`;
+            file.text()
+                .then((raw) => {
+                    const result = parseImportedArchitecture(raw);
+                    const id = nextLogId();
+                    if (!result.ok) {
+                        setLog((entries) =>
+                            appendLogEntry(entries, {
+                                id,
+                                input: label,
+                                ok: false,
+                                message: result.message,
+                            }),
+                        );
+                        return;
+                    }
+                    setUndoRedo((current) =>
+                        recordCommand(current, label, architecture),
+                    );
+                    setArchitecture(result.architecture);
+                    setLog((entries) =>
+                        appendLogEntry(entries, {
+                            id,
+                            input: label,
+                            ok: true,
+                            message: `Imported ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}".`,
+                        }),
+                    );
+                })
+                .catch(() => {
+                    const id = nextLogId();
+                    setLog((entries) =>
+                        appendLogEntry(entries, {
+                            id,
+                            input: label,
+                            ok: false,
+                            message: "Couldn't read that file.",
+                        }),
+                    );
+                });
+        },
+        [architecture],
+    );
+
     return (
         <div className="flex h-full w-full flex-col md:flex-row">
             <div className="min-h-0 min-w-0 flex-1">
@@ -416,6 +504,8 @@ export function ArchitectureWorkspace({
                     canRedo={undoRedo.redoStack.length > 0}
                     onUndo={() => runCommand("undo")}
                     onRedo={() => runCommand("redo")}
+                    onExport={() => runCommand("export")}
+                    onImport={handleImportFile}
                 />
             </aside>
         </div>

@@ -61,7 +61,7 @@ function isLogEntry(value: unknown): value is LogEntry {
     );
 }
 
-function isValidArchitecture(value: unknown): value is Architecture {
+export function isValidArchitecture(value: unknown): value is Architecture {
     return (
         isRecord(value) &&
         Array.isArray(value.nodes) &&
