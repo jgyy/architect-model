@@ -22,10 +22,9 @@ type CommandInputProps = {
     onChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
-    // caller's memoized index, so a keystroke never rebuilds the trie;
-    // suggestNodeReference falls back to building one if omitted
+    // caller's memoized index, so a keystroke never rebuilds the trie
     nodeIndex?: NodeIndex;
-    // previously submitted command text, oldest first - recalled with Up/Down
+    // previously submitted command text, oldest first, recalled with Up/Down
     commands: string[];
 };
 
