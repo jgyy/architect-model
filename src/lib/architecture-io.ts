@@ -168,10 +168,7 @@ export function decodeConnectOptionKey(key: string): {
     };
 }
 
-// Node/edge lists for the Connect control's cycle/degree checks, spanning
-// both `current` and the incoming file's (already selected/kept) nodes and
-// edges - ids namespaced via connectOptionKey so a real id collision between
-// the two can't merge two distinct nodes into one during the check.
+// Node/edge lists for the Connect control's cycle/degree checks
 export function buildConnectGraph(
     current: Architecture,
     incomingNodes: ArchitectureNode[],
@@ -202,8 +199,7 @@ export function buildConnectGraph(
     return { nodes, edges };
 }
 
-// Ids of `nodes` with no outgoing edge in `edges` yet - eligible as the
-// source of a manually-added connection
+// Ids of `nodes` with no outgoing edge in `edges` yet
 export function connectableSourceIds(
     nodes: ArchitectureNode[],
     edges: ArchitectureEdge[],
@@ -216,8 +212,7 @@ export function connectableSourceIds(
     );
 }
 
-// Ids of `nodes` that `sourceId` could connect to without giving a node a
-// second outgoing/incoming edge or closing a cycle
+// Ids of `nodes` that `sourceId` could connect to without giving a node
 export function connectableTargetIds(
     sourceId: string,
     nodes: ArchitectureNode[],
@@ -235,9 +230,6 @@ export function connectableTargetIds(
 }
 
 // source/target are connect option keys (see connectOptionKey): "current:<id>"
-// for a node already in `current` (used as-is - current ids never change),
-// or "incoming:<id>" for one of `incoming`'s own nodes using its original,
-// pre-remap id (resolved through the same id remap as everything else).
 export type AddedConnectEdge = { source: string; target: string };
 
 function resolveConnectEndpoint(

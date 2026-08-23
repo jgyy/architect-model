@@ -85,6 +85,11 @@ accent; crossed nodes/edges turn red. Steps can be dragged or reordered, both ru
 
 ## What I'd improve with more time
 
-- The merge picker's Connect option keys assume a node id never contains a literal `:` (true for
-  every id this app generates or the assignment's UUID-style example) to decode an origin/id pair
-  with a plain split; a hand-crafted import with a colon in an id could misparse.
+- A cross-tab `storage` event can overwrite local React state with a remote snapshot if it arrives
+  in the narrow window between a local update and the next autosave flush (autosave runs in a
+  separate effect, not synchronously). A real fix needs synchronous persistence or version
+  tracking; judged out of proportion for this app's size.
+- The page always paints the seed architecture first, then swaps in localStorage's persisted state
+  once the client mounts - a visible flash for a returning user with a different saved session. A
+  synchronous localStorage read in the initial `useState` would remove the flash but risks
+  reintroducing hydration-mismatch warnings, which felt worse than the cosmetic issue.

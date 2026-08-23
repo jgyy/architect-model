@@ -637,6 +637,22 @@ describe("connectOptionKey / decodeConnectOptionKey", () => {
             decodeConnectOptionKey(connectOptionKey("incoming", "node-cache")),
         ).toEqual({ origin: "incoming", id: "node-cache" });
     });
+
+    test("round-trips a raw id that itself contains colons", () => {
+        expect(
+            decodeConnectOptionKey(
+                connectOptionKey("incoming", "node:with:colons"),
+            ),
+        ).toEqual({ origin: "incoming", id: "node:with:colons" });
+    });
+
+    test("resolves origin correctly even when the raw id starts with the other origin's name", () => {
+        expect(
+            decodeConnectOptionKey(
+                connectOptionKey("incoming", "current:looks-like-current"),
+            ),
+        ).toEqual({ origin: "incoming", id: "current:looks-like-current" });
+    });
 });
 
 describe("buildConnectGraph", () => {
