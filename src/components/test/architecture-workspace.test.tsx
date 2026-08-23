@@ -773,10 +773,59 @@ describe("ArchitectureWorkspace", () => {
                 'Merged 1 node(s) and 0 edge(s) from "extra.json" into the existing architecture at step 1.',
             ),
         ).toBeInTheDocument();
-        expect(screen.getByText("Step 1 / 3")).toBeInTheDocument();
-        expect(
-            screen.getByText('Reaches "Message Queue".'),
-        ).toBeInTheDocument();
+        // Message Queue is now step 1, but Web Server (the node the user was
+        // actually viewing before the merge) stays "current" at its new
+        // step 2 - inserting ahead of it must not silently reassign
+        // "current" to whichever node landed in that slot.
+        expect(screen.getByText("Step 2 / 3")).toBeInTheDocument();
+        expect(screen.getByText('Reaches "Web Server".')).toBeInTheDocument();
+    });
+
+    test('typing "move node" directly (not just dragging/clicking the timeline) also keeps the current node\'s identity', async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        // Web Server (step 1) starts as the current step
+        expect(screen.getByText(/^Step 1 \/ 2$/)).toBeInTheDocument();
+
+        await submitCommand(user, "move node Database to step 1");
+
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Database", "Web Server"]);
+        });
+
+        // "current" should have followed Web Server to its new step 2,
+        // exactly like the equivalent timeline-button interaction does.
+        expect(screen.getByText(/^Step 2 \/ 2$/)).toBeInTheDocument();
+        expect(screen.getByText('Reaches "Web Server".')).toBeInTheDocument();
+    });
+
+    test("removing a node ahead of the current step keeps the current node's identity", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        // Jump to Database (step 2) as the current step
+        await user.click(screen.getByRole("button", { name: /^2\./ }));
+        expect(screen.getByText(/^Step 2 \/ 2$/)).toBeInTheDocument();
+
+        await submitCommand(user, "remove node Web Server");
+
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Database"]);
+        });
+
+        // Database is now the only (and first) step - "current" must stay
+        // on it rather than silently landing on whatever shares its old index.
+        expect(screen.getByText(/^Step 1 \/ 1$/)).toBeInTheDocument();
+        expect(screen.getByText('Reaches "Database".')).toBeInTheDocument();
     });
 
     test("cancelling the merge picker leaves the architecture untouched", async () => {
@@ -850,6 +899,75 @@ describe("ArchitectureWorkspace", () => {
         ).toBeInTheDocument();
     });
 
+    test("picking a second merge file while the picker is still open replaces the dialog's stale selection, instead of merging the wrong subset", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file1 = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "file1.json",
+            { type: "application/json" },
+        );
+        const file2 = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "cache",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Cache" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "file2.json",
+            { type: "application/json" },
+        );
+
+        const mergeInput = screen.getByLabelText("Merge architecture file");
+        await user.upload(mergeInput, file1);
+        expect(
+            await screen.findByRole("checkbox", { name: /^Message Queue/ }),
+        ).toBeInTheDocument();
+
+        // Pick a second, different file before confirming the first
+        await user.upload(mergeInput, file2);
+
+        // The dialog now reflects file2, with its own (freshly reset,
+        // fully-selected) state - not file1's stale checkboxes
+        expect(
+            screen.queryByRole("checkbox", { name: /^Message Queue/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            await screen.findByRole("checkbox", { name: /^Cache/ }),
+        ).toBeInTheDocument();
+
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(await screen.findByText("Cache")).toBeInTheDocument();
+        expect(screen.queryByText("Message Queue")).not.toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Merged 1 node(s) and 0 edge(s) from "file2.json" into the existing architecture.',
+            ),
+        ).toBeInTheDocument();
+    });
+
     test("choosing a malformed file to merge logs the parse failure and leaves the architecture untouched", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
@@ -892,5 +1010,91 @@ describe("ArchitectureWorkspace", () => {
         });
         expect(screen.getByText("Web Server")).toBeInTheDocument();
         expect(screen.getByText("Database")).toBeInTheDocument();
+    });
+
+    test("a cross-tab storage update closes an open merge picker instead of leaving it to be confirmed against a stale architecture", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+        expect(
+            await screen.findByRole("dialog", { name: /Merge nodes/ }),
+        ).toBeInTheDocument();
+
+        const otherTabState: PersistedState = {
+            architecture: {
+                nodes: [
+                    {
+                        id: "queue",
+                        position: { x: 0, y: 0 },
+                        data: { label: "Message Queue" },
+                    },
+                ],
+                edges: [],
+            },
+            log: [],
+            stepIndex: 0,
+            speedIndex: 1,
+        };
+        fireEvent(
+            window,
+            new StorageEvent("storage", {
+                key: STORAGE_KEY,
+                newValue: JSON.stringify(otherTabState),
+            }),
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.queryByRole("dialog", { name: /Merge nodes/ }),
+            ).not.toBeInTheDocument();
+        });
+        expect(
+            screen.getByText(
+                "Cancelled: the architecture changed in another tab while the merge picker was open.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    test("a localStorage write failure (e.g. quota exceeded, private browsing) is surfaced in the console log instead of silently discarding the change", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const setItemSpy = vi
+            .spyOn(Storage.prototype, "setItem")
+            .mockImplementation(() => {
+                throw new Error("QuotaExceededError");
+            });
+
+        await submitCommand(user, "add node Cache");
+
+        expect(
+            await screen.findByText(
+                "Couldn't save to this browser's local storage (it may be full, or you're in private browsing) - your changes may not survive closing this tab.",
+            ),
+        ).toBeInTheDocument();
+
+        setItemSpy.mockRestore();
     });
 });

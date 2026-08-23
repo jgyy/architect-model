@@ -1,11 +1,12 @@
 import {
+    MAX_LABEL_LENGTH,
     NODE_X_SPACING,
     buildNodeIndex,
     slugify,
     uniqueNodeId,
     wouldCreateCycle,
 } from "@/lib/architecture-commands";
-import { foldLabel } from "@/lib/node-reference";
+import { foldLabel, normalizeLabel } from "@/lib/node-reference";
 import { isValidArchitecture } from "@/lib/persistence";
 import type {
     Architecture,
@@ -54,21 +55,51 @@ function findCyclicNodeId(
     return nodeIds.find((id) => !visited.has(id)) ?? null;
 }
 
-// Re-checks the invariants the rest of the app assumes already hold
+// Re-checks the invariants the rest of the app assumes already hold - the
+// same ones typed/canvas commands enforce (non-blank label, unique label,
+// finite position) plus ones only a hand-edited file could violate (a
+// duplicate edge id). Node-id uniqueness/edge referential integrity/cycles
+// were already checked before this file grew the extra invariants below.
 function validateImportedArchitecture(
     architecture: Architecture,
 ): string | null {
     const nodeIds = new Set<string>();
+    const takenLabels = new Set<string>();
     for (const node of architecture.nodes) {
         if (nodeIds.has(node.id)) {
             return `Two nodes share the id "${node.id}".`;
         }
         nodeIds.add(node.id);
+
+        if (
+            !Number.isFinite(node.position.x) ||
+            !Number.isFinite(node.position.y)
+        ) {
+            return `Node "${node.id}" has a non-finite position.`;
+        }
+
+        const label = normalizeLabel(node.data.label);
+        if (label.length === 0) {
+            return `Node "${node.id}" has a blank label.`;
+        }
+        if (label.length > MAX_LABEL_LENGTH) {
+            return `Node "${node.id}"'s label is longer than ${MAX_LABEL_LENGTH} characters.`;
+        }
+        const folded = foldLabel(label);
+        if (takenLabels.has(folded)) {
+            return `Two nodes share the label "${label}".`;
+        }
+        takenLabels.add(folded);
     }
 
+    const edgeIds = new Set<string>();
     const outgoingBySource = new Map<string, string>();
     const seenTargets = new Set<string>();
     for (const edge of architecture.edges) {
+        if (edgeIds.has(edge.id)) {
+            return `Two edges share the id "${edge.id}".`;
+        }
+        edgeIds.add(edge.id);
         if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
             return `Edge "${edge.id}" references a node that doesn't exist.`;
         }
@@ -142,11 +173,7 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
 
 export type ConnectOrigin = "current" | "incoming";
 
-// Namespaces a raw node id by which side of a merge it came from. Incoming
-// node ids are deterministic slugs of their label (e.g. "node-cache"), so an
-// existing node and an incoming node can genuinely collide on id before the
-// merge remaps it - this keeps the two distinguishable while the Connect
-// control computes eligibility and records a manual edge.
+// Namespaces a raw node id by which side of a merge it came from.
 export function connectOptionKey(origin: ConnectOrigin, id: string): string {
     return `${origin}:${id}`;
 }

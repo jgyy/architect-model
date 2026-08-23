@@ -13,11 +13,16 @@ export function matchFirst(
 // zero-width space/non-joiner/joiner and byte-order-mark
 const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\uFEFF]/g;
 
+// Strips characters that render as nothing but can silently break an exact
+// substring match - a command keyword, a separator token ("connect A to\u200B B"
+// with a zero-width space inside "to"), or a label lookup.
+export function stripInvisibleChars(text: string): string {
+    return text.replace(INVISIBLE_CHARS_PATTERN, "");
+}
+
 // Collapses runs of internal whitespace (not just leading/trailing)
 export function normalizeLabel(label: string): string {
-    return label
-        .normalize("NFC")
-        .replace(INVISIBLE_CHARS_PATTERN, "")
+    return stripInvisibleChars(label.normalize("NFC"))
         .trim()
         .replace(/\s+/g, " ");
 }

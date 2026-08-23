@@ -546,4 +546,41 @@ describe("MergePickerDialog", () => {
             0,
         );
     });
+
+    describe("focus management", () => {
+        test("moves keyboard focus into the dialog on open, instead of leaving it on whatever triggered it", () => {
+            const trigger = document.createElement("button");
+            document.body.appendChild(trigger);
+            trigger.focus();
+            expect(trigger).toHaveFocus();
+
+            renderDialog();
+
+            expect(screen.getByRole("dialog")).toHaveFocus();
+            document.body.removeChild(trigger);
+        });
+
+        test("restores focus to whatever triggered it once the dialog unmounts", () => {
+            const trigger = document.createElement("button");
+            document.body.appendChild(trigger);
+            trigger.focus();
+
+            const { unmount } = render(
+                <MergePickerDialog
+                    fileName="extra.json"
+                    incoming={incoming}
+                    current={emptyArchitecture}
+                    existingFoldedLabels={new Set()}
+                    onConfirm={vi.fn()}
+                    onCancel={vi.fn()}
+                />,
+            );
+            expect(screen.getByRole("dialog")).toHaveFocus();
+
+            unmount();
+
+            expect(trigger).toHaveFocus();
+            document.body.removeChild(trigger);
+        });
+    });
 });

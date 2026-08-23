@@ -182,6 +182,30 @@ describe("ArchitectureNode", () => {
         expect(actions.onRename).toHaveBeenCalledTimes(1);
     });
 
+    test("blurring after a rejected rename cancels the edit instead of re-submitting the same value and re-trapping the user in edit mode", async () => {
+        const user = userEvent.setup();
+        const actions = renderNode(
+            { id: "node-1", data: { label: "Cache" } },
+            { onRename: vi.fn(() => false) },
+        );
+        await user.dblClick(screen.getByText("Cache"));
+        const input = screen.getByDisplayValue("Cache");
+        await user.clear(input);
+        await user.type(input, "Redis{enter}");
+        expect(actions.onRename).toHaveBeenCalledTimes(1);
+        expect(screen.getByDisplayValue("Redis")).toBeInTheDocument();
+
+        // Click away instead of pressing Escape
+        await user.tab();
+
+        // Reverted to the original label and exited edit mode - the blur's
+        // own attempt (still rejected, same value) gives up instead of
+        // refocusing back into edit mode, so this converges in one extra
+        // call instead of trapping the user in an endless retry loop
+        expect(screen.getByText("Cache")).toBeInTheDocument();
+        expect(actions.onRename).toHaveBeenCalledTimes(2);
+    });
+
     test("a node matching the highlighted context id gets the current styling", () => {
         render(
             <ReactFlowProvider>

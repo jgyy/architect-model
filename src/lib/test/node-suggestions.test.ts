@@ -51,6 +51,21 @@ describe("suggestNodeReference", () => {
         expect(suggestion!.replaceTo).toBe("remove node Da".length);
     });
 
+    test("suggests nothing for 'remove node <label>' when the cursor sits before the argument, not inside it", () => {
+        const input = "remove node We";
+        // Cursor at position 0, inside "remove" - nowhere near "We"
+        const suggestion = suggestNodeReference(input, architecture, 0);
+
+        expect(suggestion).toBeNull();
+    });
+
+    test("suggests nothing for 'rename node <label>' (pre-separator phase) when the cursor sits before the argument", () => {
+        const input = "rename node We";
+        const suggestion = suggestNodeReference(input, architecture, 0);
+
+        expect(suggestion).toBeNull();
+    });
+
     test("suggests every node once the argument is empty", () => {
         const suggestion = suggestNodeReference("remove node  ", architecture);
 

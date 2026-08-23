@@ -64,10 +64,15 @@ function singleSlotSuggestion(
     rest: string | undefined,
     nodeIndex: NodeIndex,
     limit: number,
-): NodeSuggestion {
+    cursor: number,
+): NodeSuggestion | null {
     const partial = rest ?? "";
+    const replaceFrom = input.length - partial.length;
+    // The argument always runs to the end of the string, so a cursor
+    // sitting earlier (e.g. still inside "remove"/"node") isn't editing it.
+    if (cursor < replaceFrom) return null;
     return {
-        replaceFrom: input.length - partial.length,
+        replaceFrom,
         replaceTo: input.length,
         matches: rankMatches(partial, nodeIndex, limit),
     };
@@ -165,7 +170,7 @@ function renameNodeSuggestion(
         cursor - restStart,
     );
     if (!split) {
-        return singleSlotSuggestion(input, rest, nodeIndex, limit);
+        return singleSlotSuggestion(input, rest, nodeIndex, limit, cursor);
     }
 
     const separatorStart = restStart + split.index;
@@ -223,6 +228,7 @@ export function suggestNodeReference(
             removeNodeMatch[1],
             nodeIndex,
             limit,
+            cursor,
         );
     }
 

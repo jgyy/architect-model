@@ -9,7 +9,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { ArchitectureCanvas } from "@/components/architecture-canvas";
+import {
+    ArchitectureCanvas,
+    reconcileRenderNodes,
+} from "@/components/architecture-canvas";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 afterEach(cleanup);
@@ -73,6 +76,59 @@ function canvasProps(
 async function waitForFlowInit() {
     await new Promise((resolve) => setTimeout(resolve, 10));
 }
+
+describe("reconcileRenderNodes", () => {
+    const a: ArchitectureNode = {
+        id: "a",
+        position: { x: 0, y: 0 },
+        data: { label: "A" },
+    };
+    const b: ArchitectureNode = {
+        id: "b",
+        position: { x: 200, y: 0 },
+        data: { label: "B" },
+    };
+
+    test("adopts the incoming array wholesale when nothing is being dragged", () => {
+        const draggedA = { ...a, position: { x: 999, y: 999 } };
+        const incomingA = { ...a, position: { x: 5, y: 5 } };
+
+        const result = reconcileRenderNodes(
+            [draggedA, b],
+            [incomingA, b],
+            null,
+        );
+
+        expect(result[0].position).toEqual({ x: 5, y: 5 });
+    });
+
+    test("preserves the dragged node's live position instead of snapping back to the incoming (pre-drag) one", () => {
+        const draggedA = { ...a, position: { x: 999, y: 999 } };
+        // The parent's architecture still has the pre-drag position, since
+        // in-flight drag changes are filtered out of what reaches it.
+        const staleIncomingA = { ...a, position: { x: 0, y: 0 } };
+        const renamedIncomingB = { ...b, data: { label: "Renamed B" } };
+
+        const result = reconcileRenderNodes(
+            [draggedA, b],
+            [staleIncomingA, renamedIncomingB],
+            "a",
+        );
+
+        expect(result[0].position).toEqual({ x: 999, y: 999 });
+        // Other fields on the dragged node still adopt the incoming value
+        expect(result[0].data.label).toBe("A");
+        // A node that isn't being dragged reconciles normally
+        expect(result[1].data.label).toBe("Renamed B");
+    });
+
+    test("reuses the exact incoming object reference when nothing changed for that node", () => {
+        const result = reconcileRenderNodes([a, b], [a, b], null);
+
+        expect(result[0]).toBe(a);
+        expect(result[1]).toBe(b);
+    });
+});
 
 describe("ArchitectureCanvas", () => {
     test("renders every node's label", () => {
