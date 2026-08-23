@@ -49,9 +49,10 @@ mouse gestures. **Import** replaces the whole architecture with a chosen JSON fi
 anything malformed or invariant-violating and leaving the current architecture untouched. **Merge**
 instead opens a picker to choose which of the file's nodes (and, independently, which of its
 edges) to bring in (all checked by default, with a live node/edge count and a "will be renamed"
-hint on any label collision) before adding them alongside the existing architecture: a colliding
-incoming id or label is renamed (`"Cache (2)"`) so every node stays addressable, and the log notes
-any renames.
+hint on any label collision), plus a **Connect** control to add a connection of your own between
+two selected nodes the file left unconnected, before adding them alongside the existing
+architecture: a colliding incoming id or label is renamed (`"Cache (2)"`) so every node stays
+addressable, and the log notes any renames.
 
 ## History, simulation & multi-tab sync
 
@@ -79,8 +80,9 @@ running `move node ... to step ...`.
   the invariants above.
 - The merge picker's edge checkboxes default to "included" when both endpoints are selected, but
   unchecking one drops just that edge while keeping both nodes - a choice that sticks even if a
-  node is toggled off and back on. It can only drop an edge the file already has, not add one it
-  doesn't; that still needs a follow-up `connect`.
+  node is toggled off and back on. Its Connect control fills the other direction - manually adding
+  an edge the file didn't have - by reusing the same single-outgoing/single-incoming/no-cycle
+  invariant as the main `connect` command, so the two feel like one consistent capability.
 - `move node ... to step ...` re-lays out node x-positions to match the new step order; edges
   aren't rewired.
 - `undo`/`redo` are two stacks of `{ command, snapshot }` pairs, pushed to by every mutating
@@ -92,5 +94,6 @@ running `move node ... to step ...`.
 
 ## What I'd improve with more time
 
-- The merge picker can drop an edge the incoming file already has, but can't add one it doesn't -
-  connecting two merged nodes that the file left unconnected still needs a follow-up `connect`.
+- The merge picker's Connect control only links two of the incoming file's own nodes together; it
+  can't connect a merged node to one already in the existing architecture - that still needs a
+  follow-up `connect` after confirming the merge.

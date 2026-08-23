@@ -163,7 +163,7 @@ export function buildNodeIndex(
 }
 
 // Would connecting source->target close a loop?
-function wouldCreateCycle(
+export function wouldCreateCycle(
     sourceId: string,
     targetId: string,
     nodeIndex: NodeIndex,

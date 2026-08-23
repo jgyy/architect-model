@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNodeIndex, parseCommand } from "@/lib/architecture-commands";
+import {
+    buildNodeIndex,
+    parseCommand,
+    wouldCreateCycle,
+} from "@/lib/architecture-commands";
 import type { Architecture } from "@/types/architecture";
 
 describe("parseCommand - edge commands", () => {
@@ -636,5 +640,45 @@ describe("parseCommand - edge commands", () => {
         expect(
             nodeIndex.edgesBySourceTarget.has("node-database::node-web-server"),
         ).toBe(false);
+    });
+});
+
+describe("wouldCreateCycle", () => {
+    function node(id: string): Architecture["nodes"][number] {
+        return { id, position: { x: 0, y: 0 }, data: { label: id } };
+    }
+
+    function edge(
+        source: string,
+        target: string,
+    ): Architecture["edges"][number] {
+        return { id: `edge-${source}-${target}`, source, target };
+    }
+
+    test("detects that closing the tail back to the head would create a cycle", () => {
+        const nodeIndex = buildNodeIndex(
+            [node("a"), node("b"), node("c")],
+            [edge("a", "b"), edge("b", "c")],
+        );
+
+        expect(wouldCreateCycle("c", "a", nodeIndex)).toBe(true);
+    });
+
+    test("allows extending the tail of a chain", () => {
+        const nodeIndex = buildNodeIndex(
+            [node("a"), node("b"), node("c")],
+            [edge("a", "b")],
+        );
+
+        expect(wouldCreateCycle("b", "c", nodeIndex)).toBe(false);
+    });
+
+    test("allows connecting two disjoint chains", () => {
+        const nodeIndex = buildNodeIndex(
+            [node("a"), node("b"), node("x"), node("y")],
+            [edge("a", "b"), edge("x", "y")],
+        );
+
+        expect(wouldCreateCycle("b", "x", nodeIndex)).toBe(false);
     });
 });

@@ -518,7 +518,11 @@ export function ArchitectureWorkspace({
     const handleCancelMerge = useCallback(() => setPendingMerge(null), []);
 
     const handleConfirmMerge = useCallback(
-        (selectedNodeIds: Set<string>, excludedEdgeIds: Set<string>) => {
+        (
+            selectedNodeIds: Set<string>,
+            excludedEdgeIds: Set<string>,
+            addedEdges: { source: string; target: string }[],
+        ) => {
             if (!pendingMerge) return;
             const label = `merge "${pendingMerge.fileName}"`;
             const result = mergeSelectedArchitecture(
@@ -526,6 +530,7 @@ export function ArchitectureWorkspace({
                 pendingMerge.incoming,
                 selectedNodeIds,
                 excludedEdgeIds,
+                addedEdges,
             );
             const id = nextLogId();
             setUndoRedo((current) =>

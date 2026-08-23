@@ -688,6 +688,52 @@ describe("ArchitectureWorkspace", () => {
         ).toBeInTheDocument();
     });
 
+    test("the merge picker lets you connect two selected nodes that the file left unconnected", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                        {
+                            id: "cache",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Cache" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+        await user.click(
+            await screen.findByRole("button", { name: "Add connection" }),
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(await screen.findByText("Message Queue")).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Merged 2 node(s) and 1 edge(s) from "extra.json" into the existing architecture.',
+            ),
+        ).toBeInTheDocument();
+    });
+
     test("cancelling the merge picker leaves the architecture untouched", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
