@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef } from "react";
 
 import { CommandInput } from "@/components/command-input";
+import type { NodeIndex } from "@/lib/architecture-commands";
 import type { LogEntry } from "@/lib/persistence";
 import type { Architecture } from "@/types/architecture";
 
@@ -31,6 +32,7 @@ type ConsolePanelProps = {
     onInputChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
+    nodeIndex?: NodeIndex;
     canUndo: boolean;
     canRedo: boolean;
     onUndo: () => void;
@@ -48,6 +50,7 @@ export function ConsolePanel({
     onInputChange,
     onSubmit,
     architecture,
+    nodeIndex,
     canUndo,
     canRedo,
     onUndo,
@@ -238,6 +241,7 @@ export function ConsolePanel({
                 onChange={onInputChange}
                 onSubmit={onSubmit}
                 architecture={architecture}
+                nodeIndex={nodeIndex}
                 commands={log.map((entry) => entry.input)}
             />
         </div>

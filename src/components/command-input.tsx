@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import type { NodeIndex } from "@/lib/architecture-commands";
 import {
     recallNewerCommand,
     recallOlderCommand,
@@ -21,6 +22,9 @@ type CommandInputProps = {
     onChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     architecture: Architecture;
+    // caller's memoized index, so a keystroke never rebuilds the trie;
+    // suggestNodeReference falls back to building one if omitted
+    nodeIndex?: NodeIndex;
     // previously submitted command text, oldest first - recalled with Up/Down
     commands: string[];
 };
@@ -31,6 +35,7 @@ export function CommandInput({
     onChange,
     onSubmit,
     architecture,
+    nodeIndex,
     commands,
 }: CommandInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +66,8 @@ export function CommandInput({
         value,
         architecture,
         Math.min(cursorPosition, value.length),
+        undefined,
+        nodeIndex,
     );
     const options = dismissed ? [] : (suggestion?.matches ?? []);
 

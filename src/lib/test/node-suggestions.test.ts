@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { buildNodeIndex } from "@/lib/architecture-commands";
 import {
     applyNodeSuggestion,
     suggestNodeReference,
@@ -289,6 +290,57 @@ describe("suggestNodeReference", () => {
         );
 
         expect(labels(suggestion!.matches)).toEqual(["Web Server"]);
+    });
+});
+
+describe("suggestNodeReference with a caller-supplied nodeIndex", () => {
+    test("ranks identically to the default, freshly-built index", () => {
+        const nodeIndex = buildNodeIndex(
+            architecture.nodes,
+            architecture.edges,
+        );
+
+        const input = "remove node Da";
+        const withDefault = suggestNodeReference(input, architecture);
+        const withExplicit = suggestNodeReference(
+            input,
+            architecture,
+            undefined,
+            undefined,
+            nodeIndex,
+        );
+
+        expect(labels(withExplicit!.matches)).toEqual(
+            labels(withDefault!.matches),
+        );
+    });
+
+    test("only sees nodes present in the supplied index, even if architecture changed since", () => {
+        const staleIndex = buildNodeIndex(
+            architecture.nodes,
+            architecture.edges,
+        );
+        const grown: Architecture = {
+            nodes: [
+                ...architecture.nodes,
+                {
+                    id: "node-data-lake",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Data Lake" },
+                },
+            ],
+            edges: [],
+        };
+
+        const suggestion = suggestNodeReference(
+            "remove node Da",
+            grown,
+            undefined,
+            undefined,
+            staleIndex,
+        );
+
+        expect(labels(suggestion!.matches)).toEqual(["Database"]);
     });
 });
 
