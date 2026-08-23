@@ -174,4 +174,79 @@ describe("ConsolePanel", () => {
             ).toBeInTheDocument();
         });
     });
+
+    describe("auto-scroll", () => {
+        // jsdom does no layout, so scrollHeight/clientHeight are always 0
+        function stubScrollGeometry(
+            el: HTMLElement,
+            geometry: { scrollHeight: number; clientHeight: number },
+        ) {
+            Object.defineProperty(el, "scrollHeight", {
+                value: geometry.scrollHeight,
+                configurable: true,
+            });
+            Object.defineProperty(el, "clientHeight", {
+                value: geometry.clientHeight,
+                configurable: true,
+            });
+        }
+
+        function scrollContainer(container: HTMLElement): HTMLElement {
+            const el = container.querySelector(".overflow-y-auto");
+            if (!el) throw new Error("scroll container not found");
+            return el as HTMLElement;
+        }
+
+        test("scrolls to the bottom when a new entry arrives while already at the bottom", () => {
+            const { container, rerender } = renderPanel({
+                log: [logEntry({ id: 1 })],
+            });
+            const el = scrollContainer(container);
+            stubScrollGeometry(el, { scrollHeight: 500, clientHeight: 200 });
+            el.scrollTop = 300; // exactly at the bottom (500 - 300 - 200 = 0)
+            fireEvent.scroll(el);
+
+            stubScrollGeometry(el, { scrollHeight: 600, clientHeight: 200 });
+            rerender(
+                <ConsolePanel
+                    {...{
+                        log: [logEntry({ id: 1 }), logEntry({ id: 2 })],
+                        onClear: vi.fn(),
+                        input: "",
+                        onInputChange: vi.fn(),
+                        onSubmit: vi.fn(),
+                        architecture: emptyArchitecture(),
+                    }}
+                />,
+            );
+
+            expect(el.scrollTop).toBe(600);
+        });
+
+        test("does not yank the view back to the bottom when the user has scrolled up to read earlier output", () => {
+            const { container, rerender } = renderPanel({
+                log: [logEntry({ id: 1 })],
+            });
+            const el = scrollContainer(container);
+            stubScrollGeometry(el, { scrollHeight: 500, clientHeight: 200 });
+            el.scrollTop = 0; // scrolled all the way up, far from the bottom
+            fireEvent.scroll(el);
+
+            stubScrollGeometry(el, { scrollHeight: 600, clientHeight: 200 });
+            rerender(
+                <ConsolePanel
+                    {...{
+                        log: [logEntry({ id: 1 }), logEntry({ id: 2 })],
+                        onClear: vi.fn(),
+                        input: "",
+                        onInputChange: vi.fn(),
+                        onSubmit: vi.fn(),
+                        architecture: emptyArchitecture(),
+                    }}
+                />,
+            );
+
+            expect(el.scrollTop).toBe(0);
+        });
+    });
 });

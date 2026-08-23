@@ -14,6 +14,7 @@ import {
     describe,
     expect,
     test,
+    vi,
 } from "vitest";
 
 import { ArchitectureWorkspace } from "@/components/architecture-workspace";
@@ -267,6 +268,63 @@ describe("ArchitectureWorkspace", () => {
         expect(screen.getByText("add node Message Queue")).toBeInTheDocument();
     });
 
+    test("hydrating from an existing session does not perform a redundant localStorage write", async () => {
+        const seeded: PersistedState = {
+            architecture: fixture(),
+            log: [
+                {
+                    id: 1,
+                    input: "add node Cache",
+                    ok: true,
+                    message: 'Added node "Cache".',
+                },
+            ],
+            stepIndex: 0,
+            speedIndex: 1,
+        };
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+        const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+        // give the autosave effect a chance to run, if it's going to
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(
+            setItemSpy.mock.calls.filter(([key]) => key === STORAGE_KEY),
+        ).toHaveLength(0);
+        setItemSpy.mockRestore();
+    });
+
+    test("an invalid cross-tab storage update is overwritten with this tab's own known-good state instead of silently left corrupted", async () => {
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        // Missing `log` - fails schema validation, unlike a normal update
+        fireEvent(
+            window,
+            new StorageEvent("storage", {
+                key: STORAGE_KEY,
+                newValue: JSON.stringify({
+                    architecture: { nodes: [], edges: [] },
+                }),
+            }),
+        );
+
+        // This tab's own UI is unaffected...
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(screen.getByText("Database")).toBeInTheDocument();
+
+        // ...and the corrupted entry no longer sits in storage to poison a
+        // later reload back down to initialArchitecture
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Web Server", "Database"]);
+        });
+    });
+
     test("dragging a simulation step onto another runs the equivalent 'move node' command and reorders the architecture", async () => {
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
@@ -289,6 +347,34 @@ describe("ArchitectureWorkspace", () => {
                 persisted?.architecture.nodes.map((node) => node.data.label),
             ).toEqual(["Database", "Web Server"]);
         });
+    });
+
+    test("moving a different node past the current step keeps the current node's identity, instead of silently reassigning 'current' to whichever node shifted into that slot", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        // Web Server (step 1) starts as the current step
+        expect(screen.getByText(/^Step 1 \/ 2$/)).toBeInTheDocument();
+
+        // Move Database (step 2, a different node) up to step 1 - this
+        // shifts Web Server down to step 2 without the user ever selecting
+        // Database
+        await user.click(
+            screen.getByRole("button", { name: "Move step 2 up" }),
+        );
+
+        await waitFor(() => {
+            const persisted = loadPersistedState(window.localStorage);
+            expect(
+                persisted?.architecture.nodes.map((node) => node.data.label),
+            ).toEqual(["Database", "Web Server"]);
+        });
+
+        // "current" should have followed Web Server to its new step 2, not
+        // silently become Database just because Database is now at index 0
+        expect(screen.getByText(/^Step 2 \/ 2$/)).toBeInTheDocument();
+        expect(screen.getByText('Reaches "Web Server".')).toBeInTheDocument();
     });
 
     test("a storage event that clears the key resets the workspace back to initialArchitecture", async () => {

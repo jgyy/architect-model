@@ -43,13 +43,7 @@ if (typeof window !== "undefined") {
         DOMMatrixReadOnlyStub as unknown as typeof DOMMatrixReadOnly;
     Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 
-    // jsdom does no layout. Nodes get a small fixed size so @xyflow/react
-    // considers them measured; `.react-flow__renderer` (the element it
-    // measures for the viewport's own size, via useResizeHandler) needs a
-    // much larger size instead - with `onlyRenderVisibleElements` on, a
-    // container only a little bigger than the node fixtures makes fitView's
-    // natural fit scale hit its default maxZoom (2x) and clip the
-    // farthest-out node out of the "visible" viewport entirely.
+    // jsdom does no layout.
     function isViewportContainer(element: Element): boolean {
         return element.classList?.contains("react-flow__renderer") ?? false;
     }

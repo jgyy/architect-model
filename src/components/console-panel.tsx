@@ -26,12 +26,29 @@ export function ConsolePanel({
     architecture,
 }: ConsolePanelProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Whether the user was already at (or near) the bottom before this log
+    // change, kept up to date by handleScroll independently of the log
+    // itself settling this only once per user scroll, not once per log
+    // change (which would always see the already-updated, grown scrollHeight)
+    const stickToBottomRef = useRef(true);
 
     useEffect(() => {
         // scrollIntoView on a sentinel forces a full geometry computation
         const container = scrollRef.current;
-        if (container) container.scrollTop = container.scrollHeight;
+        if (container && stickToBottomRef.current) {
+            container.scrollTop = container.scrollHeight;
+        }
     }, [log.length]);
+
+    const NEAR_BOTTOM_THRESHOLD_PX = 32;
+
+    function handleScroll(event: React.UIEvent<HTMLDivElement>) {
+        const el = event.currentTarget;
+        const distanceFromBottom =
+            el.scrollHeight - el.scrollTop - el.clientHeight;
+        stickToBottomRef.current =
+            distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+    }
 
     return (
         <div className="flex min-h-0 flex-1 flex-col font-mono text-sm">
@@ -48,7 +65,11 @@ export function ConsolePanel({
                     <Trash2 size={14} />
                 </button>
             </div>
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 {log.length === 0 ? (
                     <p className="max-w-[80ch] break-words px-3 py-2 text-muted-foreground">
                         Blast Radius console - type{" "}

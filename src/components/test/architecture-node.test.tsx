@@ -41,7 +41,7 @@ function renderNode(
     actions: Partial<NodeActions> = {},
 ) {
     const nodeActions: NodeActions = {
-        onRename: vi.fn(),
+        onRename: vi.fn(() => true),
         onDelete: vi.fn(),
         autoEditNodeId: null,
         onAutoEditConsumed: vi.fn(),
@@ -95,6 +95,22 @@ describe("ArchitectureNode", () => {
         expect(actions.onRename).not.toHaveBeenCalled();
     });
 
+    test("clearing the label to blank routes through onRename (so it gets the same rejection/feedback as any other invalid rename) instead of silently reverting", async () => {
+        const user = userEvent.setup();
+        const actions = renderNode(
+            { id: "node-1", data: { label: "Cache" } },
+            { onRename: vi.fn(() => false) },
+        );
+        await user.dblClick(screen.getByText("Cache"));
+        const input = screen.getByDisplayValue("Cache");
+        await user.clear(input);
+        await user.keyboard("{enter}");
+
+        expect(actions.onRename).toHaveBeenCalledWith("node-1", "");
+        // still editing (blank), same as any other rejected rename
+        expect(screen.getByDisplayValue("")).toBeInTheDocument();
+    });
+
     test("pressing Escape cancels the edit and restores the original label", async () => {
         const user = userEvent.setup();
         const actions = renderNode({ data: { label: "Cache" } });
@@ -117,6 +133,55 @@ describe("ArchitectureNode", () => {
         expect(actions.onRename).toHaveBeenCalledWith("node-1", "Redis");
     });
 
+    test("a successful rename exits edit mode", async () => {
+        const user = userEvent.setup();
+        renderNode(
+            { id: "node-1", data: { label: "Cache" } },
+            { onRename: vi.fn(() => true) },
+        );
+        await user.dblClick(screen.getByText("Cache"));
+        const input = screen.getByDisplayValue("Cache");
+        await user.clear(input);
+        await user.type(input, "Redis{enter}");
+        expect(screen.queryByDisplayValue("Redis")).not.toBeInTheDocument();
+        expect(screen.getByText("Cache")).toBeInTheDocument();
+    });
+
+    test("a rejected rename (e.g. a duplicate label) stays in edit mode with the attempted text, instead of silently reverting", async () => {
+        const user = userEvent.setup();
+        const actions = renderNode(
+            { id: "node-1", data: { label: "Cache" } },
+            { onRename: vi.fn(() => false) },
+        );
+        await user.dblClick(screen.getByText("Cache"));
+        const input = screen.getByDisplayValue("Cache");
+        await user.clear(input);
+        await user.type(input, "Redis{enter}");
+
+        expect(actions.onRename).toHaveBeenCalledWith("node-1", "Redis");
+        // still editing, still showing the rejected text
+        expect(screen.getByDisplayValue("Redis")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Redis")).toHaveFocus();
+    });
+
+    test("Escape still cancels out of a rejected rename", async () => {
+        const user = userEvent.setup();
+        const actions = renderNode(
+            { id: "node-1", data: { label: "Cache" } },
+            { onRename: vi.fn(() => false) },
+        );
+        await user.dblClick(screen.getByText("Cache"));
+        const input = screen.getByDisplayValue("Cache");
+        await user.clear(input);
+        await user.type(input, "Redis{enter}");
+        expect(screen.getByDisplayValue("Redis")).toBeInTheDocument();
+
+        await user.keyboard("{escape}");
+
+        expect(screen.getByText("Cache")).toBeInTheDocument();
+        expect(actions.onRename).toHaveBeenCalledTimes(1);
+    });
+
     test("a node matching the highlighted context id gets the current styling", () => {
         render(
             <ReactFlowProvider>
@@ -130,9 +195,13 @@ describe("ArchitectureNode", () => {
                 </HighlightedNodeContext.Provider>
             </ReactFlowProvider>,
         );
-        expect(screen.getByText("Web Server").closest("div")).toHaveClass(
-            "border-accent",
-        );
+        const node = screen.getByText("Web Server").closest("div");
+        expect(node).toHaveClass("border-accent");
+        // Not color alone - also an ARIA signal and an SR-only text cue
+        expect(node).toHaveAttribute("aria-current", "step");
+        expect(
+            screen.getByText(", current simulation step"),
+        ).toBeInTheDocument();
     });
 
     test("a node in the traversed set (but not current) gets the traversed styling", () => {
@@ -148,9 +217,12 @@ describe("ArchitectureNode", () => {
                 </HighlightedNodeContext.Provider>
             </ReactFlowProvider>,
         );
-        expect(screen.getByText("Web Server").closest("div")).toHaveClass(
-            "border-danger",
-        );
+        const node = screen.getByText("Web Server").closest("div");
+        expect(node).toHaveClass("border-danger");
+        // Not color alone - also a non-color (dashed) border
+        expect(node).toHaveClass("border-dashed");
+        expect(node).not.toHaveAttribute("aria-current");
+        expect(screen.getByText(", already traversed")).toBeInTheDocument();
     });
 
     test("auto-edit hands off into edit mode on first render and clears itself", async () => {

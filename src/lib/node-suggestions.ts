@@ -2,6 +2,8 @@ import {
     CONNECT_PATTERNS,
     CONNECT_SEPARATORS,
     DISCONNECT_SEPARATORS,
+    MOVE_NODE_PATTERNS,
+    MOVE_NODE_SEPARATORS,
     REMOVE_EDGE_PATTERNS,
     REMOVE_NODE_PATTERNS,
     RENAME_NODE_PATTERNS,
@@ -252,6 +254,20 @@ export function suggestNodeReference(
             input,
             renameNodeMatch[1],
             RENAME_SEPARATORS,
+            architecture,
+            limit,
+            cursor,
+        );
+    }
+
+    // "move node <A> to step <n>" has only one node reference (A) - the step
+    // number isn't one, same shape as rename's new-label argument
+    const moveNodeMatch = matchFirst(MOVE_NODE_PATTERNS, input);
+    if (moveNodeMatch) {
+        return renameNodeSuggestion(
+            input,
+            moveNodeMatch[1],
+            MOVE_NODE_SEPARATORS,
             architecture,
             limit,
             cursor,

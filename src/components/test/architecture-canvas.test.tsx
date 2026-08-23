@@ -54,7 +54,9 @@ function defaultCanvasProps() {
         onNodeCreate: vi
             .fn<(position: { x: number; y: number }) => string | null>()
             .mockReturnValue("new-node"),
-        onNodeRename: vi.fn<(nodeId: string, newLabel: string) => void>(),
+        onNodeRename: vi
+            .fn<(nodeId: string, newLabel: string) => boolean>()
+            .mockReturnValue(true),
         onNodeDelete: vi.fn<(nodeId: string) => void>(),
         onEdgeCreate: vi.fn<(sourceId: string, targetId: string) => void>(),
         onEdgeDelete: vi.fn<(edgeId: string) => void>(),
@@ -141,6 +143,47 @@ describe("ArchitectureCanvas", () => {
             const pane = container.querySelector(".react-flow__pane");
             fireEvent.click(pane as Element, { clientX: 50, clientY: 50 });
             fireEvent.click(pane as Element, { clientX: 50, clientY: 50 });
+
+            expect(onNodeCreate).toHaveBeenCalledTimes(1);
+            await waitFor(() => {
+                expect(screen.getByDisplayValue("Node 4")).toBeInTheDocument();
+            });
+        });
+    });
+
+    describe("the 'Add node' button (a touch/keyboard-reachable alternative to double-clicking)", () => {
+        test("clicking it calls onNodeCreate with a flow position, same as double-clicking the pane", async () => {
+            const props = canvasProps();
+            render(<ArchitectureCanvas {...props} />);
+            await waitForFlowInit();
+
+            await userEvent.setup().click(screen.getByTitle("Add node"));
+
+            expect(props.onNodeCreate).toHaveBeenCalledTimes(1);
+            const [position] = props.onNodeCreate.mock.calls[0];
+            expect(typeof position.x).toBe("number");
+            expect(typeof position.y).toBe("number");
+        });
+
+        test("the newly created node auto-enters edit mode, same as via double-click", async () => {
+            const architecture = baseArchitecture();
+            const onNodeCreate = vi.fn((position: { x: number; y: number }) => {
+                architecture.nodes = [
+                    ...architecture.nodes,
+                    {
+                        id: "new-node",
+                        type: "default",
+                        position,
+                        data: { label: "Node 4" },
+                    },
+                ];
+                return "new-node";
+            });
+            const props = canvasProps({ architecture, onNodeCreate });
+            render(<ArchitectureCanvas {...props} />);
+            await waitForFlowInit();
+
+            await userEvent.setup().click(screen.getByTitle("Add node"));
 
             expect(onNodeCreate).toHaveBeenCalledTimes(1);
             await waitFor(() => {
