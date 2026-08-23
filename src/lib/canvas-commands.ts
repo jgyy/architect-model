@@ -1,4 +1,11 @@
-import type { Architecture } from "@/types/architecture";
+import type { Architecture, ArchitectureNode } from "@/types/architecture";
+
+function findNode(
+    architecture: Architecture,
+    id: string,
+): ArchitectureNode | undefined {
+    return architecture.nodes.find((node) => node.id === id);
+}
 
 // Synthesizes the same "remove edge A to B" text a user would type
 export function buildRemoveEdgeCommand(
@@ -10,8 +17,8 @@ export function buildRemoveEdgeCommand(
     );
     if (!edge) return null;
 
-    const source = architecture.nodes.find((node) => node.id === edge.source);
-    const target = architecture.nodes.find((node) => node.id === edge.target);
+    const source = findNode(architecture, edge.source);
+    const target = findNode(architecture, edge.target);
     if (!source || !target) return null;
 
     return `remove edge ${source.data.label} to ${target.data.label}`;
@@ -23,8 +30,8 @@ export function buildConnectCommand(
     targetId: string,
     architecture: Architecture,
 ): string | null {
-    const source = architecture.nodes.find((node) => node.id === sourceId);
-    const target = architecture.nodes.find((node) => node.id === targetId);
+    const source = findNode(architecture, sourceId);
+    const target = findNode(architecture, targetId);
     if (!source || !target) return null;
 
     return `connect ${source.data.label} to ${target.data.label}`;
@@ -36,9 +43,7 @@ export function buildRenameNodeCommand(
     newLabel: string,
     architecture: Architecture,
 ): string | null {
-    const node = architecture.nodes.find(
-        (candidate) => candidate.id === nodeId,
-    );
+    const node = findNode(architecture, nodeId);
     if (!node) return null;
 
     return `rename node ${node.data.label} to ${newLabel}`;
@@ -49,9 +54,7 @@ export function buildRemoveNodeCommand(
     nodeId: string,
     architecture: Architecture,
 ): string | null {
-    const node = architecture.nodes.find(
-        (candidate) => candidate.id === nodeId,
-    );
+    const node = findNode(architecture, nodeId);
     if (!node) return null;
 
     return `remove node ${node.data.label}`;
@@ -63,9 +66,7 @@ export function buildMoveNodeCommand(
     targetPosition: number,
     architecture: Architecture,
 ): string | null {
-    const node = architecture.nodes.find(
-        (candidate) => candidate.id === nodeId,
-    );
+    const node = findNode(architecture, nodeId);
     if (!node) return null;
 
     return `move node ${node.data.label} to step ${targetPosition}`;

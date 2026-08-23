@@ -5,6 +5,7 @@ import {
     uniqueNodeId,
     wouldCreateCycle,
 } from "@/lib/architecture-commands";
+import { foldLabel } from "@/lib/node-reference";
 import { isValidArchitecture } from "@/lib/persistence";
 import type {
     Architecture,
@@ -127,14 +128,6 @@ export type MergeArchitectureSuccess = {
     edgeCount: number;
     renamedLabels: string[];
 };
-
-export type MergeArchitectureResult =
-    MergeArchitectureSuccess | { ok: false; message: string };
-
-// Exported so callers (e.g. the merge picker)
-export function foldLabel(label: string): string {
-    return label.normalize("NFC").toLowerCase();
-}
 
 // Disambiguates a label against the folded labels already in use
 function uniqueLabel(label: string, takenFolded: Set<string>): string {
@@ -325,19 +318,4 @@ export function mergeSelectedArchitecture(
         edgeCount: incomingEdges.length + manualEdges.length,
         renamedLabels,
     };
-}
-
-// Folds an entire incoming (already internally-valid)
-export function mergeImportedArchitecture(
-    current: Architecture,
-    raw: string,
-): MergeArchitectureResult {
-    const parsed = parseImportedArchitecture(raw);
-    if (!parsed.ok) return parsed;
-
-    return mergeSelectedArchitecture(
-        current,
-        parsed.architecture,
-        new Set(parsed.architecture.nodes.map((node) => node.id)),
-    );
 }

@@ -14,7 +14,6 @@ import {
 } from "@/lib/architecture-commands";
 import {
     ARCHITECTURE_EXPORT_FILENAME,
-    foldLabel,
     mergeSelectedArchitecture,
     parseImportedArchitecture,
     serializeArchitecture,
@@ -27,6 +26,7 @@ import {
     buildRenameNodeCommand,
     nextDefaultNodeLabel,
 } from "@/lib/canvas-commands";
+import { foldLabel } from "@/lib/node-reference";
 import {
     clearPersistedState,
     interpretStorageEvent,
@@ -119,19 +119,32 @@ export function ArchitectureWorkspace({
     }, []);
 
     const resetToInitial = useCallback(() => {
-        setArchitecture(initialArchitecture);
-        setLog([]);
-        setCurrentStepIndex(0);
-        setSpeedIndex(DEFAULT_SPEED_INDEX);
-        setUndoRedo(EMPTY_UNDO_REDO_STATE);
-        nextLogIdRef.current = 1;
-    }, [initialArchitecture]);
+        applyPersisted({
+            architecture: initialArchitecture,
+            log: [],
+            stepIndex: 0,
+            speedIndex: DEFAULT_SPEED_INDEX,
+        });
+    }, [applyPersisted, initialArchitecture]);
 
     function nextLogId(): number {
         const id = nextLogIdRef.current;
         nextLogIdRef.current += 1;
         return id;
     }
+
+    // Every logged command allocates its id and appends in one step. The id
+    // is allocated outside the updater since setLog's updater must stay pure
+    // (React can invoke it more than once per call in dev).
+    const logResult = useCallback(
+        (input: string, ok: boolean, message: string) => {
+            const id = nextLogId();
+            setLog((entries) =>
+                appendLogEntry(entries, { id, input, ok, message }),
+            );
+        },
+        [],
+    );
 
     // localStorage doesn't exist during SSR
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -232,15 +245,7 @@ export function ArchitectureWorkspace({
             const lower = trimmed.toLowerCase();
 
             if (lower === "help" || trimmed === "?") {
-                const id = nextLogId();
-                setLog((entries) =>
-                    appendLogEntry(entries, {
-                        id,
-                        input: trimmed,
-                        ok: true,
-                        message: HELP_MESSAGE,
-                    }),
-                );
+                logResult(trimmed, true, HELP_MESSAGE);
                 return { ok: true, architecture, message: HELP_MESSAGE };
             }
 
@@ -249,16 +254,8 @@ export function ArchitectureWorkspace({
                     serializeArchitecture(architecture),
                     ARCHITECTURE_EXPORT_FILENAME,
                 );
-                const id = nextLogId();
                 const message = `Exported ${architecture.nodes.length} node(s) and ${architecture.edges.length} edge(s) to "${ARCHITECTURE_EXPORT_FILENAME}".`;
-                setLog((entries) =>
-                    appendLogEntry(entries, {
-                        id,
-                        input: trimmed,
-                        ok: true,
-                        message,
-                    }),
-                );
+                logResult(trimmed, true, message);
                 return { ok: true, architecture, message };
             }
 
@@ -267,30 +264,15 @@ export function ArchitectureWorkspace({
                     lower === "undo"
                         ? undoHistory(undoRedo, architecture)
                         : redoHistory(undoRedo, architecture);
-                const id = nextLogId();
                 if (!outcome.ok) {
                     const message = `Nothing to ${lower}.`;
-                    setLog((entries) =>
-                        appendLogEntry(entries, {
-                            id,
-                            input: trimmed,
-                            ok: false,
-                            message,
-                        }),
-                    );
+                    logResult(trimmed, false, message);
                     return { ok: false, message };
                 }
                 setArchitecture(outcome.architecture);
                 setUndoRedo(outcome.state);
                 const message = `${lower === "undo" ? "Undid" : "Redid"} "${outcome.command}".`;
-                setLog((entries) =>
-                    appendLogEntry(entries, {
-                        id,
-                        input: trimmed,
-                        ok: true,
-                        message,
-                    }),
-                );
+                logResult(trimmed, true, message);
                 return {
                     ok: true,
                     architecture: outcome.architecture,
@@ -310,18 +292,10 @@ export function ArchitectureWorkspace({
                 );
                 setArchitecture(result.architecture);
             }
-            const id = nextLogId();
-            setLog((entries) =>
-                appendLogEntry(entries, {
-                    id,
-                    input: trimmed,
-                    ok: result.ok,
-                    message: result.message,
-                }),
-            );
+            logResult(trimmed, result.ok, result.message);
             return result;
         },
-        [architecture, nodeIndex, undoRedo],
+        [architecture, nodeIndex, undoRedo, logResult],
     );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -406,114 +380,62 @@ export function ArchitectureWorkspace({
     );
 
     // A whole-architecture replacement, so it's recorded like any other
-    const runFileImport = useCallback(
-        (
-            file: File,
-            label: string,
-            parse: (raw: string) =>
-                | {
-                      ok: true;
-                      architecture: Architecture;
-                      nodeCount: number;
-                      edgeCount: number;
-                      renamedLabels?: string[];
-                  }
-                | { ok: false; message: string },
-            buildMessage: (result: {
-                nodeCount: number;
-                edgeCount: number;
-                renamedLabels?: string[];
-            }) => string,
-        ) => {
+    const handleImportFile = useCallback(
+        (file: File) => {
+            const label = `import "${file.name}"`;
             file.text()
                 .then((raw) => {
-                    const result = parse(raw);
-                    const id = nextLogId();
+                    const result = parseImportedArchitecture(raw);
                     if (!result.ok) {
-                        setLog((entries) =>
-                            appendLogEntry(entries, {
-                                id,
-                                input: label,
-                                ok: false,
-                                message: result.message,
-                            }),
-                        );
+                        logResult(label, false, result.message);
                         return;
                     }
                     setUndoRedo((current) =>
                         recordCommand(current, label, architecture),
                     );
                     setArchitecture(result.architecture);
-                    setLog((entries) =>
-                        appendLogEntry(entries, {
-                            id,
-                            input: label,
-                            ok: true,
-                            message: buildMessage(result),
-                        }),
+                    logResult(
+                        label,
+                        true,
+                        `Imported ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}".`,
                     );
                 })
                 .catch(() => {
-                    const id = nextLogId();
-                    setLog((entries) =>
-                        appendLogEntry(entries, {
-                            id,
-                            input: label,
-                            ok: false,
-                            message: "Couldn't read that file.",
-                        }),
-                    );
+                    logResult(label, false, "Couldn't read that file.");
                 });
         },
-        [architecture],
-    );
-
-    const handleImportFile = useCallback(
-        (file: File) =>
-            runFileImport(
-                file,
-                `import "${file.name}"`,
-                parseImportedArchitecture,
-                (result) =>
-                    `Imported ${result.nodeCount} node(s) and ${result.edgeCount} edge(s) from "${file.name}".`,
-            ),
-        [runFileImport],
+        [architecture, logResult],
     );
 
     // Only parses and opens the picker; the actual merge happens on confirm
-    const handleMergeFile = useCallback((file: File) => {
-        file.text()
-            .then((raw) => {
-                const parsed = parseImportedArchitecture(raw);
-                if (!parsed.ok) {
-                    const id = nextLogId();
-                    setLog((entries) =>
-                        appendLogEntry(entries, {
-                            id,
-                            input: `merge "${file.name}"`,
-                            ok: false,
-                            message: parsed.message,
-                        }),
+    const handleMergeFile = useCallback(
+        (file: File) => {
+            file.text()
+                .then((raw) => {
+                    const parsed = parseImportedArchitecture(raw);
+                    if (!parsed.ok) {
+                        logResult(
+                            `merge "${file.name}"`,
+                            false,
+                            parsed.message,
+                        );
+                        return;
+                    }
+                    setPendingMerge({
+                        fileName: file.name,
+                        incoming: parsed.architecture,
+                    });
+                })
+                .catch(() => {
+                    logResult(
+                        `merge "${file.name}"`,
+                        false,
+                        "Couldn't read that file.",
                     );
-                    return;
-                }
-                setPendingMerge({
-                    fileName: file.name,
-                    incoming: parsed.architecture,
                 });
-            })
-            .catch(() => {
-                const id = nextLogId();
-                setLog((entries) =>
-                    appendLogEntry(entries, {
-                        id,
-                        input: `merge "${file.name}"`,
-                        ok: false,
-                        message: "Couldn't read that file.",
-                    }),
-                );
-            });
-    }, []);
+        },
+        [logResult],
+    );
 
     const handleCancelMerge = useCallback(() => setPendingMerge(null), []);
 
@@ -534,7 +456,6 @@ export function ArchitectureWorkspace({
                 addedEdges,
                 insertAtStep,
             );
-            const id = nextLogId();
             setUndoRedo((current) =>
                 recordCommand(current, label, architecture),
             );
@@ -552,17 +473,10 @@ export function ArchitectureWorkspace({
             const message = result.renamedLabels.length
                 ? `${base} Renamed to avoid duplicates: ${result.renamedLabels.join(", ")}.`
                 : base;
-            setLog((entries) =>
-                appendLogEntry(entries, {
-                    id,
-                    input: label,
-                    ok: true,
-                    message,
-                }),
-            );
+            logResult(label, true, message);
             setPendingMerge(null);
         },
-        [architecture, pendingMerge],
+        [architecture, pendingMerge, logResult],
     );
 
     return (
