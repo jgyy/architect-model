@@ -123,9 +123,7 @@ export function loadPersistedState(
     }
 }
 
-// Returns whether the write actually succeeded (e.g. false on a quota
-// error or Safari private-browsing's SecurityError), so a caller can warn
-// the user instead of assuming a silently-swallowed failure means success.
+// Returns whether the write actually succeeded
 export function savePersistedState(
     storage: StorageLike,
     state: PersistedState,

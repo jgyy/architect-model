@@ -1,8 +1,7 @@
 # architect-model
 
-A small web app for updating a system architecture (nodes + edges) via text input, and exploring
-a simulation trace through it. Visual editing mirrors text editing exactly - every mouse action
-runs the same command a typed instruction would.
+A small web app for updating a system architecture (nodes + edges) via text input, and exploring a
+simulation trace through it. Visual editing mirrors text editing - every mouse action runs the same command a typed instruction would.
 
 ## Demo proof
 
@@ -36,9 +35,7 @@ npm run dev
 ```
 
 Open http://localhost:3000. `npm test` runs the unit tests; `npm run check` runs lint, typecheck,
-format, and tests together.
-
-There are sample json files in docs directory to test import export and merge features
+format, and tests together. Sample JSON files for import/export/merge are in `docs/`.
 
 ## Supported commands
 
@@ -47,45 +44,68 @@ an unrecognized command or an ambiguous reference is rejected inline in the log.
 autocompletes node names as you type.
 
 | Command                         | Aliases                                  | Example                           | Effect                                                        |
-| ------------------------------- | ---------------------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| -------------------------------- | ------------------------------------------ | ------------------------------------ | ---------------------------------------------------------------- |
 | `add node <label>`              | `create node`, `new node`                | `add node Cache`                  | Adds a node as the next simulation step.                      |
 | `connect <A> to <B>`            | `connect A and B`, `link A to/and B`     | `connect Web Server to Cache`     | Adds an edge; one outgoing/incoming edge per node, no cycles. |
 | `remove node <label>`           | `delete node`                            | `remove node Cache`               | Removes the node, its edges, and its step.                    |
 | `remove edge <A> to <B>`        | `delete edge`, `disconnect A from/and B` | `remove edge Web Server to Cache` | Removes the edge.                                             |
 | `rename node <A> to <B>`        | `relabel node A to B`                    | `rename node Cache to Redis`      | Renames the node everywhere it's referenced.                  |
 | `move node <label> to step <n>` | `reorder node`                           | `move node Cache to step 2`       | Reorders the node's simulation step.                          |
-| `export`                        | -                                        | `export`                          | Downloads the architecture as `architecture.json`.            |
-| `undo` / `redo`                 | -                                        | `undo`                            | Reverts / re-applies the last command.                        |
+| `export`                        | -                                         | `export`                          | Downloads the architecture as `architecture.json`.            |
+| `undo` / `redo`                 | -                                         | `undo`                            | Reverts / re-applies the last command.                        |
 
-Undo/redo also have toolbar buttons, covering every command-driven change (typed or canvas-driven)
-but not raw dragging; history is per-tab and clears on "Clear history" or a cross-tab sync.
+## Where to point
 
-Nodes are draggable (positions persist), double-click to rename, drag from an edge handle to
-connect, and a hover-revealed × deletes - each mirrors a command above. **Import** replaces the
-architecture with a validated JSON file; **Merge** picks nodes/edges, an insert step, and connects
-two before confirming.
+Quick index from feature to implementation - for checking a specific claim against the code without
+hunting for it. Grouped by the assignment's own required/bonus split.
+
+| Category             | Area                                     | File(s)                                               |
+| -------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| Required - commands  | Command parser entry point (all 6 verbs) | `src/lib/architecture-commands.ts:425-731`            |
+| Required - commands  | `add node`                               | `src/lib/architecture-commands.ts:408-413,444-475`    |
+| Required - commands  | `connect` (add edge)                     | `src/lib/architecture-commands.ts:476-548`            |
+| Required - commands  | `remove node` (cascading delete)         | `src/lib/architecture-commands.ts:549-570`            |
+| Required - commands  | `remove edge`                            | `src/lib/architecture-commands.ts:571-609`            |
+| Required - commands  | `rename node`                            | `src/lib/architecture-commands.ts:610-666`            |
+| Required - commands  | `move node ... to step ...`              | `src/lib/architecture-commands.ts:667-728`            |
+| Required - commands  | Node reference resolution + suffix trie  | `src/lib/architecture-commands.ts:84-199`             |
+| Required - commands  | Unrecognized / ambiguous command errors  | `src/lib/architecture-commands.ts:201-214,729-731`    |
+| Required - commands  | Sole `parseCommand` call site            | `src/components/architecture-workspace.tsx:281-355`   |
+| Required - display   | React Flow canvas                        | `src/components/architecture-canvas.tsx`              |
+| Required - display   | Data model (React Flow-compatible types) | `src/types/architecture.ts:1-16`                      |
+| Required - display   | Custom node (rename/delete/highlight)    | `src/components/architecture-node.tsx:1-173`          |
+| Required - display   | Custom edge (self-loop path)             | `src/components/architecture-edge.tsx:1-107`          |
+| Required - display   | Command console / change log             | `src/components/console-panel.tsx:1-246`              |
+| Bonus - simulation   | Stepper (trace = node array order)       | `src/lib/simulation.ts:12-51`                         |
+| Bonus - simulation   | Panel (Prev/Next/Play/Pause)             | `src/components/simulation-panel.tsx:1-129`           |
+| Bonus - simulation   | Drag-to-reorder steps                    | `src/components/simulation-timeline.tsx:1-126`        |
+| Bonus - extras       | Import / export / merge                  | `src/lib/architecture-io.ts:20-348`                   |
+| Bonus - extras       | Merge picker dialog                      | `src/components/merge-picker-dialog.tsx:1-458`        |
+| Bonus - extras       | Undo/redo (two-stack model)              | `src/lib/undo-history.ts:14-85`                       |
+| Bonus - extras       | Persistence (`localStorage`) + tab sync  | `src/lib/persistence.ts:24,64-170`                    |
+| Bonus - extras       | Command recall (Up/Down, not undo)       | `src/lib/command-history.ts:1-41`                     |
+| Performance          | MiniMap node-count guard                 | `src/components/architecture-canvas.tsx:114,291-301`  |
+| Performance          | `fitView` debounce                       | `src/components/architecture-canvas.tsx:116-134`      |
+| Performance          | Drag-position autosave-spam fix          | `src/lib/node-changes.ts:1-20`                        |
+| Tests                | Parser tests (5 files, 1,873 lines)      | `src/lib/test/architecture-commands-*.test.ts`        |
+| Tests                | Component tests                          | `src/components/test/`                                |
 
 ## History, simulation & multi-tab sync
 
-The command log, architecture, current step, and playback speed persist to `localStorage` and
-restore on reload (paused). **Clear history** resets to the seed; tabs sync via `storage` events.
-
-The Simulation panel steps through `architecture.nodes` in order: **Prev**/**Next** navigate
-manually, **Play**/**Pause** auto-advance at 0.5x-4x speed, current node ringed in accent, crossed
-nodes/edges red. Steps can be dragged or reordered, both running `move node ... to step ...`.
+The command log, architecture, current step, and playback speed persist to `localStorage`, restore on reload (paused), and sync across tabs via `storage` events; **Clear history** resets to the seed.
+The Simulation panel steps through `architecture.nodes` in order - **Prev**/**Next** navigate, **Play**/**Pause** auto-advance at 0.5x-4x, current node ringed, crossed nodes/edges red; steps drag/reorder via `move node ... to step ...`.
 
 ## Key design decisions and assumptions
 
 - Regex mini-syntax, not NLP: predictable, testable command forms, no LLM used or required.
 - Pure, tested logic lives in `lib/`; components only call it.
-- The simulation trace is embedded in node order and `data.description`, not a parallel structure.
+- The simulation trace is embedded in node order and `data.description`, not a parallel structure;
+  `move node ... to step ...` re-lays out node x-positions to match, without rewiring edges.
 - Node matching is case-insensitive substring; duplicate-label rejection is exact-match.
 - The command log doubles as the validation UI - every command is appended with its outcome.
 - Every canvas mouse action synthesizes and runs the same command text a user would type.
 - Edges form a single linear path (one outgoing/incoming edge per node, no cycles); Import re-validates the same invariants against an untrusted file.
-- Merge remaps a colliding incoming id/label rather than rejecting the file, reusing `add node`'s own disambiguation; From/To are namespaced `current:<id>`/`incoming:<id>` pre-remap.
-  Insert at step splices the incoming block into `current.nodes`, re-laying out positions after it.
-- `move node ... to step ...` re-lays out node x-positions to match the new step order; edges aren't rewired.
+- Merge remaps a colliding incoming id/label rather than rejecting the file, reusing `add node`'s own disambiguation; From/To are namespaced `current:<id>`/`incoming:<id>` pre-remap, and Insert at step splices the incoming block into `current.nodes`, re-laying out positions after it.
 - `undo`/`redo` are two stacks of `{ command, snapshot }` pairs pushed by every mutating command; a fresh command clears redo, and history clears on hydration, cross-tab sync, or "Clear history".
 - Node reference lookup's substring fallback is indexed by a suffix trie over every label, so a lookup costs O(query length) rather than O(nodes); the autocomplete dropdown reuses it.
 
