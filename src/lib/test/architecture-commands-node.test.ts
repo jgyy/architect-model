@@ -165,6 +165,48 @@ describe("parseCommand - node commands", () => {
         expect(result.message).toContain("multiple nodes");
     });
 
+    test("resolves a single node whose label contains the search substring more than once", () => {
+        const architecture: Architecture = {
+            nodes: [
+                {
+                    id: "node-banana",
+                    position: { x: 0, y: 0 },
+                    data: { label: "Banana Banana Cache" },
+                },
+            ],
+            edges: [],
+        };
+
+        const result = parseCommand("remove node banana", architecture);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.message).toBe(
+            'Removed node "Banana Banana Cache" and its simulation step.',
+        );
+    });
+
+    test("finds a substring match by scanning past 20 other nodes and truncates the ambiguous list", () => {
+        const nodes: Architecture["nodes"] = Array.from(
+            { length: 25 },
+            (_, index) => ({
+                id: `node-server-${index}`,
+                position: { x: index * 250, y: 0 },
+                data: { label: `Server ${index}` },
+            }),
+        );
+        const architecture: Architecture = { nodes, edges: [] };
+
+        const result = parseCommand("remove node Server", architecture);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) throw new Error("expected an ambiguous-label failure");
+        expect(result.message).toContain("Server 0");
+        expect(result.message).toContain("Server 19");
+        expect(result.message).not.toContain("Server 20");
+        expect(result.message).toContain("and 5 more");
+    });
+
     test('accepts "create node" as an alias for adding a node', () => {
         const result = parseCommand("create node Cache", emptyArchitecture);
 

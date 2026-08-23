@@ -79,10 +79,14 @@ running `move node ... to step ...`.
 - `undo`/`redo` are two stacks of `{ command, snapshot }` pairs, pushed to by every mutating
   command including import/merge; a fresh command clears the redo branch, and the whole history
   clears on hydration, a cross-tab sync, or "Clear history".
+- Node reference lookup's substring fallback (when a typed name isn't an exact match) is indexed
+  by a trie over every label's suffixes, built once per command alongside the rest of `NodeIndex`
+    - a lookup costs O(query length), not O(nodes), however large the architecture gets.
 
 ## What I'd improve with more time
 
-- Node matching's substring fallback is an O(nodes) scan when a reference isn't exact; a prefix
-  index would help at larger scale.
 - Merge has no subset picker - bringing in only part of a file means merging all of it, then
   pruning with `remove node`.
+- The live-typing autocomplete dropdown (`node-suggestions.ts`) still ranks matches with an
+  O(nodes) scan per keystroke; it wasn't folded into the substring-index fix above since it needs
+  ranked results, not just membership.
