@@ -42,8 +42,7 @@ function renderTimeline(
     return { onStepChange, onReorder };
 }
 
-// jsdom has no DataTransfer constructor; a minimal stand-in is enough since
-// the component tracks the dragged row in its own state, not via getData
+// jsdom has no DataTransfer constructor
 function makeDataTransfer() {
     const store = new Map<string, string>();
     return {

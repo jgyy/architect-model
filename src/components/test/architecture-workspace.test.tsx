@@ -29,7 +29,8 @@ const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,
     "localStorage",
 );
-if (jsdomWindow && !window.localStorage) {
+// Installed unconditionally (not gated on reading window.localStorage first)
+if (jsdomWindow) {
     Object.defineProperty(globalThis, "localStorage", {
         value: jsdomWindow.localStorage,
         configurable: true,
@@ -315,7 +316,6 @@ describe("ArchitectureWorkspace", () => {
         expect(screen.getByText("Web Server")).toBeInTheDocument();
         expect(screen.getByText("Database")).toBeInTheDocument();
 
-        // ...and the corrupted entry no longer sits in storage to poison a
         // later reload back down to initialArchitecture
         await waitFor(() => {
             const persisted = loadPersistedState(window.localStorage);
@@ -329,7 +329,7 @@ describe("ArchitectureWorkspace", () => {
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 
-        const dataTransfer = { setData: () => {}, getData: () => "" };
+        const dataTransfer = { setData: () => { }, getData: () => "" };
         const from = screen.getByText(/^1\./).closest("li");
         const to = screen.getByText(/^2\./).closest("li");
         if (!from || !to) throw new Error("row not found");
@@ -357,9 +357,7 @@ describe("ArchitectureWorkspace", () => {
         // Web Server (step 1) starts as the current step
         expect(screen.getByText(/^Step 1 \/ 2$/)).toBeInTheDocument();
 
-        // Move Database (step 2, a different node) up to step 1 - this
-        // shifts Web Server down to step 2 without the user ever selecting
-        // Database
+        // Move Database (step 2, a different node) up to step 1
         await user.click(
             screen.getByRole("button", { name: "Move step 2 up" }),
         );
@@ -371,8 +369,7 @@ describe("ArchitectureWorkspace", () => {
             ).toEqual(["Database", "Web Server"]);
         });
 
-        // "current" should have followed Web Server to its new step 2, not
-        // silently become Database just because Database is now at index 0
+        // "current" should have followed Web Server to its new step 2
         expect(screen.getByText(/^Step 2 \/ 2$/)).toBeInTheDocument();
         expect(screen.getByText('Reaches "Web Server".')).toBeInTheDocument();
     });
@@ -508,7 +505,7 @@ describe("ArchitectureWorkspace", () => {
         const user = userEvent.setup();
         const clickSpy = vi
             .spyOn(HTMLAnchorElement.prototype, "click")
-            .mockImplementation(() => {});
+            .mockImplementation(() => { });
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 
@@ -527,7 +524,7 @@ describe("ArchitectureWorkspace", () => {
         const user = userEvent.setup();
         const clickSpy = vi
             .spyOn(HTMLAnchorElement.prototype, "click")
-            .mockImplementation(() => {});
+            .mockImplementation(() => { });
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 
@@ -590,6 +587,103 @@ describe("ArchitectureWorkspace", () => {
 
         await user.upload(
             screen.getByLabelText("Import architecture file"),
+            file,
+        );
+
+        expect(
+            await screen.findByText("That file isn't valid JSON."),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeDisabled();
+    });
+
+    test("choosing a valid architecture file merges it into the existing architecture and is undoable", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+
+        expect(await screen.findByText("Message Queue")).toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Merged 1 node(s) and 0 edge(s) from "extra.json" into the existing architecture.',
+            ),
+        ).toBeInTheDocument();
+
+        expect(screen.getByTitle("Undo")).toBeEnabled();
+        await user.click(screen.getByTitle("Undo"));
+        expect(screen.queryByText("Message Queue")).not.toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+    });
+
+    test("merging a file whose node label collides renames it and notes the rename in the log", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "web",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Web Server" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+
+        expect(await screen.findByText("Web Server (2)")).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Merged 1 node(s) and 0 edge(s) from "extra.json" into the existing architecture. Renamed to avoid duplicates: "Web Server" renamed to "Web Server (2)".',
+            ),
+        ).toBeInTheDocument();
+    });
+
+    test("choosing a malformed file to merge logs the parse failure and leaves the architecture untouched", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(["not json"], "bad.json", {
+            type: "application/json",
+        });
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
             file,
         );
 

@@ -189,11 +189,7 @@ describe("CommandInput", () => {
             onChangeSpy.mockClear();
             await user.keyboard("{ArrowDown}");
 
-            // Before the fix, historyState was untouched by accepting the
-            // suggestion, so this ArrowDown would still see the stale
-            // mid-recall state and reset the field to the empty pre-recall
-            // draft. With the recall properly ended, ArrowDown here is a
-            // plain no-op.
+            // Before the fix, historyState was untouched by accepting the suggestion
             expect(onChangeSpy).not.toHaveBeenCalled();
             expect(input).toHaveValue("connect Cache ");
         });

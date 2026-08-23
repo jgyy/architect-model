@@ -22,6 +22,7 @@ type PanelOverrides = {
     onRedo?: () => void;
     onExport?: () => void;
     onImport?: (file: File) => void;
+    onMerge?: (file: File) => void;
 };
 
 function emptyArchitecture(): Architecture {
@@ -52,6 +53,7 @@ function renderPanel(overrides: PanelOverrides = {}) {
         onRedo: vi.fn(),
         onExport: vi.fn(),
         onImport: vi.fn(),
+        onMerge: vi.fn(),
         ...overrides,
     };
     const view = render(<ConsolePanel {...props} />);
@@ -211,6 +213,36 @@ describe("ConsolePanel", () => {
 
             expect(clickSpy).toHaveBeenCalledTimes(1);
         });
+
+        test("choosing a file in the merge input calls onMerge with it", async () => {
+            const user = userEvent.setup();
+            const onMerge = vi.fn();
+            renderPanel({ onMerge });
+            const file = new File(['{"nodes":[],"edges":[]}'], "arch.json", {
+                type: "application/json",
+            });
+
+            await user.upload(
+                screen.getByLabelText("Merge architecture file"),
+                file,
+            );
+
+            expect(onMerge).toHaveBeenCalledTimes(1);
+            expect(onMerge).toHaveBeenCalledWith(file);
+        });
+
+        test("clicking the merge button opens the (hidden) merge file picker", async () => {
+            const user = userEvent.setup();
+            renderPanel();
+            const fileInput = screen.getByLabelText(
+                "Merge architecture file",
+            ) as HTMLInputElement;
+            const clickSpy = vi.spyOn(fileInput, "click");
+
+            await user.click(screen.getByTitle("Merge architecture"));
+
+            expect(clickSpy).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe("command input integration", () => {
@@ -308,6 +340,7 @@ describe("ConsolePanel", () => {
                         onRedo: vi.fn(),
                         onExport: vi.fn(),
                         onImport: vi.fn(),
+                        onMerge: vi.fn(),
                     }}
                 />,
             );
@@ -340,6 +373,7 @@ describe("ConsolePanel", () => {
                         onRedo: vi.fn(),
                         onExport: vi.fn(),
                         onImport: vi.fn(),
+                        onMerge: vi.fn(),
                     }}
                 />,
             );
