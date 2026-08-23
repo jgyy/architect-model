@@ -390,7 +390,7 @@ export type ParseCommandOptions = {
 const MAX_COMMAND_LENGTH = 500;
 
 // Horizontal gap between simulation steps, left to right
-const NODE_X_SPACING = 250;
+export const NODE_X_SPACING = 250;
 
 export function parseCommand(
     input: string,

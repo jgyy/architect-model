@@ -1,4 +1,5 @@
 import {
+    NODE_X_SPACING,
     buildNodeIndex,
     slugify,
     uniqueNodeId,
@@ -247,6 +248,9 @@ export function mergeSelectedArchitecture(
     selectedNodeIds: ReadonlySet<string>,
     excludedEdgeIds: ReadonlySet<string> = new Set(),
     addedEdges: ReadonlyArray<AddedConnectEdge> = [],
+    // Splice index into current.nodes where the incoming block lands;
+    // current.nodes.length (the default) appends, matching prior behavior
+    insertAtStep: number = current.nodes.length,
 ): MergeArchitectureSuccess {
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedNodeIds.has(node.id),
@@ -299,10 +303,22 @@ export function mergeSelectedArchitecture(
         },
     );
 
+    const before = current.nodes.slice(0, insertAtStep);
+    const after = current.nodes.slice(insertAtStep);
+    // Only the incoming block and whatever followed it shift step index;
+    // `before` keeps its existing (possibly hand-dragged) positions.
+    const shifted = [...incomingNodes, ...after].map((node, offset) => ({
+        ...node,
+        position: {
+            ...node.position,
+            x: (before.length + offset) * NODE_X_SPACING,
+        },
+    }));
+
     return {
         ok: true,
         architecture: {
-            nodes: [...current.nodes, ...incomingNodes],
+            nodes: [...before, ...shifted],
             edges: [...current.edges, ...incomingEdges, ...manualEdges],
         },
         nodeCount: incomingNodes.length,

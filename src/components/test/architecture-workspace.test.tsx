@@ -734,6 +734,51 @@ describe("ArchitectureWorkspace", () => {
         ).toBeInTheDocument();
     });
 
+    test("the merge picker's Insert at step control places the merged node ahead of the existing steps", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "extra.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Merge architecture file"),
+            file,
+        );
+        await user.selectOptions(
+            await screen.findByRole("combobox", { name: "Insert at step" }),
+            "Before step 1: Web Server",
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(
+            screen.getByText(
+                'Merged 1 node(s) and 0 edge(s) from "extra.json" into the existing architecture at step 1.',
+            ),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Step 1 / 3")).toBeInTheDocument();
+        expect(
+            screen.getByText('Reaches "Message Queue".'),
+        ).toBeInTheDocument();
+    });
+
     test("cancelling the merge picker leaves the architecture untouched", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);

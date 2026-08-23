@@ -23,6 +23,7 @@ type MergePickerDialogProps = {
         selectedNodeIds: Set<string>,
         excludedEdgeIds: Set<string>,
         addedEdges: AddedConnectEdge[],
+        insertAtStep: number,
     ) => void;
     onCancel: () => void;
 };
@@ -45,6 +46,8 @@ export function MergePickerDialog({
     const [addedEdges, setAddedEdges] = useState<AddedConnectEdge[]>([]);
     const [pendingSource, setPendingSource] = useState("");
     const [pendingTarget, setPendingTarget] = useState("");
+    // Splice index into current.nodes; defaults to appending at the end
+    const [insertAtStep, setInsertAtStep] = useState(current.nodes.length);
 
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
@@ -271,6 +274,33 @@ export function MergePickerDialog({
                         })}
                     </ul>
                 )}
+                {current.nodes.length > 0 && (
+                    <div className="space-y-1 border-t border-border pt-2">
+                        <label
+                            htmlFor="merge-insert-at-step"
+                            className="block text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                        >
+                            Insert at step
+                        </label>
+                        <select
+                            id="merge-insert-at-step"
+                            value={insertAtStep}
+                            onChange={(event) =>
+                                setInsertAtStep(Number(event.target.value))
+                            }
+                            className="w-full rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
+                        >
+                            {current.nodes.map((node, index) => (
+                                <option key={node.id} value={index}>
+                                    Before step {index + 1}: {node.data.label}
+                                </option>
+                            ))}
+                            <option value={current.nodes.length}>
+                                At the end
+                            </option>
+                        </select>
+                    </div>
+                )}
                 {canShowConnect && (
                     <div className="space-y-2 border-t border-border pt-2">
                         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -419,7 +449,12 @@ export function MergePickerDialog({
                         type="button"
                         disabled={selectedIds.size === 0}
                         onClick={() =>
-                            onConfirm(selectedIds, excludedEdgeIds, addedEdges)
+                            onConfirm(
+                                selectedIds,
+                                excludedEdgeIds,
+                                addedEdges,
+                                insertAtStep,
+                            )
                         }
                         className="rounded-full border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/90 disabled:pointer-events-none disabled:opacity-40"
                     >

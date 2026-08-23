@@ -37,6 +37,7 @@ function renderDialog(
             ids: Set<string>,
             excludedEdgeIds: Set<string>,
             addedEdges: { source: string; target: string }[],
+            insertAtStep: number,
         ) => void;
         onCancel?: () => void;
         existingFoldedLabels?: ReadonlySet<string>;
@@ -123,6 +124,7 @@ describe("MergePickerDialog", () => {
             new Set(["queue"]),
             new Set(),
             [],
+            0,
         );
     });
 
@@ -234,6 +236,7 @@ describe("MergePickerDialog", () => {
             new Set(["queue", "cache"]),
             new Set(["edge-queue-cache"]),
             [],
+            0,
         );
     });
 
@@ -289,6 +292,7 @@ describe("MergePickerDialog", () => {
             new Set(["a", "b", "c"]),
             new Set(),
             [{ source: "incoming:a", target: "incoming:b" }],
+            0,
         );
     });
 
@@ -438,6 +442,7 @@ describe("MergePickerDialog", () => {
             new Set(["queue", "cache"]),
             new Set(),
             [{ source: "current:web", target: "incoming:queue" }],
+            1,
         );
     });
 
@@ -483,5 +488,62 @@ describe("MergePickerDialog", () => {
         expect(
             screen.queryByText("Web Server → Message Queue"),
         ).not.toBeInTheDocument();
+    });
+
+    test("the Insert at step control doesn't render when there's no existing architecture to insert into", () => {
+        renderDialog();
+
+        expect(
+            screen.queryByRole("combobox", { name: "Insert at step" }),
+        ).not.toBeInTheDocument();
+    });
+
+    test("the Insert at step control defaults to appending at the end", () => {
+        renderDialog({ current: existingWithRoom });
+
+        expect(
+            screen.getByRole("combobox", { name: "Insert at step" }),
+        ).toHaveValue("1");
+    });
+
+    test("the Insert at step control offers one option per existing step plus 'At the end'", () => {
+        renderDialog({ current: existingChain });
+
+        const select = screen.getByRole("combobox", {
+            name: "Insert at step",
+        });
+        expect(
+            within(select).getByRole("option", {
+                name: "Before step 1: Internet",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            within(select).getByRole("option", {
+                name: "Before step 2: Web Server",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            within(select).getByRole("option", { name: "At the end" }),
+        ).toBeInTheDocument();
+    });
+
+    test("choosing an earlier step passes its index through to onConfirm", async () => {
+        const user = userEvent.setup();
+        const { onConfirm } = renderDialog({ current: existingChain });
+
+        await user.selectOptions(
+            screen.getByRole("combobox", { name: "Insert at step" }),
+            "Before step 1: Internet",
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
+            new Set(["queue", "cache"]),
+            new Set(),
+            [],
+            0,
+        );
     });
 });
