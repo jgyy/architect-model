@@ -86,17 +86,14 @@ export function ConsolePanel({
             distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
     }
 
-    function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    function handleFilePicked(
+        event: React.ChangeEvent<HTMLInputElement>,
+        onPicked: (file: File) => void,
+    ) {
         const file = event.target.files?.[0];
         // reset so choosing the same file again still fires this handler
         event.target.value = "";
-        if (file) onImport(file);
-    }
-
-    function handleMergeFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (file) onMerge(file);
+        if (file) onPicked(file);
     }
 
     return (
@@ -144,7 +141,7 @@ export function ConsolePanel({
                         ref={fileInputRef}
                         type="file"
                         accept="application/json,.json"
-                        onChange={handleFileChange}
+                        onChange={(event) => handleFilePicked(event, onImport)}
                         aria-label="Import architecture file"
                         className="hidden"
                     />
@@ -160,7 +157,7 @@ export function ConsolePanel({
                         ref={mergeInputRef}
                         type="file"
                         accept="application/json,.json"
-                        onChange={handleMergeFileChange}
+                        onChange={(event) => handleFilePicked(event, onMerge)}
                         aria-label="Merge architecture file"
                         className="hidden"
                     />

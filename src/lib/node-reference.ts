@@ -22,6 +22,31 @@ export function normalizeLabel(label: string): string {
         .replace(/\s+/g, " ");
 }
 
+// A cheaper normalization than normalizeLabel: just enough to compare two
+// already-trimmed labels for equality regardless of case/composition.
+export function foldLabel(label: string): string {
+    return label.normalize("NFC").toLowerCase();
+}
+
+// Every occurrence of every separator word, left to right within each word
+export function findSeparatorOccurrences(
+    rest: string,
+    separators: string[],
+): { index: number; length: number }[] {
+    const lower = rest.toLowerCase();
+    const splits: { index: number; length: number }[] = [];
+    for (const separator of separators) {
+        let from = 0;
+        while (true) {
+            const idx = lower.indexOf(separator, from);
+            if (idx === -1) break;
+            splits.push({ index: idx, length: separator.length });
+            from = idx + 1;
+        }
+    }
+    return splits;
+}
+
 export const CONNECT_PATTERNS = [/^connect (.+)$/i, /^link (.+)$/i];
 
 export const REMOVE_NODE_PATTERNS = [

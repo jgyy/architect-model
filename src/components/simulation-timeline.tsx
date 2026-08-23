@@ -95,9 +95,7 @@ export function SimulationTimeline({
                                 {stepNumber}. {stepDescription(node)}
                             </span>
                         </button>
-                        {/* self-center (not items-stretch's default) keeps this
-                        pair short, leaving blank space above/below it in the
-                        row for vertical-scroll gestures to land on */}
+                        {/* self-center (not items-stretch's default) */}
                         <div className="flex shrink-0 items-center gap-0.5 self-center border-l border-border px-1.5">
                             <button
                                 type="button"

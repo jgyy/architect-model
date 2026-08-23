@@ -13,6 +13,7 @@ import {
     REMOVE_NODE_PATTERNS,
     RENAME_NODE_PATTERNS,
     RENAME_SEPARATORS,
+    findSeparatorOccurrences,
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
@@ -78,25 +79,6 @@ function isCompleteNodeLabel(text: string, nodeIndex: NodeIndex): boolean {
     return nodeIndex.byLabel.has(needle);
 }
 
-// every occurrence of every separator word, left to right within each word
-function candidateSeparatorSplits(
-    rest: string,
-    separators: string[],
-): { index: number; length: number }[] {
-    const lower = rest.toLowerCase();
-    const splits: { index: number; length: number }[] = [];
-    for (const separator of separators) {
-        let from = 0;
-        while (true) {
-            const idx = lower.indexOf(separator, from);
-            if (idx === -1) break;
-            splits.push({ index: idx, length: separator.length });
-            from = idx + 1;
-        }
-    }
-    return splits;
-}
-
 // Prefers the split whose non-edited side is a real, complete node label
 function bestSeparatorSplit(
     rest: string,
@@ -104,7 +86,7 @@ function bestSeparatorSplit(
     nodeIndex: NodeIndex,
     cursorInRest: number,
 ): { index: number; length: number } | null {
-    const splits = candidateSeparatorSplits(rest, separators);
+    const splits = findSeparatorOccurrences(rest, separators);
     if (splits.length === 0) return null;
 
     const anchored = splits.find((split) => {

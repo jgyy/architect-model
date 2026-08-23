@@ -8,10 +8,10 @@ import {
     connectableTargetIds,
     connectOptionKey,
     decodeConnectOptionKey,
-    foldLabel,
     type AddedConnectEdge,
     type ConnectOrigin,
 } from "@/lib/architecture-io";
+import { foldLabel } from "@/lib/node-reference";
 import type { Architecture } from "@/types/architecture";
 
 type MergePickerDialogProps = {
@@ -123,6 +123,44 @@ export function MergePickerDialog({
     }
     function optionsByOrigin(ids: string[], origin: ConnectOrigin): string[] {
         return ids.filter((id) => decodeConnectOptionKey(id).origin === origin);
+    }
+
+    // Shared by the "Connect from"/"Connect to" selects below - both list the
+    // same two origin-grouped optgroups, differing only in which id list and
+    // change handler they're bound to.
+    function renderConnectSelect(
+        ariaLabel: string,
+        value: string,
+        onChange: (value: string) => void,
+        optionIds: string[],
+    ) {
+        return (
+            <select
+                aria-label={ariaLabel}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
+            >
+                {optionsByOrigin(optionIds, "current").length > 0 && (
+                    <optgroup label="Existing architecture">
+                        {optionsByOrigin(optionIds, "current").map((key) => (
+                            <option key={key} value={key}>
+                                {labelForKey(key)}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
+                {optionsByOrigin(optionIds, "incoming").length > 0 && (
+                    <optgroup label={fileName}>
+                        {optionsByOrigin(optionIds, "incoming").map((key) => (
+                            <option key={key} value={key}>
+                                {labelForKey(key)}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
+            </select>
+        );
     }
 
     const eligibleEdges = incoming.edges.filter(
@@ -307,79 +345,21 @@ export function MergePickerDialog({
                             Connect
                         </span>
                         <div className="flex items-center gap-1.5">
-                            <select
-                                aria-label="Connect from"
-                                value={effectiveSource}
-                                onChange={(event) =>
-                                    setPendingSource(event.target.value)
-                                }
-                                className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
-                            >
-                                {optionsByOrigin(sourceOptionIds, "current")
-                                    .length > 0 && (
-                                    <optgroup label="Existing architecture">
-                                        {optionsByOrigin(
-                                            sourceOptionIds,
-                                            "current",
-                                        ).map((key) => (
-                                            <option key={key} value={key}>
-                                                {labelForKey(key)}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                                {optionsByOrigin(sourceOptionIds, "incoming")
-                                    .length > 0 && (
-                                    <optgroup label={fileName}>
-                                        {optionsByOrigin(
-                                            sourceOptionIds,
-                                            "incoming",
-                                        ).map((key) => (
-                                            <option key={key} value={key}>
-                                                {labelForKey(key)}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                            </select>
+                            {renderConnectSelect(
+                                "Connect from",
+                                effectiveSource,
+                                setPendingSource,
+                                sourceOptionIds,
+                            )}
                             <span aria-hidden className="text-muted-foreground">
                                 →
                             </span>
-                            <select
-                                aria-label="Connect to"
-                                value={effectiveTarget}
-                                onChange={(event) =>
-                                    setPendingTarget(event.target.value)
-                                }
-                                className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
-                            >
-                                {optionsByOrigin(targetOptionIds, "current")
-                                    .length > 0 && (
-                                    <optgroup label="Existing architecture">
-                                        {optionsByOrigin(
-                                            targetOptionIds,
-                                            "current",
-                                        ).map((key) => (
-                                            <option key={key} value={key}>
-                                                {labelForKey(key)}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                                {optionsByOrigin(targetOptionIds, "incoming")
-                                    .length > 0 && (
-                                    <optgroup label={fileName}>
-                                        {optionsByOrigin(
-                                            targetOptionIds,
-                                            "incoming",
-                                        ).map((key) => (
-                                            <option key={key} value={key}>
-                                                {labelForKey(key)}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                            </select>
+                            {renderConnectSelect(
+                                "Connect to",
+                                effectiveTarget,
+                                setPendingTarget,
+                                targetOptionIds,
+                            )}
                             <button
                                 type="button"
                                 disabled={!canAddConnection}

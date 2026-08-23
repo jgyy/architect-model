@@ -8,6 +8,8 @@ import {
     REMOVE_NODE_PATTERNS,
     RENAME_NODE_PATTERNS,
     RENAME_SEPARATORS,
+    findSeparatorOccurrences,
+    foldLabel,
     matchFirst,
     normalizeLabel,
 } from "@/lib/node-reference";
@@ -54,11 +56,6 @@ export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     return id;
 }
 
-// null = no match, array = ambiguous (multiple substring matches, no exact one)
-function foldLabel(label: string): string {
-    return label.normalize("NFC").toLowerCase();
-}
-
 // A label->node lookup (plus the id set uniqueNodeId needs)
 export type NodeIndex = {
     byLabel: Map<string, ArchitectureNode>;
@@ -74,8 +71,6 @@ function edgeKey(sourceId: string, targetId: string): string {
 }
 
 // A trie over every suffix of every folded label: walking it by the query's
-// characters costs O(query length), replacing an O(nodes) scan for the
-// substring fallback in findNodeOrAmbiguity, however many nodes exist.
 type SubstringTrieNode = {
     children: Map<string, SubstringTrieNode>;
     matches: Set<ArchitectureNode>;
@@ -124,9 +119,7 @@ function querySubstringIndex(
     return Array.from(current.matches);
 }
 
-// Public substring lookup for callers outside this module (e.g. ranked
-// autocomplete in node-suggestions.ts) that need matches without depending
-// on the trie's internal node shape.
+// Public substring lookup for callers outside this module
 export function findNodesBySubstring(
     nodeIndex: NodeIndex,
     needle: string,
@@ -217,28 +210,34 @@ function findNodeByExactLabel(
     return nodeIndex.byLabel.get(needle);
 }
 
+// Shared by add-node and rename-node, the only two commands that introduce a label
+function duplicateLabelError(
+    label: string,
+    nodeIndex: NodeIndex,
+): CommandResult | null {
+    const duplicate = findNodeByExactLabel(label, nodeIndex);
+    return duplicate
+        ? {
+              ok: false,
+              message: `A node named "${duplicate.data.label}" already exists.`,
+          }
+        : null;
+}
+
 // "<A> <sep> <B>" is ambiguous when a label itself contains a separator word
 function splitConnectionArgs(
     rest: string,
     separators: string[],
 ): { sourceLabel: string; targetLabel: string }[] {
-    const lower = rest.toLowerCase();
-    const splits: { sourceLabel: string; targetLabel: string }[] = [];
-    for (const separator of separators) {
-        let from = 0;
-        while (true) {
-            const idx = lower.indexOf(separator, from);
-            if (idx === -1) break;
-            splits.push({
-                sourceLabel: rest.slice(0, idx).trim(),
-                targetLabel: rest.slice(idx + separator.length).trim(),
-            });
-            from = idx + 1;
-        }
-    }
-    return splits;
+    return findSeparatorOccurrences(rest, separators).map(
+        ({ index, length }) => ({
+            sourceLabel: rest.slice(0, index).trim(),
+            targetLabel: rest.slice(index + length).trim(),
+        }),
+    );
 }
 
+// null = no match, array = ambiguous (multiple substring matches, no exact one)
 type EndpointMatch = ArchitectureNode | ArchitectureNode[] | null;
 
 type ResolvedEndpoints = {
@@ -258,6 +257,20 @@ function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
         isSingleNode(match) &&
         foldLabel(normalizeLabel(sourceLabel)) === foldLabel(match.data.label)
     );
+}
+
+// Turns a raw EndpointMatch into a resolved node or the CommandResult
+function requireNode(
+    label: string,
+    match: EndpointMatch,
+): { ok: true; node: ArchitectureNode } | { ok: false; message: string } {
+    if (match === null) {
+        return { ok: false, message: `No node named "${label}".` };
+    }
+    if (Array.isArray(match)) {
+        return { ok: false, message: ambiguousLabelMessage(label, match) };
+    }
+    return { ok: true, node: match };
 }
 
 function resolveConnectionEndpoints(
@@ -386,7 +399,6 @@ export type ParseCommandOptions = {
     position?: { x: number; y: number };
 };
 
-// connect/remove-edge/rename-node parsing tries every occurrence
 const MAX_COMMAND_LENGTH = 500;
 
 // Horizontal gap between simulation steps, left to right
@@ -416,13 +428,8 @@ export function parseCommand(
         if (isBlankLabel(label)) {
             return { ok: false, message: "A node label cannot be blank." };
         }
-        const duplicate = findNodeByExactLabel(label, nodeIndex);
-        if (duplicate) {
-            return {
-                ok: false,
-                message: `A node named "${duplicate.data.label}" already exists.`,
-            };
-        }
+        const duplicateError = duplicateLabelError(label, nodeIndex);
+        if (duplicateError) return duplicateError;
         const node: ArchitectureNode = {
             id: uniqueNodeId(slugify(label), nodeIndex),
             position: options.position ?? {
@@ -454,25 +461,13 @@ export function parseCommand(
                 message: `Couldn't find a "to" or "and" separator in "${connectMatch[1]}". Try: connect <A> to <B>.`,
             };
         }
-        const { source, target, sourceLabel, targetLabel } = resolved;
-        if (source === null) {
-            return { ok: false, message: `No node named "${sourceLabel}".` };
-        }
-        if (Array.isArray(source)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(sourceLabel, source),
-            };
-        }
-        if (target === null) {
-            return { ok: false, message: `No node named "${targetLabel}".` };
-        }
-        if (Array.isArray(target)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(targetLabel, target),
-            };
-        }
+        const { sourceLabel, targetLabel } = resolved;
+        const sourceResolution = requireNode(sourceLabel, resolved.source);
+        if (!sourceResolution.ok) return sourceResolution;
+        const targetResolution = requireNode(targetLabel, resolved.target);
+        if (!targetResolution.ok) return targetResolution;
+        const source = sourceResolution.node;
+        const target = targetResolution.node;
         if (source.id === target.id) {
             return {
                 ok: false,
@@ -529,17 +524,12 @@ export function parseCommand(
     const removeNodeMatch = matchFirst(REMOVE_NODE_PATTERNS, trimmed);
     if (removeNodeMatch) {
         const label = removeNodeMatch[1].trim();
-        const resolved = findNodeOrAmbiguity(label, nodeIndex);
-        if (resolved === null) {
-            return { ok: false, message: `No node named "${label}".` };
-        }
-        if (Array.isArray(resolved)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(label, resolved),
-            };
-        }
-        const node = resolved;
+        const resolution = requireNode(
+            label,
+            findNodeOrAmbiguity(label, nodeIndex),
+        );
+        if (!resolution.ok) return resolution;
+        const node = resolution.node;
         return {
             ok: true,
             architecture: {
@@ -566,25 +556,13 @@ export function parseCommand(
                 message: `Couldn't find a "to"/"from"/"and" separator in "${removeEdgeMatch[1]}". Try: remove edge <A> to <B>.`,
             };
         }
-        const { source, target, sourceLabel, targetLabel } = resolved;
-        if (source === null) {
-            return { ok: false, message: `No node named "${sourceLabel}".` };
-        }
-        if (Array.isArray(source)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(sourceLabel, source),
-            };
-        }
-        if (target === null) {
-            return { ok: false, message: `No node named "${targetLabel}".` };
-        }
-        if (Array.isArray(target)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(targetLabel, target),
-            };
-        }
+        const { sourceLabel, targetLabel } = resolved;
+        const sourceResolution = requireNode(sourceLabel, resolved.source);
+        if (!sourceResolution.ok) return sourceResolution;
+        const targetResolution = requireNode(targetLabel, resolved.target);
+        if (!targetResolution.ok) return targetResolution;
+        const source = sourceResolution.node;
+        const target = targetResolution.node;
         const edge = nodeIndex.edgesBySourceTarget.get(
             edgeKey(source.id, target.id),
         );
@@ -617,16 +595,10 @@ export function parseCommand(
                 message: `Couldn't find a "to" separator in "${renameNodeMatch[1]}". Try: rename node <A> to <B>.`,
             };
         }
-        const { source, sourceLabel, newLabel } = resolved;
-        if (source === null) {
-            return { ok: false, message: `No node named "${sourceLabel}".` };
-        }
-        if (Array.isArray(source)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(sourceLabel, source),
-            };
-        }
+        const { sourceLabel, newLabel } = resolved;
+        const sourceResolution = requireNode(sourceLabel, resolved.source);
+        if (!sourceResolution.ok) return sourceResolution;
+        const source = sourceResolution.node;
         const normalizedNewLabel = normalizeLabel(newLabel);
         if (isBlankLabel(normalizedNewLabel)) {
             return { ok: false, message: "A node label cannot be blank." };
@@ -637,13 +609,11 @@ export function parseCommand(
                 message: `"${source.data.label}" is already named that.`,
             };
         }
-        const duplicate = findNodeByExactLabel(normalizedNewLabel, nodeIndex);
-        if (duplicate) {
-            return {
-                ok: false,
-                message: `A node named "${duplicate.data.label}" already exists.`,
-            };
-        }
+        const duplicateError = duplicateLabelError(
+            normalizedNewLabel,
+            nodeIndex,
+        );
+        if (duplicateError) return duplicateError;
         const renamedNodes = architecture.nodes.map((node) =>
             node.id === source.id
                 ? {
@@ -676,16 +646,10 @@ export function parseCommand(
                 message: `Couldn't find a "to step" separator in "${moveNodeMatch[1]}". Try: move node <label> to step <n>.`,
             };
         }
-        const { source, sourceLabel, positionText } = resolved;
-        if (source === null) {
-            return { ok: false, message: `No node named "${sourceLabel}".` };
-        }
-        if (Array.isArray(source)) {
-            return {
-                ok: false,
-                message: ambiguousLabelMessage(sourceLabel, source),
-            };
-        }
+        const { sourceLabel, positionText } = resolved;
+        const sourceResolution = requireNode(sourceLabel, resolved.source);
+        if (!sourceResolution.ok) return sourceResolution;
+        const source = sourceResolution.node;
         if (!/^\d+$/.test(positionText)) {
             return {
                 ok: false,
