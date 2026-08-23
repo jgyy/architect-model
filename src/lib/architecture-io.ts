@@ -55,11 +55,7 @@ function findCyclicNodeId(
     return nodeIds.find((id) => !visited.has(id)) ?? null;
 }
 
-// Re-checks the invariants the rest of the app assumes already hold - the
-// same ones typed/canvas commands enforce (non-blank label, unique label,
-// finite position) plus ones only a hand-edited file could violate (a
-// duplicate edge id). Node-id uniqueness/edge referential integrity/cycles
-// were already checked before this file grew the extra invariants below.
+// Re-checks the invariants the rest of the app assumes already hold
 function validateImportedArchitecture(
     architecture: Architecture,
 ): string | null {
