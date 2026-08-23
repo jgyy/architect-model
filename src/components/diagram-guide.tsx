@@ -7,6 +7,11 @@ import { useState } from "react";
 type GuideTip = { title: string; description: string };
 
 const TIPS: GuideTip[] = [
+    {
+        title: "Overview",
+        description:
+            "1 · Describe (console, right) → 2 · Architecture (this canvas) → 3 · Simulate (right panel).",
+    },
     { title: "Pan", description: "Drag empty canvas space to move around." },
     { title: "Zoom", description: "Scroll, pinch, or use the +/− controls." },
     {
@@ -47,9 +52,10 @@ export function DiagramGuide() {
                 title="Diagram navigation guide"
                 aria-expanded={open}
                 aria-controls="diagram-guide-panel"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-chrome text-foreground shadow-sm hover:bg-border/40"
+                className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-chrome px-3 text-xs font-medium text-foreground shadow-sm hover:bg-border/40"
             >
-                <HelpCircle size={16} />
+                <HelpCircle size={14} />
+                Guide
             </button>
             {open && (
                 <div

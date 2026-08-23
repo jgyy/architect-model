@@ -16,6 +16,14 @@ import { CommandInput } from "@/components/command-input";
 import type { LogEntry } from "@/lib/persistence";
 import type { Architecture } from "@/types/architecture";
 
+// Shown as clickable chips in the empty-log state so the console's
+// affordance survives past a placeholder that vanishes on focus
+const EXAMPLE_COMMANDS = [
+    "add node Cache",
+    "connect Web Server to Cache",
+    "help",
+];
+
 type ConsolePanelProps = {
     log: LogEntry[];
     onClear: () => void;
@@ -92,7 +100,7 @@ export function ConsolePanel({
         <div className="flex min-h-0 flex-1 flex-col font-mono text-sm">
             <div className="flex w-full items-center justify-between gap-6 border-b border-border px-3 py-2">
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Console
+                    1 · Describe
                 </span>
                 <div className="flex items-center gap-1">
                     <button
@@ -169,11 +177,30 @@ export function ConsolePanel({
                 className="min-h-0 flex-1 overflow-y-auto"
             >
                 {log.length === 0 ? (
-                    <p className="max-w-[80ch] break-words px-3 py-2 text-muted-foreground">
-                        Blast Radius console - type{" "}
-                        <span className="text-foreground">help</span> for a list
-                        of commands.
-                    </p>
+                    <div className="px-3 py-2">
+                        <p className="max-w-[80ch] break-words text-muted-foreground">
+                            Blast Radius console - type{" "}
+                            <span className="text-foreground">help</span> for a
+                            list of commands.
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            {EXAMPLE_COMMANDS.map((command) => (
+                                <button
+                                    key={command}
+                                    type="button"
+                                    onClick={() => {
+                                        onInputChange(command);
+                                        document
+                                            .getElementById("command-input")
+                                            ?.focus();
+                                    }}
+                                    className="rounded-full border border-border px-2.5 py-1 font-mono text-xs text-muted-foreground hover:border-accent/60 hover:text-accent"
+                                >
+                                    {command}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 ) : (
                     log.map((entry) => (
                         <div

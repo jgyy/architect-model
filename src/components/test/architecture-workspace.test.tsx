@@ -101,7 +101,7 @@ describe("ArchitectureWorkspace", () => {
 
         expect(await screen.findByText("Web Server")).toBeInTheDocument();
         expect(screen.getByText("Database")).toBeInTheDocument();
-        expect(screen.getByText(/^Simulation$/i)).toBeInTheDocument();
+        expect(screen.getByText(/3 · Simulate/i)).toBeInTheDocument();
     });
 
     test("does not render the simulation panel when the architecture has no nodes", async () => {
@@ -112,7 +112,7 @@ describe("ArchitectureWorkspace", () => {
                 screen.getByRole("combobox", { name: "Command" }),
             ).toBeInTheDocument();
         });
-        expect(screen.queryByText(/^Simulation$/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/3 · Simulate/i)).not.toBeInTheDocument();
     });
 
     test('typing "help" logs the supported commands as a successful entry', async () => {
@@ -329,7 +329,7 @@ describe("ArchitectureWorkspace", () => {
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 
-        const dataTransfer = { setData: () => { }, getData: () => "" };
+        const dataTransfer = { setData: () => {}, getData: () => "" };
         const from = screen.getByText(/^1\./).closest("li");
         const to = screen.getByText(/^2\./).closest("li");
         if (!from || !to) throw new Error("row not found");
@@ -505,7 +505,7 @@ describe("ArchitectureWorkspace", () => {
         const user = userEvent.setup();
         const clickSpy = vi
             .spyOn(HTMLAnchorElement.prototype, "click")
-            .mockImplementation(() => { });
+            .mockImplementation(() => {});
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 
@@ -524,7 +524,7 @@ describe("ArchitectureWorkspace", () => {
         const user = userEvent.setup();
         const clickSpy = vi
             .spyOn(HTMLAnchorElement.prototype, "click")
-            .mockImplementation(() => { });
+            .mockImplementation(() => {});
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
         await waitForHydration();
 

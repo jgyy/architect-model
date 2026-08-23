@@ -196,7 +196,7 @@ describe("ArchitectureNode", () => {
             </ReactFlowProvider>,
         );
         const node = screen.getByText("Web Server").closest("div");
-        expect(node).toHaveClass("border-accent");
+        expect(node).toHaveClass("border-current-step");
         // Not color alone - also an ARIA signal and an SR-only text cue
         expect(node).toHaveAttribute("aria-current", "step");
         expect(

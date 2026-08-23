@@ -101,7 +101,7 @@ export function ArchitectureNode({
             aria-current={current ? "step" : undefined}
             className={`group relative max-w-64 rounded-lg border bg-chrome px-3 py-2 text-sm font-medium break-words text-chrome-foreground shadow-sm transition-shadow hover:shadow-md ${
                 current
-                    ? "border-accent ring-2 ring-accent/30"
+                    ? "border-current-step ring-2 ring-current-step/30"
                     : traversed
                       ? "border-danger border-dashed ring-2 ring-danger/30"
                       : selected

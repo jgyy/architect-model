@@ -16,8 +16,18 @@ export default function Home() {
             </div>
             <footer className="flex shrink-0 items-center border-t border-border bg-chrome px-6 py-2">
                 <p className="truncate text-xs text-muted-foreground">
-                    Describe a system in plain text, then step through a
-                    simulated attacker&apos;s path across it.
+                    <span className="font-medium text-foreground">
+                        1 · Describe
+                    </span>{" "}
+                    in plain text →{" "}
+                    <span className="font-medium text-foreground">
+                        2 · Architecture
+                    </span>{" "}
+                    appears on the canvas →{" "}
+                    <span className="font-medium text-foreground">
+                        3 · Simulate
+                    </span>{" "}
+                    an attacker&apos;s path across it.
                 </p>
             </footer>
         </div>
