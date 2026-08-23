@@ -68,8 +68,7 @@ function singleSlotSuggestion(
 ): NodeSuggestion | null {
     const partial = rest ?? "";
     const replaceFrom = input.length - partial.length;
-    // The argument always runs to the end of the string, so a cursor
-    // sitting earlier (e.g. still inside "remove"/"node") isn't editing it.
+    // The argument always runs to the end of the string
     if (cursor < replaceFrom) return null;
     return {
         replaceFrom,
