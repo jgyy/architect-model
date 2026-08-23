@@ -114,16 +114,13 @@ describe("ArchitectureEdge", () => {
         const [, sourceX, , sourceControlX, , targetControlX, , targetX] =
             match!.map(Number);
 
-        // source's control point bows right (away from target), target's
-        // bows left (away from source) - the standard left-to-right sweep
+        // source's control point bows right (away from target)
         expect(sourceControlX).toBeGreaterThan(sourceX);
         expect(targetControlX).toBeLessThan(targetX);
     });
 
     test("an edge whose target has been reordered to the left of its source bows inward instead of looping around", async () => {
-        // c (x:-200) sits to the LEFT of a (x:0), its source - as can happen
-        // after "move node ... to step N" reorders nodes without touching
-        // edges (see architecture-commands.ts's move-node handler)
+        // c (x:-200) sits to the LEFT of a (x:0)
         const reversedArchitecture: Architecture = {
             nodes: [
                 NODE_A,
@@ -150,9 +147,6 @@ describe("ArchitectureEdge", () => {
             match!.map(Number);
 
         // Without the fix these would flip: the source's control point
-        // would bow right (away from target, which is now on the left) and
-        // the target's would bow left (away from source, now on the right)
-        // - producing a huge loop instead of this tight, inward-bowing curve
         expect(sourceControlX).toBeLessThan(sourceX);
         expect(targetControlX).toBeGreaterThan(targetX);
     });

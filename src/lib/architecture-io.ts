@@ -2,9 +2,14 @@ import {
     buildNodeIndex,
     slugify,
     uniqueNodeId,
+    wouldCreateCycle,
 } from "@/lib/architecture-commands";
 import { isValidArchitecture } from "@/lib/persistence";
-import type { Architecture } from "@/types/architecture";
+import type {
+    Architecture,
+    ArchitectureEdge,
+    ArchitectureNode,
+} from "@/types/architecture";
 
 export const ARCHITECTURE_EXPORT_FILENAME = "architecture.json";
 
@@ -19,11 +24,11 @@ export function serializeArchitecture(architecture: Architecture): string {
 
 export type ImportArchitectureResult =
     | {
-        ok: true;
-        architecture: Architecture;
-        nodeCount: number;
-        edgeCount: number;
-    }
+          ok: true;
+          architecture: Architecture;
+          nodeCount: number;
+          edgeCount: number;
+      }
     | { ok: false; message: string };
 
 // Detects a node stuck in a cycle.
@@ -141,12 +146,45 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
+// Ids of `nodes` with no outgoing edge in `edges` yet - eligible as the
+// source of a manually-added connection
+export function connectableSourceIds(
+    nodes: ArchitectureNode[],
+    edges: ArchitectureEdge[],
+): Set<string> {
+    const index = buildNodeIndex(nodes, edges);
+    return new Set(
+        nodes
+            .map((node) => node.id)
+            .filter((id) => !index.outgoingBySource.has(id)),
+    );
+}
+
+// Ids of `nodes` that `sourceId` could connect to without giving a node a
+// second outgoing/incoming edge or closing a cycle
+export function connectableTargetIds(
+    sourceId: string,
+    nodes: ArchitectureNode[],
+    edges: ArchitectureEdge[],
+): Set<string> {
+    const index = buildNodeIndex(nodes, edges);
+    const ids = new Set<string>();
+    for (const node of nodes) {
+        if (node.id === sourceId) continue;
+        if (index.incomingByTarget.has(node.id)) continue;
+        if (wouldCreateCycle(sourceId, node.id, index)) continue;
+        ids.add(node.id);
+    }
+    return ids;
+}
+
 // Folds a subset of an already-parsed
 export function mergeSelectedArchitecture(
     current: Architecture,
     incoming: Architecture,
     selectedNodeIds: ReadonlySet<string>,
     excludedEdgeIds: ReadonlySet<string> = new Set(),
+    addedEdges: ReadonlyArray<{ source: string; target: string }> = [],
 ): MergeArchitectureSuccess {
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedNodeIds.has(node.id),
@@ -191,14 +229,22 @@ export function mergeSelectedArchitecture(
         return { ...edge, id: `edge-${source}-${target}`, source, target };
     });
 
+    const manualEdges = addedEdges.map(
+        ({ source: rawSource, target: rawTarget }) => {
+            const source = idRemap.get(rawSource) ?? rawSource;
+            const target = idRemap.get(rawTarget) ?? rawTarget;
+            return { id: `edge-${source}-${target}`, source, target };
+        },
+    );
+
     return {
         ok: true,
         architecture: {
             nodes: [...current.nodes, ...incomingNodes],
-            edges: [...current.edges, ...incomingEdges],
+            edges: [...current.edges, ...incomingEdges, ...manualEdges],
         },
         nodeCount: incomingNodes.length,
-        edgeCount: incomingEdges.length,
+        edgeCount: incomingEdges.length + manualEdges.length,
         renamedLabels,
     };
 }

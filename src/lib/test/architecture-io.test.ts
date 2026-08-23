@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import {
+    connectableSourceIds,
+    connectableTargetIds,
     mergeImportedArchitecture,
     mergeSelectedArchitecture,
     parseImportedArchitecture,
@@ -480,5 +482,107 @@ describe("mergeSelectedArchitecture", () => {
             edgeCount: 0,
             renamedLabels: [],
         });
+    });
+
+    test("folds addedEdges into the merged result, remapping ids and counting them", () => {
+        const incoming: Architecture = {
+            nodes: [node("a", "Cache"), node("y", "Other")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["a", "y"]),
+            new Set(),
+            [{ source: "a", target: "y" }],
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.edges).toEqual([
+                ...chain.edges,
+                { id: "edge-node-cache-y", source: "node-cache", target: "y" },
+            ]);
+            expect(result.edgeCount).toBe(1);
+        }
+    });
+
+    test("defaults to no added edges when the argument is omitted", () => {
+        const incoming: Architecture = {
+            nodes: [node("x", "One"), node("y", "Two")],
+            edges: [],
+        };
+
+        const result = mergeSelectedArchitecture(
+            chain,
+            incoming,
+            new Set(["x", "y"]),
+        );
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.architecture.edges).toEqual(chain.edges);
+            expect(result.edgeCount).toBe(0);
+        }
+    });
+});
+
+describe("connectableSourceIds", () => {
+    test("returns every node id when there are no edges yet", () => {
+        const ids = connectableSourceIds([node("a", "A"), node("b", "B")], []);
+
+        expect(ids).toEqual(new Set(["a", "b"]));
+    });
+
+    test("excludes a node that already has an outgoing edge", () => {
+        const ids = connectableSourceIds(
+            [node("a", "A"), node("b", "B"), node("c", "C")],
+            [edge("a", "b")],
+        );
+
+        expect(ids).toEqual(new Set(["b", "c"]));
+    });
+});
+
+describe("connectableTargetIds", () => {
+    test("excludes the source itself", () => {
+        const ids = connectableTargetIds(
+            "a",
+            [node("a", "A"), node("b", "B")],
+            [],
+        );
+
+        expect(ids).toEqual(new Set(["b"]));
+    });
+
+    test("excludes a node that already has an incoming edge", () => {
+        const ids = connectableTargetIds(
+            "a",
+            [node("a", "A"), node("b", "B"), node("c", "C")],
+            [edge("b", "c")],
+        );
+
+        expect(ids).toEqual(new Set(["b"]));
+    });
+
+    test("excludes a node that would close a cycle back to the source", () => {
+        const ids = connectableTargetIds(
+            "c",
+            [node("a", "A"), node("b", "B"), node("c", "C")],
+            [edge("a", "b"), edge("b", "c")],
+        );
+
+        expect(ids).toEqual(new Set());
+    });
+
+    test("allows connecting to a node on a disjoint chain", () => {
+        const ids = connectableTargetIds(
+            "b",
+            [node("a", "A"), node("b", "B"), node("x", "X"), node("y", "Y")],
+            [edge("a", "b"), edge("x", "y")],
+        );
+
+        expect(ids).toEqual(new Set(["x"]));
     });
 });

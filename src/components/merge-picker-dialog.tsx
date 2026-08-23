@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-import { foldLabel } from "@/lib/architecture-io";
+import {
+    connectableSourceIds,
+    connectableTargetIds,
+    foldLabel,
+} from "@/lib/architecture-io";
 import type { Architecture } from "@/types/architecture";
+
+type AddedEdge = { source: string; target: string };
 
 type MergePickerDialogProps = {
     fileName: string;
@@ -12,16 +18,12 @@ type MergePickerDialogProps = {
     onConfirm: (
         selectedNodeIds: Set<string>,
         excludedEdgeIds: Set<string>,
+        addedEdges: AddedEdge[],
     ) => void;
     onCancel: () => void;
 };
 
-// Lets the user choose which of an incoming file's nodes to merge in,
-// rather than always merging the whole file. Deselecting a node also
-// drops any incoming edge that touches it (previewed via the live count).
-// An edge whose endpoints are both still selected can also be dropped on
-// its own, via a separate checkbox - that choice persists even if its
-// nodes get toggled off and back on.
+// Lets the user choose which of an incoming file's nodes to merge in
 export function MergePickerDialog({
     fileName,
     incoming,
@@ -35,6 +37,9 @@ export function MergePickerDialog({
     const [excludedEdgeIds, setExcludedEdgeIds] = useState<Set<string>>(
         () => new Set(),
     );
+    const [addedEdges, setAddedEdges] = useState<AddedEdge[]>([]);
+    const [pendingSource, setPendingSource] = useState("");
+    const [pendingTarget, setPendingTarget] = useState("");
 
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
@@ -44,6 +49,8 @@ export function MergePickerDialog({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [onCancel]);
 
+    // Deselecting a node also drops any added connection that touched it,
+    // the same way it drops an incoming file edge - see toggleEdge below.
     function toggle(nodeId: string) {
         setSelectedIds((current) => {
             const next = new Set(current);
@@ -54,6 +61,11 @@ export function MergePickerDialog({
             }
             return next;
         });
+        setAddedEdges((current) =>
+            current.filter(
+                (added) => added.source !== nodeId && added.target !== nodeId,
+            ),
+        );
     }
 
     function toggleEdge(edgeId: string) {
@@ -68,15 +80,43 @@ export function MergePickerDialog({
         });
     }
 
+    function removeAddedEdge(source: string, target: string) {
+        setAddedEdges((current) =>
+            current.filter(
+                (added) => added.source !== source || added.target !== target,
+            ),
+        );
+    }
+
     const labelById = new Map(
         incoming.nodes.map((node) => [node.id, node.data.label]),
     );
     const eligibleEdges = incoming.edges.filter(
         (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target),
     );
-    const includedEdgeCount = eligibleEdges.filter(
+    const keptEdges = eligibleEdges.filter(
         (edge) => !excludedEdgeIds.has(edge.id),
-    ).length;
+    );
+    const includedEdgeCount = keptEdges.length + addedEdges.length;
+
+    const selectedNodes = incoming.nodes.filter((node) =>
+        selectedIds.has(node.id),
+    );
+    const netEdges = [
+        ...keptEdges,
+        ...addedEdges.map((added) => ({ id: "", ...added })),
+    ];
+    const sourceOptionIds = [...connectableSourceIds(selectedNodes, netEdges)];
+    const effectiveSource = sourceOptionIds.includes(pendingSource)
+        ? pendingSource
+        : (sourceOptionIds[0] ?? "");
+    const targetOptionIds = effectiveSource
+        ? [...connectableTargetIds(effectiveSource, selectedNodes, netEdges)]
+        : [];
+    const effectiveTarget = targetOptionIds.includes(pendingTarget)
+        ? pendingTarget
+        : (targetOptionIds[0] ?? "");
+    const canAddConnection = effectiveSource !== "" && effectiveTarget !== "";
 
     return (
         <div
@@ -110,7 +150,10 @@ export function MergePickerDialog({
                     </button>
                     <button
                         type="button"
-                        onClick={() => setSelectedIds(new Set())}
+                        onClick={() => {
+                            setSelectedIds(new Set());
+                            setAddedEdges([]);
+                        }}
                         className="rounded-full border border-border px-2.5 py-1 hover:border-accent/60 hover:text-accent"
                     >
                         Select none
@@ -187,6 +230,97 @@ export function MergePickerDialog({
                         })}
                     </ul>
                 )}
+                {selectedNodes.length >= 2 && (
+                    <div className="space-y-2 border-t border-border pt-2">
+                        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                            Connect
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <select
+                                aria-label="Connect from"
+                                value={effectiveSource}
+                                onChange={(event) =>
+                                    setPendingSource(event.target.value)
+                                }
+                                className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
+                            >
+                                {sourceOptionIds.map((id) => (
+                                    <option key={id} value={id}>
+                                        {labelById.get(id) ?? id}
+                                    </option>
+                                ))}
+                            </select>
+                            <span aria-hidden className="text-muted-foreground">
+                                →
+                            </span>
+                            <select
+                                aria-label="Connect to"
+                                value={effectiveTarget}
+                                onChange={(event) =>
+                                    setPendingTarget(event.target.value)
+                                }
+                                className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground"
+                            >
+                                {targetOptionIds.map((id) => (
+                                    <option key={id} value={id}>
+                                        {labelById.get(id) ?? id}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                disabled={!canAddConnection}
+                                onClick={() =>
+                                    setAddedEdges((current) => [
+                                        ...current,
+                                        {
+                                            source: effectiveSource,
+                                            target: effectiveTarget,
+                                        },
+                                    ])
+                                }
+                                className="rounded-full border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent/60 hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+                            >
+                                Add connection
+                            </button>
+                        </div>
+                        {addedEdges.length > 0 && (
+                            <ul className="space-y-1">
+                                {addedEdges.map((added) => {
+                                    const fromLabel =
+                                        labelById.get(added.source) ??
+                                        added.source;
+                                    const toLabel =
+                                        labelById.get(added.target) ??
+                                        added.target;
+                                    return (
+                                        <li
+                                            key={`${added.source}-${added.target}`}
+                                            className="flex items-center justify-between gap-2 text-foreground"
+                                        >
+                                            <span>
+                                                {fromLabel} → {toLabel}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove connection: ${fromLabel} to ${toLabel}`}
+                                                onClick={() =>
+                                                    removeAddedEdge(
+                                                        added.source,
+                                                        added.target,
+                                                    )
+                                                }
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                ×
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                )}
                 <div className="text-xs text-muted-foreground">
                     <p>
                         {selectedIds.size} of {incoming.nodes.length} node(s)
@@ -205,7 +339,9 @@ export function MergePickerDialog({
                     <button
                         type="button"
                         disabled={selectedIds.size === 0}
-                        onClick={() => onConfirm(selectedIds, excludedEdgeIds)}
+                        onClick={() =>
+                            onConfirm(selectedIds, excludedEdgeIds, addedEdges)
+                        }
                         className="rounded-full border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/90 disabled:pointer-events-none disabled:opacity-40"
                     >
                         Merge {selectedIds.size} node(s)

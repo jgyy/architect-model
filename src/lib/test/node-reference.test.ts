@@ -57,8 +57,7 @@ describe("normalizeLabel", () => {
     });
 
     test("strips invisible characters mixed into a label", () => {
-        // zero-width space, "Hello", zero-width non-joiner, a real space,
-        // zero-width joiner, "World", byte-order mark
+        // zero-width space, "Hello", zero-width non-joiner, a real space
         const withInvisibles = "​Hello‌ ‍World﻿";
         expect(normalizeLabel(withInvisibles)).toBe("Hello World");
     });

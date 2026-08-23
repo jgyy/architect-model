@@ -1,0 +1,4 @@
+{
+    "nodes": [
+        { "id": "node-a", "position": { "x": 0, "y": 0 }, "data": { "label": "A" } },
+    "edges": []

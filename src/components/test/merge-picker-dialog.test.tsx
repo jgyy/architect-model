@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -20,9 +20,22 @@ const incoming: Architecture = {
     edges: [{ id: "edge-queue-cache", source: "queue", target: "cache" }],
 };
 
+const disjointThree: Architecture = {
+    nodes: [
+        { id: "a", position: { x: 0, y: 0 }, data: { label: "Alpha" } },
+        { id: "b", position: { x: 0, y: 0 }, data: { label: "Beta" } },
+        { id: "c", position: { x: 0, y: 0 }, data: { label: "Gamma" } },
+    ],
+    edges: [],
+};
+
 function renderDialog(
     overrides: {
-        onConfirm?: (ids: Set<string>, excludedEdgeIds: Set<string>) => void;
+        onConfirm?: (
+            ids: Set<string>,
+            excludedEdgeIds: Set<string>,
+            addedEdges: { source: string; target: string }[],
+        ) => void;
         onCancel?: () => void;
         existingFoldedLabels?: ReadonlySet<string>;
         architecture?: Architecture;
@@ -105,6 +118,7 @@ describe("MergePickerDialog", () => {
         expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
             new Set(["queue"]),
             new Set(),
+            [],
         );
     });
 
@@ -215,6 +229,132 @@ describe("MergePickerDialog", () => {
         expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
             new Set(["queue", "cache"]),
             new Set(["edge-queue-cache"]),
+            [],
         );
+    });
+
+    test("Connect doesn't render when fewer than two nodes are selected", async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.click(screen.getByRole("button", { name: "Select none" }));
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+
+        expect(
+            screen.queryByRole("combobox", { name: "Connect from" }),
+        ).not.toBeInTheDocument();
+    });
+
+    test("Connect defaults From/To to the first two nodes with no connection yet", () => {
+        renderDialog({ architecture: disjointThree });
+
+        expect(
+            screen.getByRole("combobox", { name: "Connect from" }),
+        ).toHaveValue("a");
+        expect(
+            screen.getByRole("combobox", { name: "Connect to" }),
+        ).toHaveValue("b");
+    });
+
+    test("adding a connection lists it and counts it as an included edge", async () => {
+        const user = userEvent.setup();
+        renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+
+        expect(screen.getByText("Alpha → Beta")).toBeInTheDocument();
+        expect(
+            screen.getByText("1 edge(s) will be included"),
+        ).toBeInTheDocument();
+    });
+
+    test("confirming passes added connections as the third argument", async () => {
+        const user = userEvent.setup();
+        const { onConfirm } = renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
+            new Set(["a", "b", "c"]),
+            new Set(),
+            [{ source: "a", target: "b" }],
+        );
+    });
+
+    test("removing an added connection drops it from the list and the count", async () => {
+        const user = userEvent.setup();
+        renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+        await user.click(
+            screen.getByRole("button", {
+                name: "Remove connection: Alpha to Beta",
+            }),
+        );
+
+        expect(screen.queryByText("Alpha → Beta")).not.toBeInTheDocument();
+        expect(
+            screen.getByText("0 edge(s) will be included"),
+        ).toBeInTheDocument();
+    });
+
+    test("deselecting a node used in an added connection also drops that connection", async () => {
+        const user = userEvent.setup();
+        renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+        await user.click(screen.getByRole("checkbox", { name: /^Alpha/ }));
+
+        expect(screen.queryByText("Alpha → Beta")).not.toBeInTheDocument();
+        expect(
+            screen.getByText("0 edge(s) will be included"),
+        ).toBeInTheDocument();
+    });
+
+    test("From options exclude a node once it already has an outgoing connection", async () => {
+        const user = userEvent.setup();
+        renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+
+        const fromSelect = screen.getByRole("combobox", {
+            name: "Connect from",
+        });
+        expect(
+            within(fromSelect).queryByRole("option", { name: /^Alpha/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            within(fromSelect).getByRole("option", { name: /^Gamma/ }),
+        ).toBeInTheDocument();
+    });
+
+    test("To options exclude a node that would close a cycle back through an existing connection", async () => {
+        const user = userEvent.setup();
+        renderDialog({ architecture: disjointThree });
+
+        await user.click(
+            screen.getByRole("button", { name: "Add connection" }),
+        );
+
+        const toSelect = screen.getByRole("combobox", { name: "Connect to" });
+        expect(
+            within(toSelect).queryByRole("option", { name: /^Alpha/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            within(toSelect).getByRole("option", { name: /^Gamma/ }),
+        ).toBeInTheDocument();
     });
 });

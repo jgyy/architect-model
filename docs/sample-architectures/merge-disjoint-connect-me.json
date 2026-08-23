@@ -1,0 +1,20 @@
+{
+    "nodes": [
+        {
+            "id": "node-message-queue",
+            "position": { "x": 0, "y": 200 },
+            "data": { "label": "Message Queue" }
+        },
+        {
+            "id": "node-cache",
+            "position": { "x": 250, "y": 200 },
+            "data": { "label": "Cache" }
+        },
+        {
+            "id": "node-worker",
+            "position": { "x": 500, "y": 200 },
+            "data": { "label": "Worker" }
+        }
+    ],
+    "edges": []
+}

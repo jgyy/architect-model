@@ -1,0 +1,66 @@
+{
+    "nodes": [
+        {
+            "id": "node-internet",
+            "position": { "x": 0, "y": 0 },
+            "data": {
+                "label": "Internet",
+                "description": "Attacker starts from Internet"
+            }
+        },
+        {
+            "id": "node-load-balancer",
+            "position": { "x": 250, "y": 0 },
+            "data": {
+                "label": "Load Balancer",
+                "description": "Attacker reaches Load Balancer"
+            }
+        },
+        {
+            "id": "node-app-server",
+            "position": { "x": 500, "y": 0 },
+            "data": {
+                "label": "App Server",
+                "description": "Attacker reaches App Server"
+            }
+        },
+        {
+            "id": "node-database",
+            "position": { "x": 750, "y": 0 },
+            "data": {
+                "label": "Database",
+                "description": "Attacker accesses Database"
+            }
+        },
+        {
+            "id": "node-backup",
+            "position": { "x": 1000, "y": 0 },
+            "data": {
+                "label": "Backup Storage",
+                "description": "Attacker exfiltrates Backup Storage"
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "edge-internet-lb",
+            "source": "node-internet",
+            "target": "node-load-balancer"
+        },
+        {
+            "id": "edge-lb-app",
+            "source": "node-load-balancer",
+            "target": "node-app-server"
+        },
+        {
+            "id": "edge-app-db",
+            "source": "node-app-server",
+            "target": "node-database"
+        },
+        {
+            "id": "edge-db-backup",
+            "source": "node-database",
+            "target": "node-backup"
+        }
+    ]
+}
