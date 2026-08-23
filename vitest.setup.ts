@@ -43,6 +43,10 @@ if (typeof window !== "undefined") {
         DOMMatrixReadOnlyStub as unknown as typeof DOMMatrixReadOnly;
     Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 
+    // jsdom implements neither - used by the architecture export download
+    window.URL.createObjectURL ??= () => "blob:jsdom-stub";
+    window.URL.revokeObjectURL ??= () => {};
+
     // jsdom does no layout.
     function isViewportContainer(element: Element): boolean {
         return element.classList?.contains("react-flow__renderer") ?? false;

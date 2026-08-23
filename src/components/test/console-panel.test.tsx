@@ -20,6 +20,8 @@ type PanelOverrides = {
     canRedo?: boolean;
     onUndo?: () => void;
     onRedo?: () => void;
+    onExport?: () => void;
+    onImport?: (file: File) => void;
 };
 
 function emptyArchitecture(): Architecture {
@@ -48,6 +50,8 @@ function renderPanel(overrides: PanelOverrides = {}) {
         canRedo: false,
         onUndo: vi.fn(),
         onRedo: vi.fn(),
+        onExport: vi.fn(),
+        onImport: vi.fn(),
         ...overrides,
     };
     const view = render(<ConsolePanel {...props} />);
@@ -167,6 +171,48 @@ describe("ConsolePanel", () => {
         });
     });
 
+    describe("export/import", () => {
+        test("clicking the export button calls onExport", async () => {
+            const user = userEvent.setup();
+            const onExport = vi.fn();
+            renderPanel({ onExport });
+
+            await user.click(screen.getByTitle("Export architecture"));
+
+            expect(onExport).toHaveBeenCalledTimes(1);
+        });
+
+        test("choosing a file in the import input calls onImport with it", async () => {
+            const user = userEvent.setup();
+            const onImport = vi.fn();
+            renderPanel({ onImport });
+            const file = new File(['{"nodes":[],"edges":[]}'], "arch.json", {
+                type: "application/json",
+            });
+
+            await user.upload(
+                screen.getByLabelText("Import architecture file"),
+                file,
+            );
+
+            expect(onImport).toHaveBeenCalledTimes(1);
+            expect(onImport).toHaveBeenCalledWith(file);
+        });
+
+        test("clicking the import button opens the (hidden) file picker", async () => {
+            const user = userEvent.setup();
+            renderPanel();
+            const fileInput = screen.getByLabelText(
+                "Import architecture file",
+            ) as HTMLInputElement;
+            const clickSpy = vi.spyOn(fileInput, "click");
+
+            await user.click(screen.getByTitle("Import architecture"));
+
+            expect(clickSpy).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("command input integration", () => {
         test("reflects the input prop as the command input's value", () => {
             renderPanel({ input: "help" });
@@ -260,6 +306,8 @@ describe("ConsolePanel", () => {
                         canRedo: false,
                         onUndo: vi.fn(),
                         onRedo: vi.fn(),
+                        onExport: vi.fn(),
+                        onImport: vi.fn(),
                     }}
                 />,
             );
@@ -290,6 +338,8 @@ describe("ConsolePanel", () => {
                         canRedo: false,
                         onUndo: vi.fn(),
                         onRedo: vi.fn(),
+                        onExport: vi.fn(),
+                        onImport: vi.fn(),
                     }}
                 />,
             );

@@ -42,6 +42,12 @@ const COMMAND_DOCS: CommandDoc[] = [
         note: "shifts the surrounding steps to make room",
     },
     {
+        usage: "export",
+        example: 'e.g. "export" downloads the current architecture as JSON',
+        aliases: [],
+        note: "toolbar-only Import (needs a file) does the reverse",
+    },
+    {
         usage: "undo",
         example: 'e.g. "undo" after "add node Cache" removes it again',
         aliases: [],

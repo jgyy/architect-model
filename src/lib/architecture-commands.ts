@@ -18,8 +18,7 @@ import type {
     ArchitectureNode,
 } from "@/types/architecture";
 
-// One usage line per row instead of a semicolon-joined run-on sentence, so
-// it stays scannable when it wraps inside the console's 80-column width.
+// One usage line per row instead of a semicolon-joined run-on sentence
 const UNRECOGNIZED_COMMAND_USAGE = COMMAND_USAGE.map(
     (usage) => `  ${usage}`,
 ).join("\n");
@@ -60,14 +59,7 @@ function foldLabel(label: string): string {
     return label.normalize("NFC").toLowerCase();
 }
 
-// A label->node lookup (plus the id set uniqueNodeId needs) and edge lookups
-// by source/target pair and by each endpoint alone, built once by the caller
-// and reused across commands instead of rescanning every node/edge on every
-// command - the exact-match, id-collision, and connectivity checks below
-// would otherwise be O(nodes)/O(edges) each, making a run of many commands
-// quadratic. outgoingBySource/incomingByTarget hold at most one edge per key
-// because connect() below caps every node at one outgoing and one incoming
-// edge, so a Map (not a multimap) is the right shape.
+// A label->node lookup (plus the id set uniqueNodeId needs)
 export type NodeIndex = {
     byLabel: Map<string, ArchitectureNode>;
     ids: Set<string>;
@@ -107,11 +99,7 @@ export function buildNodeIndex(
     };
 }
 
-// Would connecting source->target close a loop? Walks forward from target
-// along the (at most one) outgoing edge per node, since connect() below
-// keeps fan-out capped at 1 - a single linear walk, no branching search.
-// The visited set is a defensive guard against legacy data that predates
-// this constraint and might already contain a cycle.
+// Would connecting source->target close a loop?
 function wouldCreateCycle(
     sourceId: string,
     targetId: string,
@@ -138,8 +126,7 @@ function findNodeOrAmbiguity(
     if (needle.length === 0) return null;
     const exact = nodeIndex.byLabel.get(needle);
     if (exact) return exact;
-    // no fast path for a substring match - this only runs for a
-    // non-exact/partial reference, which is inherently rarer
+    // no fast path for a substring match
     const matches = architecture.nodes.filter((node) =>
         foldLabel(node.data.label).includes(needle),
     );
@@ -206,10 +193,7 @@ function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
     return match !== null && !Array.isArray(match);
 }
 
-// True when sourceLabel is the resolved node's whole label, not merely a
-// substring match of it - lets resolveRenameArgs/resolveMoveNodeArgs prefer
-// this split over an earlier " to "/" to step " occurrence that happens to
-// fall inside the node's own label (e.g. renaming "Point to Point Link")
+// True when sourceLabel is the resolved node's whole label
 function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
     return (
         isSingleNode(match) &&
@@ -245,13 +229,7 @@ type ResolvedRenameArgs = {
     source: EndpointMatch;
 };
 
-// A trailing " to " with nothing after it (a blank new label) never
-// survives as a real split: parseCommand's own leading trim() - and, for a
-// canvas-synthesized command, runCommand's trim() before that - strips the
-// separator's trailing space first, so by the time splitConnectionArgs runs
-// the string just ends in "...to" with no space left to match against.
-// Recognize that case explicitly instead of misreporting it as a missing
-// separator, so it reaches the real "label cannot be blank" rejection.
+// A trailing " to " with nothing after it (a blank new label)
 function resolveTrailingSeparatorWithBlankTarget(
     rest: string,
     architecture: Architecture,
@@ -297,11 +275,7 @@ function resolveRenameArgs(
 
     return (
         resolved.find((r) => isExactLabelMatch(r.sourceLabel, r.source)) ??
-        // A real (non-blank-target) split only ever wins here by matching a
-        // node as a mere substring of its label - if the label's own
-        // trailing " to " is the whole story (a blank rename attempt on a
-        // node whose label happens to contain a separator word), that's a
-        // truer read than treating the substring hit as the new label
+        // A real (non-blank-target) split only ever wins here
         (trailingBlank &&
         isExactLabelMatch(trailingBlank.sourceLabel, trailingBlank.source)
             ? trailingBlank
@@ -354,18 +328,14 @@ const ADD_NODE_PATTERNS = [
 ];
 
 export type ParseCommandOptions = {
-    // Where a canvas-created node lands; typed "add node" ignores this and
-    // uses the default formula below
+    // Where a canvas-created node lands; typed "add node" ignores this
     position?: { x: number; y: number };
 };
 
-// connect/remove-edge/rename-node parsing tries every occurrence of every
-// separator word in the argument; an unbounded input turns that into O(n^2)
-// work, so absurdly long input (e.g. a large pasted block) is rejected outright
+// connect/remove-edge/rename-node parsing tries every occurrence
 const MAX_COMMAND_LENGTH = 500;
 
-// Horizontal gap between simulation steps, left to right - shared by a new
-// node's default position and by move-node's re-layout after a reorder
+// Horizontal gap between simulation steps, left to right
 const NODE_X_SPACING = 250;
 
 export function parseCommand(
@@ -693,8 +663,7 @@ export function parseCommand(
         const withoutNode = architecture.nodes.filter(
             (n) => n.id !== source.id,
         );
-        // Re-lays out every node's x to match its new step order (y is left
-        // alone, since only left-to-right position conveys step order here)
+        // Re-lays out every node's x to match its new step order
         const reorderedNodes = [
             ...withoutNode.slice(0, targetIndex),
             source,

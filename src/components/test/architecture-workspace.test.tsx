@@ -504,6 +504,102 @@ describe("ArchitectureWorkspace", () => {
         });
     });
 
+    test('typing "export" downloads the architecture as JSON and logs a success message', async () => {
+        const user = userEvent.setup();
+        const clickSpy = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(() => {});
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await submitCommand(user, "export");
+
+        expect(
+            await screen.findByText(
+                'Exported 2 node(s) and 1 edge(s) to "architecture.json".',
+            ),
+        ).toBeInTheDocument();
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        clickSpy.mockRestore();
+    });
+
+    test("clicking the export toolbar button runs the same 'export' command as typing it", async () => {
+        const user = userEvent.setup();
+        const clickSpy = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(() => {});
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        await user.click(screen.getByTitle("Export architecture"));
+
+        expect(await screen.findByText("export")).toBeInTheDocument();
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        clickSpy.mockRestore();
+    });
+
+    test("choosing a valid architecture file replaces the architecture and is undoable", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(
+            [
+                JSON.stringify({
+                    nodes: [
+                        {
+                            id: "queue",
+                            position: { x: 0, y: 0 },
+                            data: { label: "Message Queue" },
+                        },
+                    ],
+                    edges: [],
+                }),
+            ],
+            "replacement.json",
+            { type: "application/json" },
+        );
+
+        await user.upload(
+            screen.getByLabelText("Import architecture file"),
+            file,
+        );
+
+        expect(await screen.findByText("Message Queue")).toBeInTheDocument();
+        expect(screen.queryByText("Web Server")).not.toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Imported 1 node(s) and 0 edge(s) from "replacement.json".',
+            ),
+        ).toBeInTheDocument();
+
+        // recorded like any other architecture-mutating command
+        expect(screen.getByTitle("Undo")).toBeEnabled();
+        await user.click(screen.getByTitle("Undo"));
+        expect(await screen.findByText("Web Server")).toBeInTheDocument();
+    });
+
+    test("choosing a malformed file logs the parse failure and leaves the architecture untouched", async () => {
+        const user = userEvent.setup();
+        render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
+        await waitForHydration();
+
+        const file = new File(["not json"], "bad.json", {
+            type: "application/json",
+        });
+
+        await user.upload(
+            screen.getByLabelText("Import architecture file"),
+            file,
+        );
+
+        expect(
+            await screen.findByText("That file isn't valid JSON."),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Web Server")).toBeInTheDocument();
+        expect(screen.getByTitle("Undo")).toBeDisabled();
+    });
+
     test("a storage event that clears the key resets the workspace back to initialArchitecture", async () => {
         const user = userEvent.setup();
         render(<ArchitectureWorkspace initialArchitecture={fixture()} />);
