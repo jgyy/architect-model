@@ -22,7 +22,7 @@ const incoming: Architecture = {
 
 function renderDialog(
     overrides: {
-        onConfirm?: (ids: Set<string>) => void;
+        onConfirm?: (ids: Set<string>, excludedEdgeIds: Set<string>) => void;
         onCancel?: () => void;
         existingFoldedLabels?: ReadonlySet<string>;
         architecture?: Architecture;
@@ -47,7 +47,7 @@ describe("MergePickerDialog", () => {
         renderDialog();
 
         const queueBox = screen.getByRole("checkbox", {
-            name: /Message Queue/,
+            name: "Message Queue queue",
         });
         const cacheBox = screen.getByRole("checkbox", { name: /^Cache/ });
         expect(queueBox).toBeChecked();
@@ -102,7 +102,10 @@ describe("MergePickerDialog", () => {
             screen.getByRole("button", { name: /Merge \d+ node/ }),
         );
 
-        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(new Set(["queue"]));
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
+            new Set(["queue"]),
+            new Set(),
+        );
     });
 
     test("Cancel calls onCancel without calling onConfirm", async () => {
@@ -131,8 +134,87 @@ describe("MergePickerDialog", () => {
             screen.getByRole("checkbox", { name: /^Cache.*renamed/ }),
         ).toBeInTheDocument();
         const queueBox = screen.getByRole("checkbox", {
-            name: /Message Queue/,
+            name: "Message Queue queue",
         });
         expect(queueBox.closest("label")).not.toHaveTextContent(/renamed/i);
+    });
+
+    test("renders a checked checkbox for an incoming edge when both endpoints are selected", () => {
+        renderDialog();
+
+        expect(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        ).toBeChecked();
+    });
+
+    test("unchecking an edge drops it from the included count but keeps both nodes selected", async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.click(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        );
+
+        expect(screen.getByText("2 of 2 node(s) selected")).toBeInTheDocument();
+        expect(
+            screen.getByText("0 edge(s) will be included"),
+        ).toBeInTheDocument();
+    });
+
+    test("deselecting an endpoint disables and unchecks its edge", async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+
+        const edgeBox = screen.getByRole("checkbox", {
+            name: "Message Queue → Cache",
+        });
+        expect(edgeBox).toBeDisabled();
+        expect(edgeBox).not.toBeChecked();
+    });
+
+    test("re-selecting a deselected endpoint restores an edge that wasn't explicitly dropped", async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+
+        expect(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        ).toBeChecked();
+    });
+
+    test("an explicitly dropped edge stays dropped after its node is toggled off and back on", async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.click(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        );
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+        await user.click(screen.getByRole("checkbox", { name: /^Cache/ }));
+
+        expect(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        ).not.toBeChecked();
+    });
+
+    test("confirming calls onConfirm with the dropped edge's id even though both nodes are selected", async () => {
+        const user = userEvent.setup();
+        const { onConfirm } = renderDialog();
+
+        await user.click(
+            screen.getByRole("checkbox", { name: "Message Queue → Cache" }),
+        );
+        await user.click(
+            screen.getByRole("button", { name: /Merge \d+ node/ }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledExactlyOnceWith(
+            new Set(["queue", "cache"]),
+            new Set(["edge-queue-cache"]),
+        );
     });
 });

@@ -9,13 +9,19 @@ type MergePickerDialogProps = {
     fileName: string;
     incoming: Architecture;
     existingFoldedLabels: ReadonlySet<string>;
-    onConfirm: (selectedNodeIds: Set<string>) => void;
+    onConfirm: (
+        selectedNodeIds: Set<string>,
+        excludedEdgeIds: Set<string>,
+    ) => void;
     onCancel: () => void;
 };
 
 // Lets the user choose which of an incoming file's nodes to merge in,
 // rather than always merging the whole file. Deselecting a node also
 // drops any incoming edge that touches it (previewed via the live count).
+// An edge whose endpoints are both still selected can also be dropped on
+// its own, via a separate checkbox - that choice persists even if its
+// nodes get toggled off and back on.
 export function MergePickerDialog({
     fileName,
     incoming,
@@ -25,6 +31,9 @@ export function MergePickerDialog({
 }: MergePickerDialogProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(
         () => new Set(incoming.nodes.map((node) => node.id)),
+    );
+    const [excludedEdgeIds, setExcludedEdgeIds] = useState<Set<string>>(
+        () => new Set(),
     );
 
     useEffect(() => {
@@ -47,8 +56,26 @@ export function MergePickerDialog({
         });
     }
 
-    const includedEdgeCount = incoming.edges.filter(
+    function toggleEdge(edgeId: string) {
+        setExcludedEdgeIds((current) => {
+            const next = new Set(current);
+            if (next.has(edgeId)) {
+                next.delete(edgeId);
+            } else {
+                next.add(edgeId);
+            }
+            return next;
+        });
+    }
+
+    const labelById = new Map(
+        incoming.nodes.map((node) => [node.id, node.data.label]),
+    );
+    const eligibleEdges = incoming.edges.filter(
         (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target),
+    );
+    const includedEdgeCount = eligibleEdges.filter(
+        (edge) => !excludedEdgeIds.has(edge.id),
     ).length;
 
     return (
@@ -122,6 +149,44 @@ export function MergePickerDialog({
                         );
                     })}
                 </ul>
+                {incoming.edges.length > 0 && (
+                    <ul className="max-h-32 min-h-0 space-y-1 overflow-y-auto border-t border-border pt-2">
+                        {incoming.edges.map((edge) => {
+                            const eligible =
+                                selectedIds.has(edge.source) &&
+                                selectedIds.has(edge.target);
+                            return (
+                                <li key={edge.id}>
+                                    <label
+                                        className={`flex cursor-pointer items-start gap-2 rounded px-1 py-1 hover:bg-border/40 ${
+                                            eligible
+                                                ? ""
+                                                : "cursor-not-allowed opacity-40"
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={
+                                                eligible &&
+                                                !excludedEdgeIds.has(edge.id)
+                                            }
+                                            disabled={!eligible}
+                                            onChange={() => toggleEdge(edge.id)}
+                                            className="mt-1"
+                                        />
+                                        <span className="min-w-0 flex-1 break-words text-foreground">
+                                            {labelById.get(edge.source) ??
+                                                edge.source}{" "}
+                                            →{" "}
+                                            {labelById.get(edge.target) ??
+                                                edge.target}
+                                        </span>
+                                    </label>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
                 <div className="text-xs text-muted-foreground">
                     <p>
                         {selectedIds.size} of {incoming.nodes.length} node(s)
@@ -140,7 +205,7 @@ export function MergePickerDialog({
                     <button
                         type="button"
                         disabled={selectedIds.size === 0}
-                        onClick={() => onConfirm(selectedIds)}
+                        onClick={() => onConfirm(selectedIds, excludedEdgeIds)}
                         className="rounded-full border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/90 disabled:pointer-events-none disabled:opacity-40"
                     >
                         Merge {selectedIds.size} node(s)
