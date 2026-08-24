@@ -12,7 +12,7 @@ is gated by `stickToBottomRef`, set in `handleScroll` from the pre-update
 scroll position so a user who has scrolled up to read older output is not
 yanked back down when a new entry arrives.
 
-**Source:** `src/components/console-panel.tsx:1-246`
+**Source:** `src/components/console-panel.tsx:1-287`
 
 **Submission and auto-scroll**
 

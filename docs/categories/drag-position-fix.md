@@ -2,7 +2,7 @@
 
 React Flow emits a `position`-type `NodeChange` on every pointer-move frame of a drag, not just when the drag ends, so passing all changes straight through to the persisted `architecture.nodes` store would trigger a save on every frame. `applyPersistableNodeChanges` filters the incoming changes down to only `position` changes where `dragging !== true` (i.e. the change that fires once the drag settles), then hands that filtered list to React Flow's `applyNodeChanges`. If nothing survives the filter, it returns the original `nodes` array by reference instead of calling `applyNodeChanges`, so the caller can cheaply skip persisting via a `!==` check.
 
-**Source:** `src/lib/node-changes.ts:1-20`
+**Source:** `src/lib/node-changes.ts:1-35`
 
 **Filtering settled position changes**
 

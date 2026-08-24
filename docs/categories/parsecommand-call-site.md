@@ -2,7 +2,7 @@
 
 `runCommand` (a `useCallback` in `ArchitectureWorkspace`) is the single place in the component tree that calls `parseCommand`. It first trims the input and short-circuits four non-mutating or history commands (`help`, `export`, `undo`, `redo`) without touching the parser; anything else is handed to `parseCommand` along with the current `architecture`, optional `ParseCommandOptions`, and the memoized `nodeIndex`. Only when `parseCommand` reports success does it record undo history, advance `currentStepIndex`, and commit the new `architecture` via `setArchitecture`; every path — success or failure — ends by appending an entry to the command log through `logResult`. Because both the text input form (`handleSubmit`) and programmatic callers like `handleEdgeDelete` funnel through this one function, command parsing, state mutation, and logging stay in lockstep no matter how a command is triggered.
 
-**Source:** `src/components/architecture-workspace.tsx:281-355`
+**Source:** `src/components/architecture-workspace.tsx:421-495`
 
 **Dispatch: submit through parseCommand**
 

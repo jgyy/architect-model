@@ -2,7 +2,7 @@
 
 This handler reorders `architecture.nodes` by relocating one node to a new 1-based step position without touching any edges. It resolves the source label and a numeric `positionText` via `resolveMoveNodeArgs`, validates the target is an in-range integer step and not the node's current step, then filters the source out of the array, splices it back in at `targetIndex`, and re-derives every node's `x` position from its new array index (`index * NODE_X_SPACING`). Because edges reference node `id`s rather than array position, rewiring is unnecessary — only the ordering and each node's `x` coordinate change.
 
-**Source:** `src/lib/architecture-commands.ts:667-725`
+**Source:** `src/lib/architecture-commands.ts:871-929`
 
 **Command parsing and validation**
 
