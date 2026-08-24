@@ -2,7 +2,7 @@
 
 `ArchitectureNode` and `ArchitectureEdge` are direct aliases of `@xyflow/react`'s `Node<ArchitectureNodeData>` and `Edge`, so the only app-specific addition is `ArchitectureNodeData`'s optional `description`, embedding each node's simulation narrative directly in `data` instead of a separate parallel structure.
 
-**Source:** `src/types/architecture.ts:1-39`
+**Source:** `src/types/architecture.ts:1-32`
 
 **Type definitions**
 

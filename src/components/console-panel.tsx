@@ -73,17 +73,10 @@ export function ConsolePanel({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const mergeInputRef = useRef<HTMLInputElement>(null);
     // Whether the user was at (or near) the bottom of the log the last time
-    // they scrolled. Updated only by handleScroll below, not by the
-    // auto-scroll effect that follows - if it were updated on every log
-    // change instead, it would always see the already-grown scrollHeight
-    // and report "at the bottom" even when the user had scrolled up to
-    // read older entries.
     const stickToBottomRef = useRef(true);
 
     useEffect(() => {
-        // Snap to the bottom when a new entry is appended, but only if the
-        // user was already stuck there - otherwise leave their scroll
-        // position alone so they can keep reading older entries.
+        // Snap to the bottom when a new entry is appended
         const container = scrollRef.current;
         if (container && stickToBottomRef.current) {
             container.scrollTop = container.scrollHeight;

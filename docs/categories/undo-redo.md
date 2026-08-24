@@ -2,7 +2,7 @@
 
 `recordCommand` resets `redoStack` to `[]` on every new command regardless of whether it fires from the undo or redo side, which is why redoing is only possible immediately after an undo, never after a subsequent edit.
 
-**Source:** `src/lib/undo-history.ts:26-138`
+**Source:** `src/lib/undo-history.ts:20-116`
 
 **Primary undo/redo cycle**
 

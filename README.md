@@ -64,36 +64,36 @@ row links to a focused Mermaid diagram under `docs/categories/`.
 
 | Category            | Area                                     | File(s)                                                            | Diagram                                               |
 | ------------------- | ---------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
-| Required - commands | Command parser entry point (all 6 verbs) | `src/lib/architecture-commands.ts:99-405`                          | [view](docs/categories/command-parser-entry-point.md) |
-| Required - commands | `add node`                               | `src/lib/architecture-commands.ts:57-62,118-148`                   | [view](docs/categories/add-node.md)                   |
-| Required - commands | `connect` (add edge)                     | `src/lib/architecture-commands.ts:150-222`                         | [view](docs/categories/connect-add-edge.md)           |
-| Required - commands | `remove node` (cascading delete)         | `src/lib/architecture-commands.ts:223-244`                         | [view](docs/categories/remove-node.md)                |
-| Required - commands | `remove edge`                            | `src/lib/architecture-commands.ts:245-283`                         | [view](docs/categories/remove-edge.md)                |
-| Required - commands | `rename node`                            | `src/lib/architecture-commands.ts:284-340`                         | [view](docs/categories/rename-node.md)                |
-| Required - commands | `move node ... to step ...`              | `src/lib/architecture-commands.ts:341-399`                         | [view](docs/categories/move-node-to-step.md)          |
-| Required - commands | Suffix-trie substring index              | `src/lib/node-index.ts:39-179`, `command-resolution.ts:81-93`      | [view](docs/categories/suffix-trie-index.md)          |
-| Required - commands | Regex fragments & label normalization    | `src/lib/node-reference.ts:1-165`                                  | [view](docs/categories/label-normalization.md)        |
-| Required - commands | Unrecognized / ambiguous command errors  | `command-resolution.ts:95-116`, `architecture-commands.ts:401-405` | [view](docs/categories/command-errors.md)             |
-| Required - commands | Sole `parseCommand` call site            | `src/components/architecture-workspace.tsx:121-203`                | [view](docs/categories/parsecommand-call-site.md)     |
-| Required - commands | Autocomplete suggestion ranking          | `src/lib/node-suggestions.ts:1-392`                                | [view](docs/categories/autocomplete-ranking.md)       |
-| Required - display  | React Flow canvas                        | `src/components/architecture-canvas.tsx:1-383`                     | [view](docs/categories/react-flow-canvas.md)          |
-| Required - display  | Data model (React Flow-compatible types) | `src/types/architecture.ts:1-39`                                   | [view](docs/categories/data-model.md)                 |
-| Required - display  | Custom node (rename/delete/highlight)    | `src/components/architecture-node.tsx:1-204`                       | [view](docs/categories/custom-node.md)                |
-| Required - display  | Custom edge (self-loop path)             | `src/components/architecture-edge.tsx:1-134`                       | [view](docs/categories/custom-edge.md)                |
-| Required - display  | Command console / change log             | `src/components/console-panel.tsx:1-287`                           | [view](docs/categories/command-console.md)            |
-| Required - display  | Command input (autocomplete + Up/Down)   | `src/components/command-input.tsx:1-286`                           | [view](docs/categories/command-input.md)              |
-| Required - display  | Canvas mouse-to-command synthesis        | `src/lib/canvas-commands.ts:1-157`                                 | [view](docs/categories/canvas-command-synthesis.md)   |
-| Bonus - simulation  | Stepper (trace = node array order)       | `src/lib/simulation.ts:23-85`                                      | [view](docs/categories/simulation-stepper.md)         |
-| Bonus - simulation  | Panel (Prev/Next/Play/Pause)             | `src/components/simulation-panel.tsx:1-146`                        | [view](docs/categories/simulation-panel.md)           |
-| Bonus - simulation  | Drag-to-reorder steps                    | `src/components/simulation-timeline.tsx:1-142`                     | [view](docs/categories/drag-reorder-steps.md)         |
-| Bonus - extras      | Import / export / merge                  | `src/lib/architecture-io.ts:26-464`                                | [view](docs/categories/import-export-merge.md)        |
-| Bonus - extras      | Merge picker dialog                      | `src/components/merge-picker-dialog.tsx:1-399`                     | [view](docs/categories/merge-picker-dialog.md)        |
-| Bonus - extras      | Undo/redo (two-stack model)              | `src/lib/undo-history.ts:26-138`                                   | [view](docs/categories/undo-redo.md)                  |
-| Bonus - extras      | Persistence (`localStorage`) + tab sync  | `src/lib/persistence.ts:38,97-241`                                 | [view](docs/categories/persistence-tab-sync.md)       |
-| Bonus - extras      | Command recall (Up/Down, not undo)       | `src/lib/command-history.ts:1-64`                                  | [view](docs/categories/command-recall.md)             |
-| Performance         | MiniMap node-count guard                 | `src/components/architecture-canvas.tsx:152,346-356`               | [view](docs/categories/minimap-guard.md)              |
-| Performance         | `fitView` debounce                       | `src/components/architecture-canvas.tsx:154-189`                   | [view](docs/categories/fitview-debounce.md)           |
-| Performance         | Drag-position autosave-spam fix          | `src/lib/node-changes.ts:1-35`                                     | [view](docs/categories/drag-position-fix.md)          |
+| Required - commands | Command parser entry point (all 6 verbs) | `src/lib/architecture-commands.ts:88-394`                          | [view](docs/categories/command-parser-entry-point.md) |
+| Required - commands | `add node`                               | `src/lib/architecture-commands.ts:57-62,107-137`                   | [view](docs/categories/add-node.md)                   |
+| Required - commands | `connect` (add edge)                     | `src/lib/architecture-commands.ts:139-211`                         | [view](docs/categories/connect-add-edge.md)           |
+| Required - commands | `remove node` (cascading delete)         | `src/lib/architecture-commands.ts:212-233`                         | [view](docs/categories/remove-node.md)                |
+| Required - commands | `remove edge`                            | `src/lib/architecture-commands.ts:234-272`                         | [view](docs/categories/remove-edge.md)                |
+| Required - commands | `rename node`                            | `src/lib/architecture-commands.ts:273-329`                         | [view](docs/categories/rename-node.md)                |
+| Required - commands | `move node ... to step ...`              | `src/lib/architecture-commands.ts:330-388`                         | [view](docs/categories/move-node-to-step.md)          |
+| Required - commands | Suffix-trie substring index              | `src/lib/node-index.ts:25-140`, `command-resolution.ts:61-73`      | [view](docs/categories/suffix-trie-index.md)          |
+| Required - commands | Regex fragments & label normalization    | `src/lib/node-reference.ts:1-113`                                  | [view](docs/categories/label-normalization.md)        |
+| Required - commands | Unrecognized / ambiguous command errors  | `command-resolution.ts:75-93`, `architecture-commands.ts:390-394` | [view](docs/categories/command-errors.md)             |
+| Required - commands | Sole `parseCommand` call site            | `src/components/architecture-workspace.tsx:104-186`                | [view](docs/categories/parsecommand-call-site.md)     |
+| Required - commands | Autocomplete suggestion ranking          | `src/lib/node-suggestions.ts:1-336`                                | [view](docs/categories/autocomplete-ranking.md)       |
+| Required - display  | React Flow canvas                        | `src/components/architecture-canvas.tsx:1-357`                     | [view](docs/categories/react-flow-canvas.md)          |
+| Required - display  | Data model (React Flow-compatible types) | `src/types/architecture.ts:1-32`                                   | [view](docs/categories/data-model.md)                 |
+| Required - display  | Custom node (rename/delete/highlight)    | `src/components/architecture-node.tsx:1-180`                       | [view](docs/categories/custom-node.md)                |
+| Required - display  | Custom edge (self-loop path)             | `src/components/architecture-edge.tsx:1-120`                       | [view](docs/categories/custom-edge.md)                |
+| Required - display  | Command console / change log             | `src/components/console-panel.tsx:1-260`                           | [view](docs/categories/command-console.md)            |
+| Required - display  | Command input (autocomplete + Up/Down)   | `src/components/command-input.tsx:1-263`                           | [view](docs/categories/command-input.md)              |
+| Required - display  | Canvas mouse-to-command synthesis        | `src/lib/canvas-commands.ts:1-122`                                 | [view](docs/categories/canvas-command-synthesis.md)   |
+| Bonus - simulation  | Stepper (trace = node array order)       | `src/lib/simulation.ts:14-69`                                      | [view](docs/categories/simulation-stepper.md)         |
+| Bonus - simulation  | Panel (Prev/Next/Play/Pause)             | `src/components/simulation-panel.tsx:1-139`                        | [view](docs/categories/simulation-panel.md)           |
+| Bonus - simulation  | Drag-to-reorder steps                    | `src/components/simulation-timeline.tsx:1-137`                     | [view](docs/categories/drag-reorder-steps.md)         |
+| Bonus - extras      | Import / export / merge                  | `src/lib/architecture-io.ts:23-407`                                | [view](docs/categories/import-export-merge.md)        |
+| Bonus - extras      | Merge picker dialog                      | `src/components/merge-picker-dialog.tsx:1-363`                     | [view](docs/categories/merge-picker-dialog.md)        |
+| Bonus - extras      | Undo/redo (two-stack model)              | `src/lib/undo-history.ts:20-116`                                   | [view](docs/categories/undo-redo.md)                  |
+| Bonus - extras      | Persistence (`localStorage`) + tab sync  | `src/lib/persistence.ts:27,71-203`                                 | [view](docs/categories/persistence-tab-sync.md)       |
+| Bonus - extras      | Command recall (Up/Down, not undo)       | `src/lib/command-history.ts:1-50`                                  | [view](docs/categories/command-recall.md)             |
+| Performance         | MiniMap node-count guard                 | `src/components/architecture-canvas.tsx:132,320-330`               | [view](docs/categories/minimap-guard.md)              |
+| Performance         | `fitView` debounce                       | `src/components/architecture-canvas.tsx:134-163`                   | [view](docs/categories/fitview-debounce.md)           |
+| Performance         | Drag-position autosave-spam fix          | `src/lib/node-changes.ts:1-26`                                     | [view](docs/categories/drag-position-fix.md)          |
 | Tests               | Parser tests (7 files, 1,887 lines)      | `src/lib/test/architecture-commands-*.test.ts`                     | [view](docs/categories/parser-tests.md)               |
 | Tests               | Component tests                          | `src/components/test/`                                             | [view](docs/categories/component-tests.md)            |
 

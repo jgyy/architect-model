@@ -2,7 +2,7 @@
 
 `findSeparatorOccurrences` does its own lowercasing rather than reusing `foldLabel`, and skips whitespace/invisible-character normalization entirely, scanning only the already-normalized `rest` argument and leaving callers responsible for running `normalizeLabel` first.
 
-**Source:** `src/lib/node-reference.ts:1-165`
+**Source:** `src/lib/node-reference.ts:1-113`
 
 **Normalizing and folding labels**
 

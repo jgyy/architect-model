@@ -2,7 +2,7 @@
 
 `bestSeparatorSplit` resolves ambiguous separator occurrences by only accepting a split whose untouched side is an existing node label, falling back to the rightmost occurrence otherwise, letting a word like `to` appear inside a node's own label.
 
-**Source:** `src/lib/node-suggestions.ts:1-392`
+**Source:** `src/lib/node-suggestions.ts:1-336`
 
 **Command pattern dispatch**
 

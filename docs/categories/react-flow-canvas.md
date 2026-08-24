@@ -2,7 +2,7 @@
 
 `ArchitectureCanvas` bridges the app's `Architecture` state and React Flow's render state through `reconcileRenderNodes`, which preserves the live drag position of whichever node `draggingNodeIdRef` currently identifies, so drags never jump mid-gesture.
 
-**Source:** `src/components/architecture-canvas.tsx:1-383`
+**Source:** `src/components/architecture-canvas.tsx:1-357`
 
 **Prop sync and interaction handlers**
 

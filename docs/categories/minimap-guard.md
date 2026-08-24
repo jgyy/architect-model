@@ -2,7 +2,7 @@
 
 `MINIMAP_NODE_LIMIT` (300) gates whether `<MiniMap pannable zoomable />` renders inside `<ReactFlow>`, since the minimap redraws every node's position on each mutation, dominating render cost at scale unlike the main canvas.
 
-**Source:** `src/components/architecture-canvas.tsx:152,346-356`
+**Source:** `src/components/architecture-canvas.tsx:132,320-330`
 
 **Node-count guard check**
 

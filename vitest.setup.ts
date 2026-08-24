@@ -1,9 +1,4 @@
-// Global Vitest setup: jsdom (the lightweight DOM implementation Node runs
-// tests against, in place of a real browser) omits or only partially
-// implements several browser APIs this app's components - especially the
-// React Flow canvas (the @xyflow/react diagramming library this app's graph
-// editor is built on) - rely on. This file patches those gaps so tests can
-// render and interact with the UI as if a real browser were present.
+// Global Vitest setup: jsdom
 import "@testing-library/jest-dom/vitest";
 
 /** Stub for jsdom's missing ResizeObserver; `observe()` reports current dimensions once, without tracking real changes. */
@@ -53,16 +48,14 @@ if (typeof window !== "undefined") {
     window.ResizeObserver ??= ResizeObserverStub;
     window.DOMMatrixReadOnly ??=
         DOMMatrixReadOnlyStub as unknown as typeof DOMMatrixReadOnly;
-    // jsdom doesn't implement scrollIntoView either; a no-op keeps callers
-    // from throwing when they invoke it (e.g. programmatic focus/scroll).
+    // jsdom doesn't implement scrollIntoView either
     Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 
     // jsdom implements neither - used by the architecture export download
     window.URL.createObjectURL ??= () => "blob:jsdom-stub";
     window.URL.revokeObjectURL ??= () => {};
 
-    // jsdom does no layout, so the stubs below give every element a fixed
-    // size instead of a measured one.
+    // jsdom does no layout
     /**
      * True if `element` is React Flow's pannable viewport container, not an ordinary node.
      * @param element - element being measured

@@ -2,7 +2,7 @@
 
 `parseCommand` strips invisible characters, trims, rejects input over `MAX_COMMAND_LENGTH`, then tests each verb's regex patterns in a fixed, short-circuiting order via `matchFirst`, so the first matching verb's branch runs while later verbs are never tested.
 
-**Source:** `src/lib/architecture-commands.ts:99-405`
+**Source:** `src/lib/architecture-commands.ts:88-394`
 
 **Trim, length guard, and the add/connect/remove-node branches**
 

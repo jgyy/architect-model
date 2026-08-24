@@ -12,83 +12,83 @@ required work from bonus features.
 
 - **Command parser entry point** - `parseCommand` strips/trims/length-checks input, then tries
   each verb's regex patterns in a fixed order via `matchFirst`.
-  (`src/lib/architecture-commands.ts:99-405`)
+  (`src/lib/architecture-commands.ts:88-394`)
 - **`add node`** - matches four phrasings, validates the label, appends a node positioned by
-  current node count. (`src/lib/architecture-commands.ts:57-62,118-148`)
+  current node count. (`src/lib/architecture-commands.ts:57-62,107-137`)
 - **`connect` (add edge)** - enforces one outgoing/incoming edge per node; the only new-cycle
-  case is closing the chain on itself. (`src/lib/architecture-commands.ts:150-222`)
+  case is closing the chain on itself. (`src/lib/architecture-commands.ts:139-211`)
 - **`remove node`** - cascading delete: a single `edges.filter` pass drops every edge touching
-  the removed node. (`src/lib/architecture-commands.ts:223-244`)
+  the removed node. (`src/lib/architecture-commands.ts:212-233`)
 - **`remove edge`** - resolves both endpoints, finds the edge in O(1) via an index, but still
-  deletes with an O(n) filter. (`src/lib/architecture-commands.ts:245-283`)
+  deletes with an O(n) filter. (`src/lib/architecture-commands.ts:234-272`)
 - **`rename node`** - validates the new label, then unconditionally overwrites the node's
-  description. (`src/lib/architecture-commands.ts:284-340`)
+  description. (`src/lib/architecture-commands.ts:273-329`)
 - **`move node ... to step ...`** - splices the node into the array and re-derives every x from
   index; edges stay untouched since they reference ids.
-  (`src/lib/architecture-commands.ts:341-399`)
+  (`src/lib/architecture-commands.ts:330-388`)
 - **Suffix-trie substring index** - every suffix of every folded label is indexed, so a lookup
-  costs O(query length), not O(nodes). (`src/lib/node-index.ts:39-179`,
-  `src/lib/command-resolution.ts:81-93`)
+  costs O(query length), not O(nodes). (`src/lib/node-index.ts:25-140`,
+  `src/lib/command-resolution.ts:61-73`)
 - **Label normalization** - separator-splitting does its own lowercasing and skips
   whitespace/invisible-character handling, which callers must do first.
-  (`src/lib/node-reference.ts:1-165`)
+  (`src/lib/node-reference.ts:1-113`)
 - **Command errors** - ambiguous-label messages cap the listed names at 20 with an "and N more"
-  suffix. (`src/lib/command-resolution.ts:95-116`, `src/lib/architecture-commands.ts:401-405`)
+  suffix. (`src/lib/command-resolution.ts:75-93`, `src/lib/architecture-commands.ts:390-394`)
 - **`parseCommand` call site** - `runCommand` in `ArchitectureWorkspace` is the sole caller;
   state commits only when the result is ok.
-  (`src/components/architecture-workspace.tsx:121-203`)
+  (`src/components/architecture-workspace.tsx:104-186`)
 - **Autocomplete ranking** - an ambiguous separator only splits where the untouched side is an
-  existing node label. (`src/lib/node-suggestions.ts:1-392`)
+  existing node label. (`src/lib/node-suggestions.ts:1-336`)
 
 ## Required - display (7)
 
 - **React Flow canvas** - `reconcileRenderNodes` bridges app state and React Flow's render
-  state, preserving live drag position mid-gesture. (`src/components/architecture-canvas.tsx:1-383`)
+  state, preserving live drag position mid-gesture. (`src/components/architecture-canvas.tsx:1-357`)
 - **Data model** - `ArchitectureNode`/`Edge` alias `@xyflow/react` types directly; the only
   app-specific addition is an optional `description` on node data.
-  (`src/types/architecture.ts:1-39`)
+  (`src/types/architecture.ts:1-32`)
 - **Custom node** - reads highlight and action context independently every render, so a rename
-  and a highlight can overlap. (`src/components/architecture-node.tsx:1-204`)
+  and a highlight can overlap. (`src/components/architecture-node.tsx:1-180`)
 - **Custom edge** - self-loops get a hand-computed path with the curve's apex offset above both
-  endpoints. (`src/components/architecture-edge.tsx:1-134`)
+  endpoints. (`src/components/architecture-edge.tsx:1-120`)
 - **Command console** - auto-scroll sticks to bottom only if the user was already there before
-  the update, tracked via a ref. (`src/components/console-panel.tsx:1-287`)
+  the update, tracked via a ref. (`src/components/console-panel.tsx:1-260`)
 - **Command input** - Up/Down/Enter/Tab route to suggestion navigation first; history recall
-  only fires once suggestions are empty. (`src/components/command-input.tsx:1-286`)
+  only fires once suggestions are empty. (`src/components/command-input.tsx:1-263`)
 - **Canvas -> command synthesis** - mouse gestures (drag-connect, double-click rename) become the
-  same command strings the text box accepts. (`src/lib/canvas-commands.ts:1-157`)
+  same command strings the text box accepts. (`src/lib/canvas-commands.ts:1-122`)
 
 ## Bonus - simulation (3)
 
 - **Stepper** - an edge highlights only once both endpoints appear in the traversed-node set
-  built from step order. (`src/lib/simulation.ts:23-85`)
+  built from step order. (`src/lib/simulation.ts:14-69`)
 - **Panel** - Play/Pause drives a recursive `setTimeout`, not `setInterval`, so every tick
-  re-reads the current step and speed. (`src/components/simulation-panel.tsx:1-146`)
+  re-reads the current step and speed. (`src/components/simulation-panel.tsx:1-139`)
 - **Drag-to-reorder steps** - two `useState` values track dragged/drag-over index; `onDragEnd`
-  always resets both. (`src/components/simulation-timeline.tsx:1-142`)
+  always resets both. (`src/components/simulation-timeline.tsx:1-137`)
 
 ## Bonus - extras (5)
 
 - **Import/export/merge** - both enforce label uniqueness; import rejects the whole file on
-  collision, merge silently renames the incoming node. (`src/lib/architecture-io.ts:26-464`)
+  collision, merge silently renames the incoming node. (`src/lib/architecture-io.ts:23-407`)
 - **Merge picker dialog** - source/target are recomputed from the graph every render, so a stale
-  selection falls back automatically. (`src/components/merge-picker-dialog.tsx:1-399`)
+  selection falls back automatically. (`src/components/merge-picker-dialog.tsx:1-363`)
 - **Undo/redo** - two stacks of `{ command, snapshot }` pairs; any new command clears redo, so
-  redo only follows an undo. (`src/lib/undo-history.ts:26-138`)
+  redo only follows an undo. (`src/lib/undo-history.ts:20-116`)
 - **Persistence + tab sync** - a cross-tab `storage` event is classified
   irrelevant/cleared/invalid/updated; an invalid write gets self-healed by the receiving tab.
-  (`src/lib/persistence.ts:38,97-241`)
+  (`src/lib/persistence.ts:27,71-203`)
 - **Command recall** - Up/Down exits recall and restores the frozen draft once the index hits 0,
-  mirroring shell history. (`src/lib/command-history.ts:1-64`)
+  mirroring shell history. (`src/lib/command-history.ts:1-50`)
 
 ## Performance (3)
 
 - **MiniMap guard** - the minimap is omitted above 300 nodes since it repaints every node
-  position on each mutation. (`src/components/architecture-canvas.tsx:152,346-356`)
+  position on each mutation. (`src/components/architecture-canvas.tsx:132,320-330`)
 - **`fitView` debounce** - bursts of node changes collapse into one animated `fitView` 300ms
-  after the last change settles. (`src/components/architecture-canvas.tsx:154-189`)
+  after the last change settles. (`src/components/architecture-canvas.tsx:134-163`)
 - **Drag-position fix** - per-frame drag `position` changes are filtered out so autosave doesn't
-  fire on every drag frame. (`src/lib/node-changes.ts:1-35`)
+  fire on every drag frame. (`src/lib/node-changes.ts:1-26`)
 
 ## Tests (2)
 

@@ -239,9 +239,7 @@ describe("parseImportedArchitecture", () => {
     });
 
     test("rejects a node with a non-finite position", () => {
-        // 1e400 is valid JSON number syntax that overflows to Infinity on
-        // parse - JSON.stringify(Infinity) itself would serialize to null,
-        // so this has to be a raw string to actually exercise the bug.
+        // 1e400 is valid JSON number syntax that overflows
         const raw = JSON.stringify({
             nodes: [
                 { id: "a", position: { x: 0, y: 0 }, data: { label: "A" } },
