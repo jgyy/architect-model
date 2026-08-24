@@ -53,7 +53,7 @@ that uses each term.
   `{ ok: true; ...payload } | { ok: false; message: string }`, used instead of throwing, so every
   call site is forced by the type checker to handle failure before touching the payload. Appears as
   `CommandResult`, `UndoRedoResult`, `ImportArchitectureResult`, `MergeArchitectureSuccess`.
-  `src/lib/architecture-commands.ts:35-41`, `src/lib/undo-history.ts:71-78`,
+  `src/lib/command-resolution.ts:15-21`, `src/lib/undo-history.ts:71-78`,
   `src/lib/architecture-io.ts:40-47`
 - **Readonly collection types** - `ReadonlySet`/`ReadonlyArray` parameter types on functions like
   `mergeSelectedArchitecture` document (and let the compiler enforce) that the function only reads
@@ -66,7 +66,7 @@ that uses each term.
 
 - **ESLint 9 flat config** - `eslint.config.mjs` exports an array of config objects (no `.eslintrc`),
   composing `eslint-config-next`'s Core Web Vitals and TypeScript rule sets plus one project rule
-  (`max-lines: 1000`). `eslint.config.mjs:1-19`
+  (`max-lines: 500`). `eslint.config.mjs:1-19`
 - **Prettier** - formatting-only, run separately from lint (`npm run format`); not wired in as an
   ESLint rule. `package.json:11-12`
 - **Vitest** - the test runner (`vitest run`), configured with `environment: "node"` rather than a
@@ -89,24 +89,24 @@ that uses each term.
 - **Suffix trie (substring index)** - a trie keyed by character, built by inserting every suffix
   of every folded node label; each trie node caches the set of labels passing through it, so a
   substring query is a walk of `needle.length` character-steps rather than a scan of every node.
-  Backs both node-reference resolution and autocomplete. `src/lib/architecture-commands.ts:124-207`
+  Backs both node-reference resolution and autocomplete. `src/lib/node-index.ts:31-118`
 - **Two-stack undo/redo** - `undoStack`/`redoStack`, both arrays of `{ command, snapshot }`;
   `undo`/`redo` pop one, push its inverse onto the other. A capped array (`slice` to the last 500)
   standing in for a ring buffer. `src/lib/undo-history.ts:20-63`
 - **`Map`/`Set`-backed index (`NodeIndex`)** - one object bundling four `Map`s and a `Set`
   (label→node, id membership, edge-by-key, edge-by-source, edge-by-target) built once per command
-  instead of re-deriving lookups from arrays on every access. `src/lib/architecture-commands.ts:97-118`
+  instead of re-deriving lookups from arrays on every access. `src/lib/node-index.ts:8-29`
 - **Degree-constrained graph** - the architecture's edges aren't a general graph; the parser
   enforces at most one outgoing and one incoming edge per node
   (`outgoingBySource`/`incomingByTarget` are `Map<string, Edge>`, not `Map<string, Edge[]>`), so
-  the traversable structure is really a set of disjoint chains. `src/lib/architecture-commands.ts:109-111`
+  the traversable structure is really a set of disjoint chains. `src/lib/node-index.ts:20-22`
 
 ## Algorithms
 
 - **Cycle check via forward walk** (`wouldCreateCycle`) - before adding an edge, walks forward
   from the proposed target following `outgoingBySource` until it either reaches the proposed
   source (cycle) or a dead end; a `visited` set bounds the walk in case existing data is already
-  cyclic. `src/lib/architecture-commands.ts:245-268`
+  cyclic. `src/lib/node-index.ts:164-179`
 - **Cycle check via in-degree + reachability** (`findCyclicNodeId`) - a stripped-down first phase
   of Kahn's algorithm: compute in-degree per node, walk forward only from nodes with in-degree 0,
   and any node never reached is on a cycle. Used to re-validate an imported file's edges rather
@@ -119,5 +119,5 @@ that uses each term.
   recomputation and unnecessary child re-renders. `src/components/architecture-canvas.tsx:217-300`
 - **Complexity notes from the code's own comments** - the substring index is called out as
   `O(query length)` rather than `O(nodes)` per lookup; the `NodeIndex` map lookups are `O(1)`
-  average versus an `O(n)` `Array.find` per node reference. `src/lib/architecture-commands.ts:175`,
+  average versus an `O(n)` `Array.find` per node reference. `src/lib/node-index.ts:86`,
   `src/lib/node-suggestions.ts:61`

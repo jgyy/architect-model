@@ -12,30 +12,31 @@ required work from bonus features.
 
 - **Command parser entry point** - `parseCommand` strips/trims/length-checks input, then tries
   each verb's regex patterns in a fixed order via `matchFirst`.
-  (`src/lib/architecture-commands.ts:629-935`)
+  (`src/lib/architecture-commands.ts:99-405`)
 - **`add node`** - matches four phrasings, validates the label, appends a node positioned by
-  current node count. (`src/lib/architecture-commands.ts:587-592,648-679`)
+  current node count. (`src/lib/architecture-commands.ts:57-62,118-148`)
 - **`connect` (add edge)** - enforces one outgoing/incoming edge per node; the only new-cycle
-  case is closing the chain on itself. (`src/lib/architecture-commands.ts:680-752`)
+  case is closing the chain on itself. (`src/lib/architecture-commands.ts:150-222`)
 - **`remove node`** - cascading delete: a single `edges.filter` pass drops every edge touching
-  the removed node. (`src/lib/architecture-commands.ts:753-774`)
+  the removed node. (`src/lib/architecture-commands.ts:223-244`)
 - **`remove edge`** - resolves both endpoints, finds the edge in O(1) via an index, but still
-  deletes with an O(n) filter. (`src/lib/architecture-commands.ts:775-813`)
+  deletes with an O(n) filter. (`src/lib/architecture-commands.ts:245-283`)
 - **`rename node`** - validates the new label, then unconditionally overwrites the node's
-  description. (`src/lib/architecture-commands.ts:814-870`)
+  description. (`src/lib/architecture-commands.ts:284-340`)
 - **`move node ... to step ...`** - splices the node into the array and re-derives every x from
   index; edges stay untouched since they reference ids.
-  (`src/lib/architecture-commands.ts:871-929`)
+  (`src/lib/architecture-commands.ts:341-399`)
 - **Suffix-trie substring index** - every suffix of every folded label is indexed, so a lookup
-  costs O(query length), not O(nodes). (`src/lib/architecture-commands.ts:124-290`)
+  costs O(query length), not O(nodes). (`src/lib/node-index.ts:39-179`,
+  `src/lib/command-resolution.ts:81-93`)
 - **Label normalization** - separator-splitting does its own lowercasing and skips
   whitespace/invisible-character handling, which callers must do first.
   (`src/lib/node-reference.ts:1-165`)
 - **Command errors** - ambiguous-label messages cap the listed names at 20 with an "and N more"
-  suffix. (`src/lib/architecture-commands.ts:292-313,933-935`)
+  suffix. (`src/lib/command-resolution.ts:95-116`, `src/lib/architecture-commands.ts:401-405`)
 - **`parseCommand` call site** - `runCommand` in `ArchitectureWorkspace` is the sole caller;
   state commits only when the result is ok.
-  (`src/components/architecture-workspace.tsx:421-495`)
+  (`src/components/architecture-workspace.tsx:121-203`)
 - **Autocomplete ranking** - an ambiguous separator only splits where the untouched side is an
   existing node label. (`src/lib/node-suggestions.ts:1-392`)
 
@@ -71,7 +72,7 @@ required work from bonus features.
 - **Import/export/merge** - both enforce label uniqueness; import rejects the whole file on
   collision, merge silently renames the incoming node. (`src/lib/architecture-io.ts:26-464`)
 - **Merge picker dialog** - source/target are recomputed from the graph every render, so a stale
-  selection falls back automatically. (`src/components/merge-picker-dialog.tsx:1-542`)
+  selection falls back automatically. (`src/components/merge-picker-dialog.tsx:1-399`)
 - **Undo/redo** - two stacks of `{ command, snapshot }` pairs; any new command clears redo, so
   redo only follows an undo. (`src/lib/undo-history.ts:26-138`)
 - **Persistence + tab sync** - a cross-tab `storage` event is classified
@@ -91,7 +92,7 @@ required work from bonus features.
 
 ## Tests (2)
 
-- **Parser tests** - five files, 1,873 lines; adversarial label cases are asserted individually
+- **Parser tests** - seven files, 1,887 lines; adversarial label cases are asserted individually
   rather than table-driven. (`src/lib/test/architecture-commands-*.test.ts`)
 - **Component tests** - React Testing Library renders under jsdom; assertions target rendered
   output and mock callbacks, not internal state. (`src/components/test/`)

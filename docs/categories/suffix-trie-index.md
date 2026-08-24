@@ -2,7 +2,7 @@
 
 `NodeIndex` builds a trie from every suffix of each node's folded label via `insertSuffixes`, so every substring becomes a valid trie path whose terminal `matches` set collects every node containing it.
 
-**Source:** `src/lib/architecture-commands.ts:124-290`
+**Source:** `src/lib/node-index.ts:39-179`, `src/lib/command-resolution.ts:81-93`
 
 **Building the trie**
 

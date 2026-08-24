@@ -2,7 +2,7 @@
 
 Because the one-outgoing/one-incoming constraint already keeps the graph a simple chain, `wouldCreateCycle` only needs to catch the edge case where the new edge closes that chain back on itself.
 
-**Source:** `src/lib/architecture-commands.ts:680-752`
+**Source:** `src/lib/architecture-commands.ts:150-222`
 
 **Endpoint resolution and guard checks**
 
