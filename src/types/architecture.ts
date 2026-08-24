@@ -1,37 +1,30 @@
 import type { Edge, Node } from "@xyflow/react";
 
 /**
- * Data payload for every canvas node: label plus, optionally, its step in the
- * simulation trace. The trace isn't a separate structure - it's embedded in
- * node order and each node's `description`.
+ * Canvas node payload: label plus its simulation step, if any. The trace
+ * is embedded here, not a separate structure.
  */
 export type ArchitectureNodeData = {
     label: string;
-    /**
-     * Simulation narrative for this step, if the node participates.
-     */
+    /** Simulation narrative, if the node participates in the trace. */
     description?: string;
 };
 
 /**
- * A canvas node as React Flow renders and manages it: React Flow's `Node<T>`
- * instantiated with this app's `ArchitectureNodeData`, so it inherits React
- * Flow's node fields (id, position, etc.) plus this app's `data` shape.
+ * Canvas node: React Flow's `Node<T>` instantiated with this app's
+ * `ArchitectureNodeData`.
  */
 export type ArchitectureNode = Node<ArchitectureNodeData>;
 
 /**
- * An edge connecting two canvas nodes; reused as-is from React Flow's `Edge`
- * type since edges carry no extra data. The one-outgoing/one-incoming rule
- * (making the graph disjoint linear chains) is enforced by the command
- * parser, not this type.
+ * Edge between two nodes, reused as-is from React Flow's `Edge`. The
+ * one-in/one-out chain rule is enforced by the command parser, not here.
  */
 export type ArchitectureEdge = Edge;
 
 /**
- * Full state of the architecture graph: every node and edge. Persisted,
- * imported/exported, and snapshotted for undo/redo - the app's single
- * source of truth.
+ * Full architecture graph: nodes and edges - the app's single source of
+ * truth.
  */
 export type Architecture = {
     nodes: ArchitectureNode[];

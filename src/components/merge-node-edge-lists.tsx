@@ -1,27 +1,20 @@
 import type { Architecture } from "@/types/architecture";
 
-/**
- * Props for {@link MergeNodeList}: the incoming file's nodes, which are
- * currently checked, labels that would collide on merge, and the toggle
- * handler.
- */
+/** Props for {@link MergeNodeList}: incoming nodes, selection state, and toggle handler. */
 type MergeNodeListProps = {
-    /** Architecture parsed from the imported file; source of merge candidates. */
+    /** Parsed architecture from the imported file. */
     incoming: Architecture;
-    /** Incoming node ids currently checked for inclusion. */
+    /** Currently checked node ids. */
     selectedIds: ReadonlySet<string>;
-    /** Folded labels in the current architecture, used to flag colliding incoming labels. */
+    /** Existing folded labels; flags colliding incoming labels. */
     existingFoldedLabels: ReadonlySet<string>;
-    /** Toggles whether an incoming node is selected. */
+    /** Toggles selection of an incoming node. */
     onToggle: (nodeId: string) => void;
-    /** Folds a label the same way `existingFoldedLabels` was built. */
+    /** Must fold the same way `existingFoldedLabels` was built. */
     foldLabel: (label: string) => string;
 };
 
-/**
- * Checkbox list of every incoming node, flagging any whose label would
- * collide with an existing one.
- */
+/** Checkbox list of incoming nodes, flagging label collisions with existing ones. */
 export function MergeNodeList({
     incoming,
     selectedIds,
@@ -66,27 +59,21 @@ export function MergeNodeList({
     );
 }
 
-/**
- * Props for {@link MergeEdgeList}: the incoming file's edges, which nodes
- * and edges are currently selected/excluded, and the toggle handler.
- */
+/** Props for {@link MergeEdgeList}: incoming edges, selection state, and toggle handler. */
 type MergeEdgeListProps = {
-    /** Architecture parsed from the imported file; source of merge candidates. */
+    /** Parsed architecture from the imported file. */
     incoming: Architecture;
-    /** Incoming node ids currently checked for inclusion - an edge needs both endpoints selected to be eligible. */
+    /** Checked node ids; both endpoints must be selected for an edge to be eligible. */
     selectedIds: ReadonlySet<string>;
-    /** Eligible incoming edge ids the user has explicitly unchecked. */
+    /** Eligible edge ids the user unchecked. */
     excludedEdgeIds: ReadonlySet<string>;
-    /** Incoming node id to label, for rendering `source → target`. */
+    /** Node id → label, for rendering `source → target`. */
     labelById: ReadonlyMap<string, string>;
-    /** Toggles whether an eligible incoming edge is included. */
+    /** Toggles inclusion of an eligible edge. */
     onToggleEdge: (edgeId: string) => void;
 };
 
-/**
- * Checkbox list of every incoming edge; an edge whose endpoints aren't both
- * selected renders disabled and unchecked rather than being hidden.
- */
+/** Checkbox list of incoming edges; ineligible ones render disabled, not hidden. */
 export function MergeEdgeList({
     incoming,
     selectedIds,

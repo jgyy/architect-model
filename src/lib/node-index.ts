@@ -1,30 +1,19 @@
 import { foldLabel } from "@/lib/node-reference";
 import type { ArchitectureEdge, ArchitectureNode } from "@/types/architecture";
 
-/**
- * Lookup Maps/Sets for an architecture's nodes and edges, built once per
- * command instead of re-derived on every access. See {@link buildNodeIndex}.
- */
+/** Precomputed lookup Maps/Sets for a node/edge set; see {@link buildNodeIndex}. */
 export type NodeIndex = {
-    /** Nodes keyed by folded label, for exact lookup. */
+    /** Nodes by folded label (exact lookup). */
     byLabel: Map<string, ArchitectureNode>;
-    /** Every node id currently in use, for collision checks. */
+    /** All node ids, for collision checks. */
     ids: Set<string>;
-    /** Every edge keyed by `"<sourceId>::<targetId>"` (see {@link edgeKey}). */
+    /** Edges keyed by `"source::target"` (see {@link edgeKey}). */
     edgesBySourceTarget: Map<string, ArchitectureEdge>;
-    /**
-     * Each node's single outgoing edge, keyed by source id. The parser
-     * caps nodes at one outgoing/incoming edge each, so connected nodes
-     * form disjoint chains, not an arbitrary graph.
-     */
+    /** Outgoing edge by source id. Nodes cap at one edge each way, so graphs form disjoint chains only. */
     outgoingBySource: Map<string, ArchitectureEdge>;
-    /** Each node's single incoming edge, keyed by target id (see `outgoingBySource`). */
+    /** Incoming edge by target id (see `outgoingBySource`). */
     incomingByTarget: Map<string, ArchitectureEdge>;
-    /**
-     * Root of the suffix trie for substring lookups over node labels - one
-     * step per query character instead of scanning every label. See
-     * {@link SubstringTrieNode}, {@link buildSubstringIndex}.
-     */
+    /** Suffix trie root for substring label lookups (no full scan). See {@link SubstringTrieNode}. */
     substringIndex: SubstringTrieNode;
 };
 
@@ -32,12 +21,9 @@ export function edgeKey(sourceId: string, targetId: string): string {
     return `${sourceId}::${targetId}`;
 }
 
-/**
- * One trie node: edges keyed by the next folded character; each node
- * caches labels reachable through it, for substring matching.
- */
+/** Trie node: child per next folded char; caches labels reachable through it. */
 type SubstringTrieNode = {
-    /** Child node per next folded character. */
+    /** Child per next folded char. */
     children: Map<string, SubstringTrieNode>;
     /** Nodes whose label contains this path's substring. */
     matches: Set<ArchitectureNode>;
@@ -48,10 +34,9 @@ function createSubstringTrieNode(): SubstringTrieNode {
 }
 
 /**
- * Inserts every suffix of a node's folded label, so a later query can
- * match anywhere inside a label, not just its start.
+ * Inserts every suffix of the label so queries can match mid-label, not just the start.
  * @param root - trie root
- * @param node - node whose label is inserted
+ * @param node - node to insert
  */
 function insertSuffixes(root: SubstringTrieNode, node: ArchitectureNode): void {
     const folded = foldLabel(node.data.label);
@@ -70,11 +55,7 @@ function insertSuffixes(root: SubstringTrieNode, node: ArchitectureNode): void {
     }
 }
 
-/**
- * Builds a suffix trie over every node's label for substring queries.
- * @param nodes - nodes to index
- * @returns root of the built trie
- */
+/** Builds a suffix trie over all node labels, for substring queries. */
 function buildSubstringIndex(nodes: ArchitectureNode[]): SubstringTrieNode {
     const root = createSubstringTrieNode();
     for (const node of nodes) {
@@ -84,11 +65,8 @@ function buildSubstringIndex(nodes: ArchitectureNode[]): SubstringTrieNode {
 }
 
 /**
- * Walks the trie by `needle`'s characters, returning every node whose
- * label contains it, in `architecture.nodes` order.
- * @param root - trie to search
- * @param needle - already-folded substring
- * @returns matching nodes, or `[]` if none
+ * Walks the trie by `needle`, returning matches in `architecture.nodes` order.
+ * @param needle - must already be folded
  */
 function querySubstringIndex(
     root: SubstringTrieNode,
@@ -103,13 +81,7 @@ function querySubstringIndex(
     return Array.from(current.matches);
 }
 
-/**
- * Public substring lookup for callers outside this module (e.g. UI
- * autocomplete), using the same trie the parser uses.
- * @param nodeIndex - index to query
- * @param needle - substring to search for
- * @returns nodes whose label contains `needle`
- */
+/** Public substring lookup (e.g. UI autocomplete), reusing the parser's trie. */
 export function findNodesBySubstring(
     nodeIndex: NodeIndex,
     needle: string,
@@ -117,14 +89,7 @@ export function findNodesBySubstring(
     return querySubstringIndex(nodeIndex.substringIndex, needle);
 }
 
-/**
- * Builds a {@link NodeIndex}: label lookup, id set, edge lookups, and
- * substring trie built up front so parsing reads Maps/Sets instead of
- * re-deriving them each access.
- * @param nodes - nodes to index
- * @param edges - edges to index (default none)
- * @returns a fresh index reflecting the given nodes/edges
- */
+/** Builds a {@link NodeIndex} up front so parsing reads Maps/Sets instead of re-deriving them each time. */
 export function buildNodeIndex(
     nodes: ArchitectureNode[],
     edges: ArchitectureEdge[] = [],
@@ -154,12 +119,8 @@ export function buildNodeIndex(
 }
 
 /**
- * True if connecting `sourceId` to `targetId` would close a loop (walks
- * forward from the target to the source). Used by `connect`.
- * @param sourceId - new edge's start id
- * @param targetId - new edge's end id
- * @param nodeIndex - forward-edge lookups
- * @returns true if a cycle would form
+ * True if `sourceId` → `targetId` would close a loop (walks forward from target to
+ * source). Used by `connect`.
  */
 export function wouldCreateCycle(
     sourceId: string,

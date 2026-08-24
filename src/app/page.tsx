@@ -2,10 +2,8 @@ import { ArchitectureWorkspace } from "@/components/architecture-workspace";
 import { exampleArchitecture } from "@/data/example-architecture";
 
 /**
- * Root route ("/") for the App Router. Server-rendered (no "use client");
- * lays out page chrome and mounts {@link ArchitectureWorkspace} - the
- * client component owning graph-editing and simulation state - seeded
- * with the bundled example architecture.
+ * Root route; server component that mounts {@link ArchitectureWorkspace},
+ * seeded with the bundled example architecture.
  */
 export default function Home() {
     return (

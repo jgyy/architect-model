@@ -42,10 +42,7 @@ const TIPS: GuideTip[] = [
 ];
 
 /**
- * Floating "?" overlay explaining how to navigate the React Flow canvas.
- * Toggles a popover listing canvas gestures (pan, zoom,
- * add/connect/rename/delete nodes) and the console/simulation workflow for
- * first-time users.
+ * Floating "?" overlay toggling a gesture/workflow tips popover for new users.
  */
 export function DiagramGuide() {
     const [open, setOpen] = useState(false);

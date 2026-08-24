@@ -28,9 +28,7 @@ import {
 } from "@/lib/workspace-log";
 import type { Architecture } from "@/types/architecture";
 
-/**
- * A merge file that's been parsed but not yet confirmed via the picker.
- */
+/** A merge file that's been parsed but not yet confirmed via the picker. */
 type PendingMerge = {
     key: number;
     fileName: string;
@@ -38,15 +36,11 @@ type PendingMerge = {
 };
 
 /**
- * Owns everything about the workspace's persisted session: the
- * architecture, command log, simulation step/speed, undo/redo history, and
- * an in-flight merge-picker selection. Hydrates from `localStorage` on
- * mount, autosaves on change, and reacts to `storage` events from other
- * tabs so every open tab converges on the same session - including
- * cancelling a merge picker left open against an architecture another tab
- * just changed underneath it.
- * @param initialArchitecture - architecture to start from before hydration,
- * and to reset to on "clear history" or a cross-tab clear
+ * Owns the workspace's persisted session (architecture, log, step/speed,
+ * undo/redo, pending merge). Hydrates from `localStorage`, autosaves, and
+ * syncs across tabs via `storage` events - including cancelling a stale
+ * merge picker when another tab changes the architecture underneath it.
+ * @param initialArchitecture - reset target for "clear history"/cross-tab clear
  */
 export function useWorkspaceSession(initialArchitecture: Architecture) {
     const [architecture, setArchitecture] = useState(initialArchitecture);
@@ -68,11 +62,10 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     const nextLogIdRef = useRef(1);
 
     /**
-     * Replaces the visible session with `state` (architecture, log, step,
-     * speed). Used for initial hydration and for adopting changes from
-     * another tab. Undo/redo resets to empty (it's ephemeral, per-tab, not
-     * persisted), and the log id counter fast-forwards past `state`'s ids.
-     * @param state - the full session snapshot to adopt
+     * Adopts `state` as the visible session (hydration or cross-tab update).
+     * Undo/redo resets to empty (ephemeral, per-tab); log id counter
+     * fast-forwards past `state`'s ids.
+     * @param state - session snapshot to adopt
      */
     const applyPersisted = useCallback((state: PersistedState) => {
         setArchitecture(state.architecture);
@@ -83,11 +76,7 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
         nextLogIdRef.current = maxLogId(state.log) + 1;
     }, []);
 
-    /**
-     * Discards the current session and starts over from
-     * `initialArchitecture` with an empty log, as if nothing was persisted.
-     * Used when storage is cleared, by this tab or another.
-     */
+    /** Resets to `initialArchitecture` with an empty log, as if nothing was persisted. */
     const resetToInitial = useCallback(() => {
         applyPersisted({
             architecture: initialArchitecture,
@@ -104,13 +93,10 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     }
 
     /**
-     * Appends one outcome to the command log: allocates its id and appends
-     * in one step. Every submitted command, typed or from a canvas gesture,
-     * is recorded with whether it succeeded and why - the log doubles as
-     * this app's validation UI.
-     * @param input - the command text that was run
-     * @param ok - whether it succeeded
-     * @param message - human-readable outcome to display
+     * Allocates an id, appends the outcome - log doubles as validation UI.
+     * @param input - command text
+     * @param ok - success flag
+     * @param message - text to log
      */
     const logResult = useCallback(
         (input: string, ok: boolean, message: string) => {
@@ -123,10 +109,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     );
 
     /**
-     * Runs once on mount to hydrate the session from `localStorage`, if a
-     * previous one was saved. Deferred to an effect since `localStorage`
-     * isn't available during server rendering; `hydrated` gates the
-     * autosave effect below until this initial read has run.
+     * Hydrates from `localStorage` on mount (deferred to an effect since
+     * it's unavailable during SSR); `hydrated` gates the autosave effect below.
      */
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
@@ -141,18 +125,11 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     /* eslint-enable react-hooks/set-state-in-effect */
 
     /**
-     * Reacts to storage changes made by *other* tabs, so every open tab
-     * converges on the same session: adopts updates, resets on a clear, and
-     * repairs storage if something unreadable landed there. The `storage`
-     * event only fires in other tabs - this tab's own writes are already
-     * reflected.
+     * Reacts to `storage` events from *other* tabs (this tab's own writes
+     * don't fire it): adopts updates, resets on clear, repairs invalid writes.
      */
     useEffect(() => {
-        /**
-         * Drops a merge mid-review in the picker dialog: its selections
-         * and added edges were computed against an architecture that's now
-         * stale (another tab changed it).
-         */
+        /** Cancels an open merge picker - its selections are stale once another tab changes the architecture. */
         function cancelStalePendingMerge() {
             if (!pendingMerge) return;
             setPendingMerge(null);
@@ -163,11 +140,9 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
             );
         }
         /**
-         * Classifies and applies one `storage` event: adopts another tab's
-         * update, resets on a clear, or - if the write doesn't parse -
-         * overwrites storage with this tab's last known-good state so the
-         * corruption doesn't keep propagating.
-         * @param event - the browser `storage` event to react to
+         * Applies one `storage` event; an unparseable write is overwritten
+         * with this tab's last known-good state so corruption doesn't spread.
+         * @param event - `storage` event to react to
          */
         function handleStorage(event: StorageEvent) {
             const change = interpretStorageEvent(event.key, event.newValue);
@@ -192,10 +167,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     }, [applyPersisted, resetToInitial, pendingMerge, logResult]);
 
     /**
-     * The step index actually safe to render/look up this render, clamped
-     * into the current trace's bounds. Needed because `currentStepIndex`
-     * can point past the trace's end after a command shrinks it (e.g.
-     * remove node).
+     * `currentStepIndex` clamped into bounds - it can point past the
+     * trace's end after a command shrinks it (e.g. remove node).
      */
     const safeStepIndex = clampStepIndex(
         currentStepIndex,
@@ -206,11 +179,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     const persistenceWarnedRef = useRef(false);
 
     /**
-     * Persists the session to `localStorage` whenever architecture, log,
-     * step, or speed change, so a refresh or new tab resumes where this one
-     * left off. Skips writing if serialized state is unchanged (avoids
-     * redundant `storage` events elsewhere), and logs once per failure
-     * streak if storage fails (e.g. full, private browsing).
+     * Autosaves to `localStorage` on change; skips if unchanged (avoids
+     * redundant `storage` events) and logs once per failure streak.
      */
     useEffect(() => {
         if (!hydrated) return;
@@ -237,10 +207,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     }, [architecture, log, safeStepIndex, speedIndex, hydrated, logResult]);
 
     /**
-     * Handles the console's "clear history" action: wipes the persisted
-     * session and resets visible state to `initialArchitecture` regardless
-     * of whether the storage removal succeeded, logging a warning only if
-     * the old session might reappear on reload.
+     * Wipes persisted session and resets to `initialArchitecture`; logs a
+     * warning only if storage removal failed (session may reappear on reload).
      */
     function handleClearHistory() {
         const cleared = clearPersistedState(window.localStorage);
@@ -256,10 +224,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     }
 
     /**
-     * Updates the current step from the simulation panel's scrubber/
-     * controls, clamped to the trace's bounds. Memoized so its identity
-     * stays stable across unrelated re-renders (e.g. input keystrokes).
-     * @param index - step index to move to
+     * Sets the current step, clamped to the trace's bounds.
+     * @param index - step to move to
      */
     const handleStepChange = useCallback(
         (index: number) => {
@@ -271,10 +237,8 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     );
 
     /**
-     * Map/Set-backed index over the architecture: node lookups by label
-     * (resolving a command's typed reference) and by id (collision checks),
-     * plus edge connectivity. Rebuilt via `useMemo` only when nodes/edges
-     * change, and passed into `parseCommand` to avoid re-deriving it.
+     * Map/Set index over the architecture (label/id lookups, edge
+     * connectivity), memoized on nodes/edges to avoid re-deriving per command.
      */
     const nodeIndex = useMemo(
         () => buildNodeIndex(architecture.nodes, architecture.edges),
@@ -282,10 +246,9 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     );
 
     /**
-     * Handles importing a file as a full replacement of the architecture:
-     * reads, validates, and on success swaps it in wholesale. Bypasses
-     * `parseCommand` but is still recorded onto undo history.
-     * @param file - the file selected or dropped to import
+     * Imports a file as a full architecture replacement, bypassing
+     * `parseCommand` but still recorded onto undo history.
+     * @param file - file to import
      */
     const handleImportFile = useCallback(
         (file: File) => {
@@ -317,10 +280,9 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     );
 
     /**
-     * First half of merging a file: reads and validates it, then stashes
-     * the result as `pendingMerge` to open the merge picker. The actual
-     * merge happens on confirm, in `handleConfirmMerge`.
-     * @param file - the file selected or dropped to merge
+     * Reads/validates a file to merge, stashing it as `pendingMerge` to
+     * open the picker; the merge itself happens in `handleConfirmMerge`.
+     * @param file - file to merge
      */
     const handleMergeFile = useCallback(
         (file: File) => {
@@ -355,14 +317,12 @@ export function useWorkspaceSession(initialArchitecture: Architecture) {
     const handleCancelMerge = useCallback(() => setPendingMerge(null), []);
 
     /**
-     * Handles the merge picker's "confirm" action: applies the user's
-     * choices to merge `pendingMerge.incoming` into the architecture,
-     * records it onto undo history, and logs a summary including any
-     * incoming labels renamed to avoid collisions.
+     * Merges `pendingMerge.incoming` per the picker's choices, records
+     * undo history, and logs a summary (renamed labels included).
      * @param selectedNodeIds - incoming node ids to keep
      * @param excludedEdgeIds - incoming edge ids to drop
-     * @param addedEdges - extra connections drawn in the picker
-     * @param insertAtStep - trace position to insert merged nodes at
+     * @param addedEdges - extra connections drawn in picker
+     * @param insertAtStep - trace position to insert at
      */
     const handleConfirmMerge = useCallback(
         (

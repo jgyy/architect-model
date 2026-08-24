@@ -17,10 +17,7 @@ import type {
 export const ARCHITECTURE_EXPORT_FILENAME = "architecture.json";
 
 /**
- * Serializes the architecture to JSON for export, keeping only `nodes`
- * and `edges` (see {@link parseImportedArchitecture}). Pretty-printed.
- *
- * @param architecture - The architecture to export.
+ * Serializes to JSON for export, keeping only `nodes`/`edges` (see {@link parseImportedArchitecture}).
  * @returns Indented JSON text.
  */
 export function serializeArchitecture(architecture: Architecture): string {
@@ -32,10 +29,7 @@ export function serializeArchitecture(architecture: Architecture): string {
 }
 
 /**
- * Outcome of importing an architecture file. A discriminated union on
- * `ok` - callers must check `ok === true` before reading `architecture`,
- * so failure is handled rather than thrown. Success carries the
- * architecture and counts; failure carries a message.
+ * Import outcome, discriminated on `ok`; check before reading `architecture`.
  */
 export type ImportArchitectureResult =
     | {
@@ -47,16 +41,10 @@ export type ImportArchitectureResult =
     | { ok: false; message: string };
 
 /**
- * Detects a node stuck in a cycle, given each node's outgoing edge
- * (`outgoingBySource`: source id to target id).
- *
- * First phase of Kahn's algorithm: compute in-degree per node, then walk
- * forward from every zero-in-degree node, marking visits. An unvisited
- * node is only reachable from within a cycle.
- *
- * @param nodeIds - All node ids to check.
- * @param outgoingBySource - Each node's outgoing edge, by source id.
- * @returns Id of a cyclic node, or null.
+ * Finds a node stuck in a cycle via Kahn's algorithm: after walking forward from every zero-in-degree node, an unvisited node is only reachable from within a cycle.
+ * @param nodeIds - Node ids to check.
+ * @param outgoingBySource - Source id to target id.
+ * @returns Cyclic node id, or null.
  */
 function findCyclicNodeId(
     nodeIds: string[],
@@ -79,15 +67,8 @@ function findCyclicNodeId(
 }
 
 /**
- * Re-checks every invariant the app assumes an `Architecture` satisfies:
- * unique node ids/labels, finite positions, label length limit, unique
- * edge ids, edges referencing real nodes, at most one outgoing/incoming
- * edge per node (chains, not an arbitrary graph), and no cycles.
- *
- * An imported file may be hand-edited or from another version, so these
- * checks are redone rather than trusted.
- *
- * @param architecture - Parsed, schema-valid architecture to check.
+ * Re-validates all invariants (unique ids/labels, positions, label length, edge refs, one edge in/out per node, no cycles) since an imported file may be hand-edited or from another version.
+ * @param architecture - Schema-valid architecture to check.
  * @returns Problem description, or null if valid.
  */
 function validateImportedArchitecture(
@@ -152,10 +133,7 @@ function validateImportedArchitecture(
 }
 
 /**
- * Parses and validates an imported file's raw text into a ready-to-load
- * `Architecture`, or a rejection reason.
- *
- * @param raw - Raw text of the imported file.
+ * Parses and validates raw imported text into a ready-to-load `Architecture`.
  * @returns Parsed architecture and counts, or a failure message.
  */
 export function parseImportedArchitecture(
@@ -190,9 +168,7 @@ export function parseImportedArchitecture(
 }
 
 /**
- * Result of folding a subset of an already-parsed architecture into the
- * current one (see {@link mergeSelectedArchitecture}). Only a success
- * case exists - merge runs after import validation.
+ * Merge result (see {@link mergeSelectedArchitecture}); success-only since merge runs after import validation.
  */
 export type MergeArchitectureSuccess = {
     ok: true;
@@ -204,12 +180,10 @@ export type MergeArchitectureSuccess = {
 };
 
 /**
- * Disambiguates a label against folded labels in use by appending
- * " (2)", " (3)", etc. until unique.
- *
+ * Disambiguates by appending " (2)", " (3)", etc. until unique.
  * @param label - Label to make unique.
- * @param takenFolded - Case-folded labels already taken (see {@link foldLabel}).
- * @returns A label not in `takenFolded`.
+ * @param takenFolded - Case-folded labels taken (see {@link foldLabel}).
+ * @returns Label not in `takenFolded`.
  */
 function uniqueLabel(label: string, takenFolded: Set<string>): string {
     let candidate = label;
@@ -221,18 +195,12 @@ function uniqueLabel(label: string, takenFolded: Set<string>): string {
     return candidate;
 }
 
-/**
- * Which side of a merge a Connect control id came from: current or
- * incoming.
- */
+/** Which side of a merge a Connect control id came from. */
 export type ConnectOrigin = "current" | "incoming";
 
 /**
- * Namespaces a raw node id by merge side, so Connect control dropdowns
- * can hold ids from both sides without collisions.
- *
+ * Namespaces a node id by merge side so Connect dropdowns can hold ids from both sides without collisions.
  * @param origin - Which architecture the id belongs to.
- * @param id - The raw node id.
  * @returns Combined key: "current:\<id\>" or "incoming:\<id\>".
  */
 export function connectOptionKey(origin: ConnectOrigin, id: string): string {
@@ -240,10 +208,8 @@ export function connectOptionKey(origin: ConnectOrigin, id: string): string {
 }
 
 /**
- * Inverse of {@link connectOptionKey}: splits into origin and raw id.
- *
- * @param key - A key from {@link connectOptionKey}.
- * @returns The origin and raw id.
+ * Inverse of {@link connectOptionKey}.
+ * @returns Origin and raw id.
  */
 export function decodeConnectOptionKey(key: string): {
     origin: ConnectOrigin;
@@ -257,13 +223,8 @@ export function decodeConnectOptionKey(key: string): {
 }
 
 /**
- * Builds a combined node/edge list, ids namespaced via
- * {@link connectOptionKey}, so checks can treat both architectures as
- * one graph.
- *
+ * Combines both architectures into one graph, ids namespaced via {@link connectOptionKey}.
  * @param current - Architecture on the canvas.
- * @param incomingNodes - Nodes being imported.
- * @param incomingEdges - Edges being imported.
  * @returns Namespaced nodes and edges.
  */
 export function buildConnectGraph(
@@ -297,10 +258,7 @@ export function buildConnectGraph(
 }
 
 /**
- * Nodes eligible as a new edge's source: those with no outgoing edge yet
- * (max one per node).
- *
- * @param nodes - Candidate nodes.
+ * Nodes eligible as a new edge's source (no outgoing edge yet; max one per node).
  * @param edges - Existing edges.
  * @returns Ids of `nodes` with no outgoing edge.
  */
@@ -317,12 +275,8 @@ export function connectableSourceIds(
 }
 
 /**
- * Finds which of `nodes` `sourceId` could validly connect to: excludes
- * `sourceId`, nodes with an incoming edge, and nodes where connecting
- * would create a cycle (`wouldCreateCycle`).
- *
- * @param sourceId - Id of the prospective source.
- * @param nodes - Candidate target nodes.
+ * Valid targets for `sourceId`: excludes itself, nodes with an incoming edge, and cycle-creating targets.
+ * @param sourceId - Prospective source id.
  * @param edges - Existing edges.
  * @returns Ids of valid targets.
  */
@@ -342,20 +296,14 @@ export function connectableTargetIds(
     return ids;
 }
 
-/**
- * An edge from the merge UI, unresolved: source/target are connect
- * option keys (see {@link connectOptionKey}).
- */
+/** Unresolved merge-UI edge; source/target are {@link connectOptionKey} keys. */
 export type AddedConnectEdge = { source: string; target: string };
 
 /**
- * Resolves one endpoint of a manually added edge to its real node id:
- * current-side ids pass through; incoming-side ids use their remap if
- * renamed.
- *
+ * Resolves an edge endpoint to its real node id: current-side ids pass through, incoming-side ids use their remap.
  * @param key - Connect option key naming the endpoint.
  * @param idRemap - Incoming ids renamed to avoid collision, old to new.
- * @returns The resolved node id.
+ * @returns Resolved node id.
  */
 function resolveConnectEndpoint(
     key: string,
@@ -366,19 +314,14 @@ function resolveConnectEndpoint(
 }
 
 /**
- * Folds a subset of an already-parsed incoming architecture into the
- * current one: picks nodes to keep (`selectedNodeIds`), edges to drop
- * (`excludedEdgeIds`), and edges to add by hand (`addedEdges`). Colliding
- * ids/labels are remapped/renamed, not rejected - structure was already
- * validated.
- *
+ * Folds selected nodes/edges from an already-validated incoming architecture into the current one; colliding ids/labels are remapped/renamed, not rejected.
  * @param current - Architecture on the canvas.
- * @param incoming - Already-validated architecture being merged in.
- * @param selectedNodeIds - Ids (from `incoming`) of nodes to bring in.
- * @param excludedEdgeIds - Ids (from `incoming`) of edges to leave out.
+ * @param incoming - Validated architecture being merged in.
+ * @param selectedNodeIds - Incoming node ids to bring in.
+ * @param excludedEdgeIds - Incoming edge ids to leave out.
  * @param addedEdges - Extra edges to add, as connect option keys.
  * @param insertAtStep - Splice index into `current.nodes`; defaults to appending.
- * @returns Merged architecture, added counts, and renamed labels.
+ * @returns Merged architecture, added counts, renamed labels.
  */
 export function mergeSelectedArchitecture(
     current: Architecture,

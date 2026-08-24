@@ -1,8 +1,4 @@
-/**
- * Description of one console command for the `help` output: usage
- * syntax, a worked example, accepted alias phrasings, and an optional
- * note about a side effect or constraint.
- */
+/** One console command's help entry: usage, example, aliases, and an optional note. */
 type CommandDoc = {
     usage: string;
     example: string;
@@ -10,11 +6,7 @@ type CommandDoc = {
     note?: string;
 };
 
-/**
- * Full list of commands documented by the console's `help` output, one
- * entry per command family. Raw data that COMMAND_USAGE and
- * SUPPORTED_COMMANDS derive from.
- */
+/** Per-command help data; source that COMMAND_USAGE and SUPPORTED_COMMANDS derive from. */
 const COMMAND_DOCS: CommandDoc[] = [
     {
         usage: "add node <label>",
@@ -70,20 +62,15 @@ const COMMAND_DOCS: CommandDoc[] = [
     },
 ];
 
-/**
- * Every command's usage line, in COMMAND_DOCS order, with no
- * example/alias/note text.
- */
+/** Usage line per command, COMMAND_DOCS order (no example/alias/note text). */
 export const COMMAND_USAGE = COMMAND_DOCS.map((doc) => doc.usage);
 
 const INDENT = "    ";
 
 /**
- * Renders one CommandDoc into its multi-line help block: usage line,
- * indented example, an indented alias line when aliases exist, and an
- * indented note when present.
- * @param doc - command description to format
- * @returns newline-joined formatted block of text
+ * Renders one CommandDoc into its multi-line help block.
+ * @param doc - command to format
+ * @returns formatted block text
  */
 function formatCommandDoc(doc: CommandDoc): string {
     const lines = [doc.usage, `${INDENT}${doc.example}`];
@@ -95,14 +82,8 @@ function formatCommandDoc(doc: CommandDoc): string {
     return lines.join("\n");
 }
 
-/**
- * One help-text block per command, COMMAND_DOCS order, wrapped inside
- * 80 columns; joined by HELP_MESSAGE.
- */
+/** One wrapped (80-col) help-text block per command, COMMAND_DOCS order. */
 export const SUPPORTED_COMMANDS = COMMAND_DOCS.map(formatCommandDoc);
 
-/**
- * Text shown for the console's `help` command: header plus
- * SUPPORTED_COMMANDS blocks, separated by blank lines.
- */
+/** Full `help` command text: header plus SUPPORTED_COMMANDS blocks. */
 export const HELP_MESSAGE = `Commands:\n\n${SUPPORTED_COMMANDS.join("\n\n")}`;

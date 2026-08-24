@@ -61,11 +61,7 @@ const ADD_NODE_PATTERNS = [
     /^add a node called(?:\s+(.*))?$/i,
 ];
 
-/**
- * Extra input to {@link parseCommand} beyond the text, used by canvas
- * actions that synthesize commands but also carry info a typed command
- * wouldn't (e.g. a drop position).
- */
+/** Extra input to {@link parseCommand} beyond the text; e.g. a canvas drop position. */
 export type ParseCommandOptions = {
     /** Where a canvas-created node lands; a typed "add node" ignores this. */
     position?: { x: number; y: number };
@@ -74,27 +70,20 @@ export type ParseCommandOptions = {
 const MAX_COMMAND_LENGTH = 500;
 
 /**
- * Horizontal pixel gap between simulation steps - used when placing a new
- * node and re-laying-out `x` after `move node` reorders the chain. The
- * trace is just node array order (no separate structure), so spacing
- * visually communicates it.
+ * Horizontal pixel gap between steps; re-applied to `x` after `move node` reorders the
+ * chain (trace order = node array order, no separate structure).
  */
 export const NODE_X_SPACING = 250;
 
 /**
- * Parses one command line (typed or canvas-synthesized) into the
- * resulting architecture, if recognized. Sole parser for the six verbs
- * (add/connect/remove node, remove edge, rename node, move node) via
- * fixed per-verb regexes, not NLP/an LLM. Enforces invariants (valid
- * labels, edges only between distinct nodes, no cycles - see
- * {@link wouldCreateCycle}); returns a message on failure instead of
- * throwing, so callers (incl. the command log, doubling as the validation
- * UI) can show the reason.
- * @param input - raw command text to parse
- * @param architecture - architecture to apply the command to
- * @param options - extra input; see {@link ParseCommandOptions}
+ * Parses one command line into the resulting architecture, if recognized. Fixed per-verb
+ * regexes (not NLP/an LLM) for the six verbs; enforces invariants like no cycles (see
+ * {@link wouldCreateCycle}) and returns a message on failure instead of throwing.
+ * @param input - command text
+ * @param architecture - architecture to apply to
+ * @param options - see {@link ParseCommandOptions}
  * @param nodeIndex - prebuilt index; omit to build fresh
- * @returns the resulting {@link CommandResult}
+ * @returns resulting {@link CommandResult}
  */
 export function parseCommand(
     input: string,

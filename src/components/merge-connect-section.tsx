@@ -1,19 +1,16 @@
 import type { AddedConnectEdge, ConnectOrigin } from "@/lib/architecture-io";
 
-/**
- * Props for {@link MergeConnectSection}: the from/to option sets, current
- * selections, added-connection list, and the handlers that mutate them.
- */
+/** Props for {@link MergeConnectSection}: option sets, current selections, added edges, and their handlers. */
 type MergeConnectSectionProps = {
     /** Imported file's name; used as the incoming optgroup's label. */
     fileName: string;
     /** Connect option keys (`current:<id>`/`incoming:<id>`) eligible as a source. */
     sourceOptionIds: string[];
-    /** Connect option keys eligible as a target for `effectiveSource`. */
+    /** Keys eligible as a target for `effectiveSource`. */
     targetOptionIds: string[];
-    /** The From select's actual value, already fallen back to a valid option. */
+    /** From select's value, already fallen back to a valid option. */
     effectiveSource: string;
-    /** The To select's actual value, already fallen back to a valid option. */
+    /** To select's value, already fallen back to a valid option. */
     effectiveTarget: string;
     onSourceChange: (value: string) => void;
     onTargetChange: (value: string) => void;
@@ -29,11 +26,7 @@ type MergeConnectSectionProps = {
     optionsByOrigin: (ids: string[], origin: ConnectOrigin) => string[];
 };
 
-/**
- * The merge picker's "Connect" block: From/To selects (each grouped into
- * "Existing architecture" and the incoming file's optgroups), an add
- * button, and the list of connections drawn so far.
- */
+/** The merge picker's "Connect" block: From/To selects (grouped by architecture), add button, and connections drawn so far. */
 export function MergeConnectSection({
     fileName,
     sourceOptionIds,
@@ -50,14 +43,9 @@ export function MergeConnectSection({
     optionsByOrigin,
 }: MergeConnectSectionProps) {
     /**
-     * Renders one connect `<select>` (source or target), grouped into
-     * "Existing architecture" and `fileName` optgroups. Shared by the
-     * Connect from/to selects.
-     * @param ariaLabel - accessible label.
+     * Renders one connect `<select>`, grouped by architecture. Shared by from/to.
      * @param value - selected connect option key.
-     * @param onChange - called with the new key.
-     * @param optionIds - connect option keys to offer.
-     * @returns the select element.
+     * @param optionIds - keys to offer.
      */
     function renderConnectSelect(
         ariaLabel: string,

@@ -6,12 +6,7 @@ import {
 import { findNodesBySubstring, type NodeIndex } from "@/lib/node-index";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-/**
- * Result of running one command through {@link parseCommand}: a
- * discriminated union keyed on `ok`, forcing callers to check it before
- * reading `architecture`. A success carries the updated architecture plus
- * a message; a failure carries only the message.
- */
+/** Discriminated union from {@link parseCommand}; check `ok` before reading `architecture`. */
 export type CommandResult =
     | {
           ok: true;
@@ -20,19 +15,12 @@ export type CommandResult =
       }
     | { ok: false; message: string };
 
-/**
- * Checks whether a label is empty. Callers always pass an already-normalized
- * string, so this just checks length.
- */
+/** True if `label` is empty. */
 export function isBlankLabel(label: string): boolean {
     return label.length === 0;
 }
 
-/**
- * Upper bound on a node label's length, so canvas-synthesized commands
- * referencing it (e.g. "rename node <old> to <new>") stay under
- * `MAX_COMMAND_LENGTH` and reachable from the canvas's mouse actions.
- */
+/** Label length cap so canvas-synthesized commands stay under `MAX_COMMAND_LENGTH`. */
 export const MAX_LABEL_LENGTH = 200;
 
 export function isTooLongLabel(label: string): boolean {
@@ -40,10 +28,8 @@ export function isTooLongLabel(label: string): boolean {
 }
 
 /**
- * Converts a label into a URL/id-safe slug: lowercased, non-alphanumeric
- * runs collapsed to a hyphen, edges trimmed.
- * @param label - label to slugify
- * @returns the slug; may be empty if the label had no alphanumeric characters
+ * Slugifies a label: lowercased, non-alphanumeric collapsed to `-`.
+ * @returns slug (may be empty)
  */
 export function slugify(label: string): string {
     return label
@@ -54,11 +40,8 @@ export function slugify(label: string): string {
 }
 
 /**
- * Builds a node id from a slug, appending a numeric suffix to avoid
- * collisions.
- * @param slug - base slug, see {@link slugify}
- * @param nodeIndex - checked for id collisions
- * @returns an id not already in `nodeIndex.ids`
+ * Builds a node id from a slug, suffixing a number to avoid collisions.
+ * @returns id not already in `nodeIndex.ids`
  */
 export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     let id = `node-${slug}`;
@@ -71,11 +54,8 @@ export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
 }
 
 /**
- * Resolves a typed label to the {@link ArchitectureNode} it names: exact
- * match wins, else substring matching via the trie. One match resolves;
- * multiple is ambiguous; none (or blank) is nothing.
+ * Resolves a typed label: exact match wins, else substring match via the trie.
  * @param label - as-typed label text
- * @param nodeIndex - index to resolve against
  * @returns node, candidates if ambiguous, or null
  */
 export function findNodeOrAmbiguity(
@@ -95,12 +75,9 @@ export function findNodeOrAmbiguity(
 const AMBIGUOUS_MATCHES_SHOWN = 20;
 
 /**
- * Formats the error shown when a label substring-matches more than one
- * node: lists up to `AMBIGUOUS_MATCHES_SHOWN`, summarizing the rest as a
- * count.
- * @param label - the ambiguous label typed
+ * Formats the ambiguous-match error: lists up to `AMBIGUOUS_MATCHES_SHOWN`, summarizing the rest as a count.
  * @param matches - matched nodes
- * @returns message asking the user to be more specific
+ * @returns "be more specific" message
  */
 function ambiguousLabelMessage(
     label: string,
@@ -124,11 +101,9 @@ function findNodeByExactLabel(
 }
 
 /**
- * Checks a candidate label for an exact duplicate among existing labels,
- * unlike the substring matching used to reference nodes. Shared by
- * `add node` and `rename node`.
+ * Checks for an exact duplicate label (unlike the substring matching used to reference nodes). Shared by `add node`/`rename node`.
  * @param label - candidate label
- * @param nodeIndex - index to check against
+ * @param nodeIndex - index to check
  * @returns failure if taken, else null
  */
 export function duplicateLabelError(
@@ -145,11 +120,8 @@ export function duplicateLabelError(
 }
 
 /**
- * Splits text after a command's verb into every possible source/target
- * reading around each separator occurrence - a label can itself contain a
- * separator word. Caller picks the best reading later.
+ * Splits text into every possible source/target reading around each separator - a label may itself contain a separator word.
  * @param rest - text after the verb
- * @param separators - words/phrases to split on
  * @returns every possible split
  */
 function splitConnectionArgs(
@@ -164,17 +136,10 @@ function splitConnectionArgs(
     );
 }
 
-/**
- * Result of resolving a label: a single node on a clean match, candidates
- * when ambiguous, or null when nothing matches.
- */
+/** Label resolution result: single node, candidates if ambiguous, or null. */
 type EndpointMatch = ArchitectureNode | ArchitectureNode[] | null;
 
-/**
- * One candidate reading of `connect <A> to <B>`, pairing each side's raw
- * label with its resolved {@link EndpointMatch}. See
- * {@link resolveConnectionEndpoints}.
- */
+/** One candidate reading of `connect <A> to <B>`: each side's raw label paired with its resolved {@link EndpointMatch}. */
 type ResolvedEndpoints = {
     sourceLabel: string;
     targetLabel: string;
@@ -186,13 +151,7 @@ function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
     return match !== null && !Array.isArray(match);
 }
 
-/**
- * True when `sourceLabel` is the resolved node's whole label, not just a
- * substring - used to prefer an exact match over an ambiguous split.
- * @param sourceLabel - raw label as typed
- * @param match - resolved {@link EndpointMatch}
- * @returns true if `match` is a single node equal to `sourceLabel`
- */
+/** True when `sourceLabel` is the resolved node's whole label, not a substring - prefers an exact match over an ambiguous split. */
 function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
     return (
         isSingleNode(match) &&
@@ -201,11 +160,8 @@ function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
 }
 
 /**
- * Turns a raw {@link EndpointMatch} into the resolved node or a failure
- * message ("no node named…", or the ambiguity message).
+ * Turns an {@link EndpointMatch} into the node or a failure message.
  * @param label - raw label, for the error message
- * @param match - resolved {@link EndpointMatch}
- * @returns the node, or a failure with the message
  */
 export function requireNode(
     label: string,
@@ -221,12 +177,8 @@ export function requireNode(
 }
 
 /**
- * Resolves `connect`/`remove edge` args. Tries every split (see
- * {@link splitConnectionArgs}); first where both sides resolve to one node
- * wins, else the first split.
+ * Resolves `connect`/`remove edge` args: first split where both sides resolve to one node wins, else the first split.
  * @param rest - command text after the verb
- * @param nodeIndex - index for label lookup
- * @param separators - words to split on
  * @returns best-guess endpoints, or null
  */
 export function resolveConnectionEndpoints(
@@ -250,11 +202,7 @@ export function resolveConnectionEndpoints(
     );
 }
 
-/**
- * One candidate reading of `rename node <A> to <B>`, pairing the source's
- * raw label with its resolved {@link EndpointMatch} and the new label
- * text. Produced by {@link resolveRenameArgs}.
- */
+/** One candidate reading of `rename node <A> to <B>`: source's raw label, resolved {@link EndpointMatch}, and new label text. */
 type ResolvedRenameArgs = {
     sourceLabel: string;
     newLabel: string;
@@ -262,13 +210,9 @@ type ResolvedRenameArgs = {
 };
 
 /**
- * Handles `rename node <A> to` with no new name typed yet: finds a
- * trailing separator, treats the text before it as the source label, and
- * returns a blank `newLabel` (so the caller reports "cannot be blank",
- * not "no separator found").
+ * Handles `rename node <A> to` with no new name typed: finds a trailing separator and returns a blank `newLabel`, so the caller reports
+ * "cannot be blank" rather than "no separator found".
  * @param rest - text after the verb
- * @param nodeIndex - index for the source label
- * @param separators - separator words to look for
  * @returns args with empty `newLabel`, or null
  */
 function resolveTrailingSeparatorWithBlankTarget(
@@ -299,13 +243,9 @@ function resolveTrailingSeparatorWithBlankTarget(
 }
 
 /**
- * Resolves `rename node <A> to <B>` args - only `<A>` is a node reference.
- * Prefers exact source match, then the blank-target case
- * ({@link resolveTrailingSeparatorWithBlankTarget}), then a single-node
- * split, else the first split.
+ * Resolves `rename node <A> to <B>` args - only `<A>` is a node reference. Prefers exact source match, then blank-target
+ * ({@link resolveTrailingSeparatorWithBlankTarget}), then any single-node split, else the first split.
  * @param rest - text after the verb
- * @param nodeIndex - index for the source label
- * @param separators - words to split on
  * @returns best-guess rename args, or null
  */
 export function resolveRenameArgs(
@@ -339,11 +279,7 @@ export function resolveRenameArgs(
     );
 }
 
-/**
- * One candidate reading of `move node <label> to step <n>`, pairing the
- * node's raw label with its resolved {@link EndpointMatch} and the raw
- * step-number text. Produced by {@link resolveMoveNodeArgs}.
- */
+/** One candidate reading of `move node <label> to step <n>`: raw label, resolved {@link EndpointMatch}, and raw step-number text. */
 type ResolvedMoveArgs = {
     sourceLabel: string;
     positionText: string;
@@ -351,13 +287,9 @@ type ResolvedMoveArgs = {
 };
 
 /**
- * Resolves `move node <label> to step <n>` args - the right side is a step
- * number, not a node reference. Prefers an exact source match with
- * digits-only right side, then any single-node source, else the first
- * split.
+ * Resolves `move node <label> to step <n>` args - right side is a step number, not a node reference. Prefers exact source + digits-only
+ * right side, then any single-node source, else the first split.
  * @param rest - text after the verb
- * @param nodeIndex - index for the source label
- * @param separators - words to split on
  * @returns best-guess move args, or null
  */
 export function resolveMoveNodeArgs(
