@@ -2,7 +2,7 @@
 
 `MINIMAP_NODE_LIMIT` is a module-level constant fixed at `300`. Inside `<ReactFlow>`, the `<MiniMap pannable zoomable />` element is only rendered when `architecture.nodes.length <= MINIMAP_NODE_LIMIT`; above that count the minimap is omitted entirely rather than rendered and hidden. A code comment on the guard notes the reason: the minimap redraws every node's position on each mutation, so its per-mutation redraw cost is what dominates at scale, not the main canvas. The canvas itself separately sets `onlyRenderVisibleElements` on `<ReactFlow>` to limit its own render cost, independent of this guard.
 
-**Source:** `src/components/architecture-canvas.tsx:114,291-301`
+**Source:** `src/components/architecture-canvas.tsx:152,346-356`
 
 **Node-count guard check**
 

@@ -11,7 +11,7 @@ target node sits to the left of the source. Both branches yield the same `[path,
 which feeds the visible `BaseEdge`, a wider invisible hover path, and a hover/focus-revealed delete
 button rendered via `EdgeLabelRenderer`.
 
-**Source:** `src/components/architecture-edge.tsx:1-107`
+**Source:** `src/components/architecture-edge.tsx:1-134`
 
 **Path computation: self-loop vs. bezier fork**
 
