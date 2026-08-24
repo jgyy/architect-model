@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/node-suggestions.ts:1-288`
 
+**Command pattern dispatch**
+
 ```mermaid
 flowchart TD
     A[suggestNodeReference] --> B{CONNECT_PATTERNS matched?}
@@ -17,15 +19,20 @@ flowchart TD
     E -- no --> F{MOVE_NODE_PATTERNS matched?}
     F -- yes --> J
     F -- no --> Null1[return null]
+```
 
-    H --> K1{bestSeparatorSplit found?}
+**Slot suggestion and match ranking**
+
+```mermaid
+flowchart TD
+    H[twoSlotSuggestion] --> K1{bestSeparatorSplit found?}
     K1 -- no --> L1[rankMatches on whole rest]
     K1 -- yes --> M{cursor <= separatorStart?}
     M -- yes, still 1st arg --> N1[rankMatches before separator]
     M -- no, 2nd arg --> N2[rankMatches after separator]
 
-    J --> K2{bestSeparatorSplit found?}
-    K2 -- no --> I
+    J[renameNodeSuggestion] --> K2{bestSeparatorSplit found?}
+    K2 -- no --> I[singleSlotSuggestion]
     K2 -- yes --> P{cursor > separatorStart?}
     P -- yes, editing 2nd arg --> Null2[return null: not a node ref]
     P -- no --> N1

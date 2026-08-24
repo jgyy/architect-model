@@ -4,6 +4,8 @@
 
 **Source:** `src/components/simulation-timeline.tsx:1-126`
 
+**Drag start, hover, and drop**
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -22,8 +24,17 @@ sequenceDiagram
     alt draggedIndex !== null and draggedIndex !== index
         Row->>Parent: onReorder(nodes[draggedIndex].id, index)
     end
+```
+
+**Drag-end cleanup**
+
+```mermaid
+sequenceDiagram
+    participant Row as "li" row
+    participant State as useState (SimulationTimeline)
+
     Row->>Row: dragend fires endDrag()
-    Row->>State: setDraggedIndex(null); setDragOverIndex(null)
+    Row->>State: setDraggedIndex(null)#59; setDragOverIndex(null)
 ```
 
 The diagram makes it visible that `endDrag()` runs unconditionally on `dragend`, outside the `alt` branch — so a drag that never triggers `onReorder` (dropped on itself, or cancelled) still clears the highlight state, preventing a stuck drag-over border.

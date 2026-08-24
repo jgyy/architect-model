@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/architecture-commands.ts:408-413,444-475`
 
+**Matching and guard checks**
+
 ```mermaid
 flowchart TD
     A["trimmed input"] --> B{"matchFirst(ADD_NODE_PATTERNS)"}
@@ -15,6 +17,13 @@ flowchart TD
     F -- yes --> G["ok: false — exceeds MAX_LABEL_LENGTH"]
     F -- no --> H{"duplicateLabelError(label, nodeIndex)?"}
     H -- yes --> I["ok: false — node already exists"]
+```
+
+**Node construction and result**
+
+```mermaid
+flowchart TD
+    H{"duplicateLabelError(label, nodeIndex)?"}
     H -- no --> J["build ArchitectureNode:\nid = uniqueNodeId(slugify(label))\nposition = options.position ?? (nodes.length * NODE_X_SPACING, 0)\ndata = { label, description }"]
     J --> K["return ok: true with node appended to architecture.nodes"]
     K --> L["message: Added node as simulation step N"]

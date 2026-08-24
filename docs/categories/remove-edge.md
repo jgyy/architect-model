@@ -4,6 +4,8 @@ This slice matches a `remove edge <A> ... <B>` command, then splits the remainde
 
 **Source:** `src/lib/architecture-commands.ts:571-609`
 
+**Command matching and endpoint validation**
+
 ```mermaid
 flowchart TD
     A["matchFirst(REMOVE_EDGE_PATTERNS, trimmed)"] -->|no match| Z1["fall through to next command"]
@@ -13,6 +15,13 @@ flowchart TD
     C -->|not ok: null or ambiguous| E2["ok: false - no node / ambiguous label"]
     C -->|ok| D["requireNode(targetLabel, resolved.target)"]
     D -->|not ok: null or ambiguous| E3["ok: false - no node / ambiguous label"]
+```
+
+**Edge lookup and removal**
+
+```mermaid
+flowchart TD
+    D["requireNode(targetLabel, resolved.target)"]
     D -->|ok| F["edgeKey(source.id, target.id)"]
     F --> G["nodeIndex.edgesBySourceTarget.get(key)"]
     G -->|undefined| E4["ok: false - No edge from A to B"]

@@ -11,6 +11,8 @@ so the test names double as a behavior checklist for the component.
 
 **Source:** `src/components/test/`
 
+**Canvas & graph test coverage**
+
 ```mermaid
 flowchart LR
     subgraph canvas_group["Canvas & graph"]
@@ -20,6 +22,16 @@ flowchart LR
         DG["diagram-guide.test.tsx"]
     end
 
+    AC -->|covers| C1["ArchitectureCanvas\n+ reconcileRenderNodes"]
+    AN -->|covers| C2["ArchitectureNode"]
+    AE -->|covers| C3["ArchitectureEdge\n(via ArchitectureCanvas)"]
+    DG -->|covers| C4["DiagramGuide"]
+```
+
+**Workspace shell & simulation test coverage**
+
+```mermaid
+flowchart LR
     subgraph workspace_group["Workspace shell"]
         AW["architecture-workspace.test.tsx"]
         CI["command-input.test.tsx"]
@@ -32,10 +44,6 @@ flowchart LR
         ST["simulation-timeline.test.tsx"]
     end
 
-    AC -->|covers| C1["ArchitectureCanvas\n+ reconcileRenderNodes"]
-    AN -->|covers| C2["ArchitectureNode"]
-    AE -->|covers| C3["ArchitectureEdge\n(via ArchitectureCanvas)"]
-    DG -->|covers| C4["DiagramGuide"]
     AW -->|covers| C5["ArchitectureWorkspace"]
     CI -->|covers| C6["CommandInput"]
     CP -->|covers| C7["ConsolePanel"]

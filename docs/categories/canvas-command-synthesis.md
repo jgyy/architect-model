@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/canvas-commands.ts:1-100`
 
+**Mouse gesture to command builder**
+
 ```mermaid
 flowchart LR
     subgraph Mouse actions
@@ -19,6 +21,17 @@ flowchart LR
     C --> H["buildRenameNodeCommand(nodeId, newLabel, architecture)"]
     D --> I["buildRemoveNodeCommand(nodeId, architecture)"]
     E --> J["buildMoveNodeCommand(nodeId, targetPosition, architecture)"]
+```
+
+**Builder result to command execution**
+
+```mermaid
+flowchart LR
+    F["buildRemoveEdgeCommand(edgeId, architecture)"]
+    G["buildConnectCommand(sourceId, targetId, architecture)"]
+    H["buildRenameNodeCommand(nodeId, newLabel, architecture)"]
+    I["buildRemoveNodeCommand(nodeId, architecture)"]
+    J["buildMoveNodeCommand(nodeId, targetPosition, architecture)"]
 
     F -->|edge/nodes found| F1["'remove edge A to B'"]
     G -->|both nodes found| G1["'connect A to B'"]

@@ -4,6 +4,8 @@ This dialog lets a user selectively merge an uploaded file's architecture into t
 
 **Source:** `src/components/merge-picker-dialog.tsx:1-458`
 
+**Node, edge & step selection**
+
 ```mermaid
 flowchart TD
     A[MergePickerDialog opens] --> B[selectedIds = all incoming node ids]
@@ -16,15 +18,21 @@ flowchart TD
     G -- yes --> H{toggleEdge}
     H --> I[flip id in excludedEdgeIds]
     B --> J[keptEdges = eligible minus excluded]
-    J --> K[buildConnectGraph current + selectedNodes + keptEdges]
+    B --> R[Insert at step select]
+    R --> S[insertAtStep index into current.nodes]
+```
+
+**Connect-graph construction and merge**
+
+```mermaid
+flowchart TD
+    J[keptEdges = eligible minus excluded] --> K[buildConnectGraph current + selectedNodes + keptEdges]
     K --> L[connectableSourceIds]
     L --> M[connectableTargetIds for chosen source]
     M --> N{Add connection}
     N --> O[push to addedEdges]
     O --> P{Remove connection}
     P --> Q[filter addedEdges by source/target]
-    B --> R[Insert at step select]
-    R --> S[insertAtStep index into current.nodes]
     J --> T[includedEdgeCount = keptEdges + addedEdges]
     T --> U{Merge button}
     U --> V["onConfirm(selectedIds, excludedEdgeIds, addedEdges, insertAtStep)"]

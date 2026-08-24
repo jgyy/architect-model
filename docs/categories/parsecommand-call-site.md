@@ -4,17 +4,18 @@
 
 **Source:** `src/components/architecture-workspace.tsx:281-355`
 
+**Dispatch: submit through parseCommand**
+
 ```mermaid
 sequenceDiagram
     participant User
     participant Form as handleSubmit
     participant RC as runCommand
     participant PC as parseCommand
-    participant State as React state
     participant Log as logResult
 
     User->>Form: submit event
-    Form->>Form: preventDefault(); trim check
+    Form->>Form: preventDefault()#59; trim check
     Form->>RC: runCommand(input)
     RC->>RC: trimmed = text.trim()
     alt trimmed is help/export/undo/redo
@@ -23,14 +24,25 @@ sequenceDiagram
     else generic command
         RC->>PC: parseCommand(trimmed, architecture, options, nodeIndex)
         PC-->>RC: CommandResult
-        alt result.ok
-            RC->>State: setUndoRedo(recordCommand(...))
-            RC->>State: setCurrentStepIndex(nextStepIndexForSameNode(...))
-            RC->>State: setArchitecture(result.architecture)
-        end
-        RC->>Log: logResult(trimmed, result.ok, result.message)
-        RC-->>Form: return result
     end
+```
+
+**Result handling: state commit and logging**
+
+```mermaid
+sequenceDiagram
+    participant RC as runCommand
+    participant State as React state
+    participant Log as logResult
+    participant Form as handleSubmit
+
+    alt result.ok
+        RC->>State: setUndoRedo(recordCommand(...))
+        RC->>State: setCurrentStepIndex(nextStepIndexForSameNode(...))
+        RC->>State: setArchitecture(result.architecture)
+    end
+    RC->>Log: logResult(trimmed, result.ok, result.message)
+    RC-->>Form: return result
 ```
 
 The diagram makes visible that `logResult` runs unconditionally on the `parseCommand` branch — a failed parse still gets a log entry — while `setArchitecture` only fires inside the `result.ok` guard, so a rejected command never mutates the graph.

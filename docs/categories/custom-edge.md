@@ -13,6 +13,8 @@ button rendered via `EdgeLabelRenderer`.
 
 **Source:** `src/components/architecture-edge.tsx:1-107`
 
+**Path computation: self-loop vs. bezier fork**
+
 ```mermaid
 flowchart TD
     A["ArchitectureEdge render\n(sourceX, sourceY, targetX, targetY, positions)"] --> B{"isSelfLoop:\nsource === target?"}
@@ -30,7 +32,13 @@ flowchart TD
 
     F --> K["edgePath, labelX, labelY"]
     J --> K
-    K --> L["BaseEdge (visible path)\n+ invisible wide hover path\n+ EdgeLabelRenderer delete button at (labelX, labelY)"]
+```
+
+**Unified edge rendering**
+
+```mermaid
+flowchart TD
+    K["edgePath, labelX, labelY"] --> L["BaseEdge (visible path)\n+ invisible wide hover path\n+ EdgeLabelRenderer delete button at (labelX, labelY)"]
 ```
 
 The self-loop branch and the ordinary branch both terminate in the same `[path, labelX, labelY]`

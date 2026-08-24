@@ -4,6 +4,28 @@ Undo/redo is implemented as two stacks of `HistoryEntry` (`command` text plus a 
 
 **Source:** `src/lib/undo-history.ts:14-85`
 
+**Primary undo/redo cycle**
+
+```mermaid
+stateDiagram-v2
+    state "undoStack" as Undo
+    state "redoStack" as Redo
+
+    [*] --> Undo
+
+    Undo --> Redo: undo(current)\npop undoStack.at(-1)\narchitecture = last.snapshot\npush {last.command, current} to redoStack
+
+    Redo --> Undo: redo(current)\npop redoStack.at(-1)\narchitecture = last.snapshot\npush {last.command, current} to undoStack
+
+    note right of Undo
+        undo() / redo() return { ok: false }
+        when the source stack is empty
+        (stack.at(-1) is undefined)
+    end note
+```
+
+**recordCommand resetting the redo branch**
+
 ```mermaid
 stateDiagram-v2
     state "undoStack" as Undo
@@ -13,17 +35,7 @@ stateDiagram-v2
 
     Undo --> Undo: recordCommand(cmd, before)\npush {cmd, before}; redoStack = []
 
-    Undo --> Redo: undo(current)\npop undoStack.at(-1)\narchitecture = last.snapshot\npush {last.command, current} to redoStack
-
-    Redo --> Undo: redo(current)\npop redoStack.at(-1)\narchitecture = last.snapshot\npush {last.command, current} to undoStack
-
     Redo --> Undo: recordCommand(cmd, before)\npush {cmd, before}; redoStack = []
-
-    note right of Undo
-        undo() / redo() return { ok: false }
-        when the source stack is empty
-        (stack.at(-1) is undefined)
-    end note
 ```
 
 The subtle part the diagram makes visible: `recordCommand` can fire from either state (`Undo` or `Redo`) and both times it clears `redoStack`, which is why redoing is only ever possible immediately after an undo, not after any new edit.

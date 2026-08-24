@@ -4,11 +4,12 @@ This slice implements the three ways an `Architecture` crosses a file/JSON bound
 
 **Source:** `src/lib/architecture-io.ts:20-348`
 
+**Serialize and validate on import**
+
 ```mermaid
 flowchart TD
     A["architecture-io.ts"] --> B["serializeArchitecture"]
     A --> C["parseImportedArchitecture"]
-    A --> D["mergeSelectedArchitecture"]
 
     B --> B1["JSON.stringify(nodes, edges, pretty-printed)"]
 
@@ -22,6 +23,13 @@ flowchart TD
     C3struct -- problem found --> Cerr3["ok: false, with message"]
     C3cyc -- cycle found --> Cerr3
     C3cyc -- acyclic --> Cok["ok: true, architecture"]
+```
+
+**Merge a selected subset into the current architecture**
+
+```mermaid
+flowchart TD
+    A["architecture-io.ts"] --> D["mergeSelectedArchitecture"]
 
     D --> D1["filter selected nodes/edges, minus excludedEdgeIds"]
     D1 --> D2["uniqueNodeId + uniqueLabel resolve id/label collisions"]

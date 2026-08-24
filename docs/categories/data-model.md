@@ -4,6 +4,8 @@
 
 **Source:** `src/types/architecture.ts:1-16`
 
+**Type definitions**
+
 ```mermaid
 classDiagram
     class Architecture {
@@ -20,6 +22,12 @@ classDiagram
     class ArchitectureEdge {
         <<alias of xyflow Edge>>
     }
+```
+
+**Containment relationships**
+
+```mermaid
+classDiagram
     Architecture "1" o-- "*" ArchitectureNode : nodes
     Architecture "1" o-- "*" ArchitectureEdge : edges
     ArchitectureNode *-- ArchitectureNodeData : data

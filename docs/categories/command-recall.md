@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/command-history.ts:1-41`
 
+**Entering recall and paging older**
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
@@ -14,6 +16,15 @@ stateDiagram-v2
 
     Recalling: index = 0..commands.length-1
     Recalling --> Recalling: recallOlderCommand\nindex = min(index+1, len-1)
+```
+
+**Paging newer and exiting recall**
+
+```mermaid
+stateDiagram-v2
+    Idle: index = null
+    Recalling: index = 0..commands.length-1
+
     Recalling --> Recalling: recallNewerCommand\n(index > 0 and commands not empty)\nindex = min(index-1, len-1)
 
     Recalling --> Idle: recallNewerCommand\n(index == 0 or commands.length == 0)\nrestore value = draft, index = null

@@ -4,13 +4,14 @@
 
 **Source:** `src/components/command-input.tsx:1-246`
 
+**Autocomplete suggestion flow**
+
 ```mermaid
 sequenceDiagram
     participant U as User
     participant I as input element
     participant C as CommandInput
     participant S as suggestNodeReference
-    participant H as command-history
 
     U->>I: keystroke
     I->>C: onChange(value)
@@ -24,10 +25,6 @@ sequenceDiagram
     I->>C: handleKeyDown
     alt options.length > 0
         C->>C: setActiveIndex((i+1) % options.length)
-    else no suggestions
-        C->>H: recallNewerCommand(commands, historyState)
-        H-->>C: { state, value }
-        C->>C: onChange(value)
     end
 
     U->>I: Tab (accept suggestion)
@@ -38,6 +35,24 @@ sequenceDiagram
     C->>C: onChange(applied.value)
     C->>C: pendingCursorRef.current = applied.cursor
     C-->>I: useEffect([value]) -> setSelectionRange(pending)
+```
+
+**History recall flow**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant I as input element
+    participant C as CommandInput
+    participant H as command-history
+
+    U->>I: ArrowDown
+    I->>C: handleKeyDown
+    alt no suggestions
+        C->>H: recallNewerCommand(commands, historyState)
+        H-->>C: { state, value }
+        C->>C: onChange(value)
+    end
 
     U->>I: ArrowUp (no suggestions)
     I->>C: handleKeyDown -> recallOlder()

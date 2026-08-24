@@ -4,6 +4,8 @@
 
 **Source:** `src/components/architecture-canvas.tsx:1-328`
 
+**Prop sync and interaction handlers**
+
 ```mermaid
 flowchart TD
     A[architecture.nodes prop changes] -->|nodes !== syncedFrom| B[reconcileRenderNodes]
@@ -18,7 +20,13 @@ flowchart TD
     RF -->|onPaneClick| F[handlePaneClick]
     F -->|isDoubleClick check| G[onNodeCreate -> setAutoEditNodeId]
     Panel[Panel: Add node button] -->|click| H[handleAddNodeClick] --> G
+```
 
+**ReactFlow's rendered children and fit-view**
+
+```mermaid
+flowchart TD
+    RF[ReactFlow]
     RF --> NT[nodeTypes: ArchitectureNodeCard]
     RF --> ET[edgeTypes: ArchitectureEdgeCard]
     RF --> BG[Background: dotted]
