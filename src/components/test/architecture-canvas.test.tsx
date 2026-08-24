@@ -104,8 +104,7 @@ describe("reconcileRenderNodes", () => {
 
     test("preserves the dragged node's live position instead of snapping back to the incoming (pre-drag) one", () => {
         const draggedA = { ...a, position: { x: 999, y: 999 } };
-        // The parent's architecture still has the pre-drag position, since
-        // in-flight drag changes are filtered out of what reaches it.
+        // The parent's architecture still has the pre-drag position
         const staleIncomingA = { ...a, position: { x: 0, y: 0 } };
         const renamedIncomingB = { ...b, data: { label: "Renamed B" } };
 

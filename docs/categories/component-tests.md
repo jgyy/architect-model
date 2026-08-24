@@ -26,7 +26,9 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph workspace_group["Workspace shell"]
-        AW["architecture-workspace.test.tsx"]
+        AWC["architecture-workspace-core.test.tsx"]
+        AWI["architecture-workspace-io.test.tsx"]
+        AWM["architecture-workspace-merge.test.tsx"]
         CI["command-input.test.tsx"]
         CP["console-panel.test.tsx"]
         MP["merge-picker-dialog.test.tsx"]
@@ -37,7 +39,9 @@ flowchart LR
         ST["simulation-timeline.test.tsx"]
     end
 
-    AW -->|covers| C5["ArchitectureWorkspace"]
+    AWC -->|covers| C5["ArchitectureWorkspace\n(rendering, commands, undo/redo)"]
+    AWI -->|covers| C5
+    AWM -->|covers| C5
     CI -->|covers| C6["CommandInput"]
     CP -->|covers| C7["ConsolePanel"]
     MP -->|covers| C8["MergePickerDialog"]
