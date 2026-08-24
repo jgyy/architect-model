@@ -5,6 +5,10 @@ import type {
     ArchitectureNode,
 } from "@/types/architecture";
 
+/**
+ * One command-log entry: the submitted command, whether it succeeded, and
+ * the shown message. Also the shape persisted and restored across sessions.
+ */
 export type LogEntry = {
     id: number;
     input: string;
@@ -12,6 +16,11 @@ export type LogEntry = {
     message: string;
 };
 
+/**
+ * Full app-state snapshot for storage: architecture graph, command log, and
+ * simulation playback position (step, speed). Saved whenever any of these
+ * change and restored on load, so a session survives a refresh or new tab.
+ */
 export type PersistedState = {
     architecture: Architecture;
     log: LogEntry[];
@@ -19,6 +28,11 @@ export type PersistedState = {
     speedIndex: number;
 };
 
+/**
+ * Subset of `Storage` (localStorage/sessionStorage) this module uses:
+ * `getItem`, `setItem`, `removeItem`, via `Pick`. Lets tests pass a plain
+ * in-memory object instead of stubbing the full browser API.
+ */
 export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 const STORAGE_KEY = "architect-model:session";
@@ -27,6 +41,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === "object";
 }
 
+/**
+ * Runtime shape check for one architecture node from parsed JSON, since
+ * JSON data can't be trusted at compile time. Checks a string id, `{x, y}`
+ * position, and a `data` object with required label and optional
+ * description.
+ */
 function isArchitectureNode(value: unknown): value is ArchitectureNode {
     if (!isRecord(value)) return false;
     const position = value.position;
@@ -42,6 +62,10 @@ function isArchitectureNode(value: unknown): value is ArchitectureNode {
     );
 }
 
+/**
+ * Runtime shape check for an architecture edge: verifies string `id`,
+ * `source`, and `target` fields.
+ */
 function isArchitectureEdge(value: unknown): value is ArchitectureEdge {
     if (!isRecord(value)) return false;
     return (
@@ -51,6 +75,10 @@ function isArchitectureEdge(value: unknown): value is ArchitectureEdge {
     );
 }
 
+/**
+ * Verifies a persisted `LogEntry`'s `id`, `input`, `ok`, `message` field
+ * types.
+ */
 function isLogEntry(value: unknown): value is LogEntry {
     if (!isRecord(value)) return false;
     return (
@@ -61,6 +89,11 @@ function isLogEntry(value: unknown): value is LogEntry {
     );
 }
 
+/**
+ * Validates a parsed JSON value as a full `Architecture`: `nodes`/`edges`
+ * arrays with every entry passing its structural check. Gates whether
+ * storage-read data is trusted or rejected as corrupt.
+ */
 export function isValidArchitecture(value: unknown): value is Architecture {
     return (
         isRecord(value) &&
@@ -71,7 +104,11 @@ export function isValidArchitecture(value: unknown): value is Architecture {
     );
 }
 
-// Sessions saved before stepIndex/speedIndex existed
+/**
+ * Parses raw JSON into a `PersistedState`, validating every field; returns
+ * null on mismatch. Migrates sessions saved before `stepIndex`/`speedIndex`
+ * existed by defaulting step to 0 and speed to default.
+ */
 function parsePersistedState(value: unknown): PersistedState | null {
     if (!isRecord(value)) return null;
     if (!isValidArchitecture(value.architecture)) return null;
@@ -105,6 +142,13 @@ function parsePersistedState(value: unknown): PersistedState | null {
     };
 }
 
+/**
+ * Reads and parses persisted state from storage, used to restore the last
+ * session on load. Returns null for a missing entry, unreadable storage, or
+ * invalid JSON - callers treat all failures alike: start fresh.
+ * @param storage - real or `StorageLike` test double
+ * @returns parsed state, or null if none found
+ */
 export function loadPersistedState(
     storage: StorageLike,
 ): PersistedState | null {
@@ -123,7 +167,15 @@ export function loadPersistedState(
     }
 }
 
-// Returns whether the write actually succeeded
+/**
+ * Writes state to storage as JSON under this app's key; called on every
+ * persisted-state change so a session survives a refresh. Failures are
+ * caught, not thrown - persistence is a convenience, not something command
+ * success depends on.
+ * @param storage - backend to write to
+ * @param state - snapshot to persist
+ * @returns whether the write succeeded
+ */
 export function savePersistedState(
     storage: StorageLike,
     state: PersistedState,
@@ -136,6 +188,12 @@ export function savePersistedState(
     }
 }
 
+/**
+ * Removes persisted state from storage, e.g. on an explicit reset. Failures
+ * are caught and reported via the return value, not thrown.
+ * @param storage - backend to clear
+ * @returns whether removal succeeded
+ */
 export function clearPersistedState(storage: StorageLike): boolean {
     try {
         storage.removeItem(STORAGE_KEY);
@@ -145,13 +203,28 @@ export function clearPersistedState(storage: StorageLike): boolean {
     }
 }
 
+/**
+ * Outcome of interpreting a browser `storage` event for this app's key, as
+ * a discriminated union tagged by `type`. `irrelevant`: different key.
+ * `cleared`: another tab removed the session. `invalid`: new value failed
+ * to parse as `PersistedState`. `updated`: carries the freshly parsed state
+ * to adopt.
+ */
 export type PersistedStateChange =
     | { type: "irrelevant" }
     | { type: "cleared" }
     | { type: "invalid" }
     | { type: "updated"; state: PersistedState };
 
-// Classifies a `window` `storage` event so another tab can react
+/**
+ * Classifies a browser `window` `storage` event so another open tab can
+ * react to a change made elsewhere. Storage events carry only a key and
+ * raw value, so this re-parses and re-validates it like `loadPersistedState`
+ * does.
+ * @param key - the event's storage key (may be null for some browser clears)
+ * @param newValue - raw new value, or null if removed
+ * @returns a tagged description of what changed
+ */
 export function interpretStorageEvent(
     key: string | null,
     newValue: string | null,

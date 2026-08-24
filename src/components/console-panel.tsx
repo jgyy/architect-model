@@ -17,32 +17,57 @@ import type { NodeIndex } from "@/lib/architecture-commands";
 import type { LogEntry } from "@/lib/persistence";
 import type { Architecture } from "@/types/architecture";
 
-// Shown as clickable chips in the empty-log state so the console's
-// affordance survives past a placeholder that vanishes on focus
+/**
+ * Clickable example commands shown in the empty-log state so a first-time
+ * user has something to try instead of guessing the syntax.
+ */
 const EXAMPLE_COMMANDS = [
     "add node Cache",
     "connect Web Server to Cache",
     "help",
 ];
 
+/**
+ * Props for {@link ConsolePanel}: log/input state plus callbacks for the
+ * toolbar actions (undo/redo, export/import/merge, clear).
+ */
 type ConsolePanelProps = {
+    /** Commands and outcomes, rendered as the scrolling log. */
     log: LogEntry[];
     onClear: () => void;
+    /** Controlled input's current text. */
     input: string;
     onInputChange: (value: string) => void;
+    /** Submits the typed command upstream for parsing. */
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+    /** Graph passed to {@link CommandInput} for suggestions. */
     architecture: Architecture;
+    /**
+     * Precomputed lookup index over the architecture (Maps/a Set by label,
+     * id, edge endpoints), built once per command. Used by
+     * {@link CommandInput} for node-name autocomplete.
+     */
     nodeIndex?: NodeIndex;
+    /** Whether undo has an entry. */
     canUndo: boolean;
+    /** Whether redo has an entry. */
     canRedo: boolean;
     onUndo: () => void;
     onRedo: () => void;
+    /** Downloads the current architecture. */
     onExport: () => void;
+    /** Replaces the architecture with the picked file. */
     onImport: (file: File) => void;
+    /** Merges the picked file into the architecture. */
     onMerge: (file: File) => void;
 };
 
-// A REPL-style console: scrolling command/output history with a live prompt
+/**
+ * The command console: a REPL-style panel logging every submitted command
+ * with its success/failure outcome, doubling as the app's validation UI.
+ * Also hosts the undo/redo and export/import/merge toolbar, and renders
+ * the live command input.
+ */
 export function ConsolePanel({
     log,
     onClear,
@@ -62,14 +87,18 @@ export function ConsolePanel({
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const mergeInputRef = useRef<HTMLInputElement>(null);
-    // Whether the user was already at (or near) the bottom before this log
-    // change, kept up to date by handleScroll independently of the log
-    // itself settling this only once per user scroll, not once per log
-    // change (which would always see the already-updated, grown scrollHeight)
+    // Whether the user was at (or near) the bottom of the log the last time
+    // they scrolled. Updated only by handleScroll below, not by the
+    // auto-scroll effect that follows - if it were updated on every log
+    // change instead, it would always see the already-grown scrollHeight
+    // and report "at the bottom" even when the user had scrolled up to
+    // read older entries.
     const stickToBottomRef = useRef(true);
 
     useEffect(() => {
-        // scrollIntoView on a sentinel forces a full geometry computation
+        // Snap to the bottom when a new entry is appended, but only if the
+        // user was already stuck there - otherwise leave their scroll
+        // position alone so they can keep reading older entries.
         const container = scrollRef.current;
         if (container && stickToBottomRef.current) {
             container.scrollTop = container.scrollHeight;
@@ -78,6 +107,12 @@ export function ConsolePanel({
 
     const NEAR_BOTTOM_THRESHOLD_PX = 32;
 
+    /**
+     * Updates {@link stickToBottomRef} from the current scroll position, so
+     * the auto-scroll effect knows whether to keep pinning to the bottom or
+     * leave the user's scroll-up alone.
+     * @param event - the log container's scroll event
+     */
     function handleScroll(event: React.UIEvent<HTMLDivElement>) {
         const el = event.currentTarget;
         const distanceFromBottom =
@@ -86,6 +121,12 @@ export function ConsolePanel({
             distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
     }
 
+    /**
+     * Reads the picked file from the hidden import/merge input and forwards
+     * it to the wired callback.
+     * @param event - change event
+     * @param onPicked - callback for the file (import or merge)
+     */
     function handleFilePicked(
         event: React.ChangeEvent<HTMLInputElement>,
         onPicked: (file: File) => void,

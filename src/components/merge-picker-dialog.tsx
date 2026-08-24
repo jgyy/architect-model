@@ -14,21 +14,41 @@ import {
 import { foldLabel } from "@/lib/node-reference";
 import type { Architecture } from "@/types/architecture";
 
+/**
+ * Props for {@link MergePickerDialog}: the architectures being merged,
+ * labels that would collide, and the confirm/cancel callbacks.
+ */
 type MergePickerDialogProps = {
+    /** Imported file's name; used in the dialog title and Connect optgroup label. */
     fileName: string;
+    /** Architecture parsed from the imported file; source of merge candidates. */
     incoming: Architecture;
+    /** Workspace architecture that `incoming` merges into. */
     current: Architecture;
+    /** Folded labels in `current`, used to flag colliding incoming labels. */
     existingFoldedLabels: ReadonlySet<string>;
+    /**
+     * Fires with everything needed to splice `incoming` into `current` when confirmed.
+     * @param selectedNodeIds - ids of `incoming` nodes to include.
+     * @param excludedEdgeIds - `incoming` edge ids unchecked though both endpoints qualified.
+     * @param addedEdges - connections drawn between the two architectures via Connect.
+     * @param insertAtStep - splice index into `current.nodes`.
+     */
     onConfirm: (
         selectedNodeIds: Set<string>,
         excludedEdgeIds: Set<string>,
         addedEdges: AddedConnectEdge[],
         insertAtStep: number,
     ) => void;
+    /** Dismisses the dialog without merging. */
     onCancel: () => void;
 };
 
-// Lets the user choose which of an incoming file's nodes to merge in
+/**
+ * Modal dialog for resolving a merge conflict between an imported file and
+ * the open architecture: pick which nodes/edges to merge, where to splice
+ * them in, and optional cross-architecture connections.
+ */
 export function MergePickerDialog({
     fileName,
     incoming,
@@ -46,7 +66,10 @@ export function MergePickerDialog({
     const [addedEdges, setAddedEdges] = useState<AddedConnectEdge[]>([]);
     const [pendingSource, setPendingSource] = useState("");
     const [pendingTarget, setPendingTarget] = useState("");
-    // Splice index into current.nodes; defaults to appending at the end
+    /**
+     * Splice index into `current.nodes` for the merged nodes; node position
+     * encodes simulation step order. Defaults to the end.
+     */
     const [insertAtStep, setInsertAtStep] = useState(current.nodes.length);
     const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +93,13 @@ export function MergePickerDialog({
         };
     }, []);
 
-    // Deselecting a node also drops any added connection that touched it
+    /**
+     * Toggles whether an incoming node is selected. Also drops any added
+     * connection touching it, since endpoints are "connect option keys"
+     * (`incoming:<id>`/`current:<id>`) namespacing ids by origin so the two
+     * architectures' ids don't collide.
+     * @param nodeId - the incoming node's id.
+     */
     function toggle(nodeId: string) {
         setSelectedIds((current) => {
             const next = new Set(current);
@@ -112,7 +141,11 @@ export function MergePickerDialog({
     const labelById = new Map(
         incoming.nodes.map((node) => [node.id, node.data.label]),
     );
-    // Covers both origins for the Connect control, whose option/added-edge
+    /**
+     * Maps each connect option key (`current:<id>`/`incoming:<id>`) to its
+     * node's label, since Connect's options and edges use namespaced keys,
+     * not raw ids.
+     */
     const labelByKey = new Map<string, string>([
         ...current.nodes.map(
             (node) =>
@@ -129,14 +162,35 @@ export function MergePickerDialog({
                 ] as const,
         ),
     ]);
+    /**
+     * Resolves a key to its label, falling back to the bare id.
+     * @param key - connect option key (`current:<id>`/`incoming:<id>`).
+     * @returns the label, or raw id if none.
+     */
     function labelForKey(key: string): string {
         return labelByKey.get(key) ?? decodeConnectOptionKey(key).id;
     }
+    /**
+     * Filters connect option keys to one merge side, for splitting the
+     * Connect selects into optgroups.
+     * @param ids - keys to filter.
+     * @param origin - side to keep ("current" or "incoming").
+     * @returns matching subset of `ids`.
+     */
     function optionsByOrigin(ids: string[], origin: ConnectOrigin): string[] {
         return ids.filter((id) => decodeConnectOptionKey(id).origin === origin);
     }
 
-    // Shared by the "Connect from"/"Connect to" selects below
+    /**
+     * Renders one connect `<select>` (source or target), grouped into
+     * "Existing architecture" and `fileName` optgroups. Shared by the
+     * Connect from/to selects.
+     * @param ariaLabel - accessible label.
+     * @param value - selected connect option key.
+     * @param onChange - called with the new key.
+     * @param optionIds - connect option keys to offer.
+     * @returns the select element.
+     */
     function renderConnectSelect(
         ariaLabel: string,
         value: string,
@@ -172,28 +226,56 @@ export function MergePickerDialog({
         );
     }
 
+    /**
+     * Incoming edges whose endpoints are both selected - only these can be
+     * merged in.
+     */
     const eligibleEdges = incoming.edges.filter(
         (edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target),
     );
+    /** `eligibleEdges` minus user-unchecked edges. */
     const keptEdges = eligibleEdges.filter(
         (edge) => !excludedEdgeIds.has(edge.id),
     );
+    /** Total merged edges: kept incoming edges plus additions. */
     const includedEdgeCount = keptEdges.length + addedEdges.length;
 
     const selectedNodes = incoming.nodes.filter((node) =>
         selectedIds.has(node.id),
     );
+    /**
+     * Graph the Connect control validates against: `current` plus selected
+     * incoming nodes/edges, namespaced via `buildConnectGraph` to avoid id
+     * collisions.
+     */
     const connectGraph = buildConnectGraph(current, selectedNodes, keptEdges);
+    /**
+     * `connectGraph`'s edges plus this dialog's added edges, so recomputed
+     * options reflect the latest addition.
+     */
     const netEdges = [
         ...connectGraph.edges,
         ...addedEdges.map((added) => ({ id: "", ...added })),
     ];
+    /**
+     * Ids eligible as a connection source: nodes with no outgoing edge in
+     * `netEdges`. Nodes allow at most one outgoing/incoming edge (disjoint
+     * chains), and this enforces that limit.
+     */
     const sourceOptionIds = [
         ...connectableSourceIds(connectGraph.nodes, netEdges),
     ];
+    // The select's actual value: `pendingSource` if it's still a valid
+    // option, otherwise the first available one - covers the case where the
+    // previously chosen source stopped being connectable (e.g. its node was
+    // deselected).
     const effectiveSource = sourceOptionIds.includes(pendingSource)
         ? pendingSource
         : (sourceOptionIds[0] ?? "");
+    /**
+     * Ids `effectiveSource` can connect to, without a second incoming edge
+     * or a cycle.
+     */
     const targetOptionIds = effectiveSource
         ? [
               ...connectableTargetIds(
@@ -203,10 +285,12 @@ export function MergePickerDialog({
               ),
           ]
         : [];
+    // Same fallback logic as `effectiveSource`, for the target select.
     const effectiveTarget = targetOptionIds.includes(pendingTarget)
         ? pendingTarget
         : (targetOptionIds[0] ?? "");
     const canAddConnection = effectiveSource !== "" && effectiveTarget !== "";
+    /** Whether both architectures together have enough nodes to connect. */
     const canShowConnect = current.nodes.length + selectedNodes.length >= 2;
 
     return (

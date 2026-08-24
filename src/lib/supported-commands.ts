@@ -1,4 +1,8 @@
-// Human-readable syntax reference, printed by the console's `help` command
+/**
+ * Description of one console command for the `help` output: usage
+ * syntax, a worked example, accepted alias phrasings, and an optional
+ * note about a side effect or constraint.
+ */
 type CommandDoc = {
     usage: string;
     example: string;
@@ -6,6 +10,11 @@ type CommandDoc = {
     note?: string;
 };
 
+/**
+ * Full list of commands documented by the console's `help` output, one
+ * entry per command family. Raw data that COMMAND_USAGE and
+ * SUPPORTED_COMMANDS derive from.
+ */
 const COMMAND_DOCS: CommandDoc[] = [
     {
         usage: "add node <label>",
@@ -61,11 +70,21 @@ const COMMAND_DOCS: CommandDoc[] = [
     },
 ];
 
-// Every command's plain usage line, in a fixed order
+/**
+ * Every command's usage line, in COMMAND_DOCS order, with no
+ * example/alias/note text.
+ */
 export const COMMAND_USAGE = COMMAND_DOCS.map((doc) => doc.usage);
 
 const INDENT = "    ";
 
+/**
+ * Renders one CommandDoc into its multi-line help block: usage line,
+ * indented example, an indented alias line when aliases exist, and an
+ * indented note when present.
+ * @param doc - command description to format
+ * @returns newline-joined formatted block of text
+ */
 function formatCommandDoc(doc: CommandDoc): string {
     const lines = [doc.usage, `${INDENT}${doc.example}`];
     if (doc.aliases.length > 0) {
@@ -76,7 +95,14 @@ function formatCommandDoc(doc: CommandDoc): string {
     return lines.join("\n");
 }
 
-// One entry per command, each hard-wrapped well inside the console's 80
+/**
+ * One help-text block per command, COMMAND_DOCS order, wrapped inside
+ * 80 columns; joined by HELP_MESSAGE.
+ */
 export const SUPPORTED_COMMANDS = COMMAND_DOCS.map(formatCommandDoc);
 
+/**
+ * Text shown for the console's `help` command: header plus
+ * SUPPORTED_COMMANDS blocks, separated by blank lines.
+ */
 export const HELP_MESSAGE = `Commands:\n\n${SUPPORTED_COMMANDS.join("\n\n")}`;

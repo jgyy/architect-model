@@ -6,7 +6,11 @@ import { X } from "lucide-react";
 
 import type { ArchitectureNode as ArchitectureNodeType } from "@/types/architecture";
 
-// Which node the simulation is currently on, and which it has already crossed
+/**
+ * Which node the simulation trace is currently on, and which nodes it has
+ * already crossed. Node renderers use this to draw themselves as current,
+ * traversed, or plain.
+ */
 export type SimulationHighlight = {
     currentNodeId?: string;
     traversedNodeIds: Set<string>;
@@ -14,10 +18,19 @@ export type SimulationHighlight = {
 
 const EMPTY_HIGHLIGHT: SimulationHighlight = { traversedNodeIds: new Set() };
 
+/**
+ * Broadcasts the current {@link SimulationHighlight} to every node, avoiding
+ * per-node prop threading from ArchitectureCanvas. Defaults to an empty
+ * highlight so nodes render unstyled outside a simulation.
+ */
 export const HighlightedNodeContext =
     createContext<SimulationHighlight>(EMPTY_HIGHLIGHT);
 
-// Mouse-driven mutations, wired up by ArchitectureCanvas
+/**
+ * Actions a node performs on itself (rename, delete), plus hand-off state
+ * for auto-entering edit mode on a freshly created node. Supplied by
+ * ArchitectureCanvas via context, keeping the node component a pure renderer.
+ */
 export type NodeActions = {
     // Returns whether the rename was accepted
     onRename: (nodeId: string, newLabel: string) => boolean;
@@ -34,8 +47,22 @@ const NOOP_NODE_ACTIONS: NodeActions = {
     onAutoEditConsumed: () => {},
 };
 
+/**
+ * Carries the current {@link NodeActions}; defaults to no-ops so a node
+ * without a provider doesn't crash.
+ */
 export const NodeActionsContext = createContext<NodeActions>(NOOP_NODE_ACTIONS);
 
+/**
+ * React Flow's custom renderer for each box on the architecture graph.
+ * Highlights the node when the simulation trace is on or has passed through
+ * it, and supports rename (double-click) and delete (hover button) via
+ * {@link NodeActions}, keeping the command/undo-redo system as source of truth.
+ *
+ * @param props.id - the node id
+ * @param props.data - label and optional simulation description
+ * @param props.selected - whether this node is selected
+ */
 export function ArchitectureNode({
     id,
     data,
@@ -77,13 +104,17 @@ export function ArchitectureNode({
         setIsEditing(true);
     }
 
-    // onBlur passes cancelOnReject: true - blur is a low-commitment "I'm
-    // done with this box" gesture (clicking another node, the canvas, a
-    // toolbar button), so a rejection there should just cancel the edit
-    // rather than keep re-submitting the same rejected value and refocusing
-    // out from under the click, which would otherwise trap the user unable
-    // to leave except via Escape. Enter is the opposite: an explicit retry
-    // request, so it keeps the current (invalid) text in place to fix.
+    /**
+     * Submits the rename via {@link NodeActions.onRename}, or exits edit
+     * mode per the rejection handling.
+     *
+     * Blur is a low-commitment exit, so a rejection there cancels the edit
+     * instead of re-submitting and refocusing (which would trap the user).
+     * Enter is an explicit retry, so the invalid text stays for fixing.
+     *
+     * @param cancelOnReject - when true, a rejected rename cancels the edit
+     * instead of leaving it for another attempt
+     */
     function commitEditing(cancelOnReject = false) {
         const trimmed = draft.trim();
         if (trimmed === data.label) {

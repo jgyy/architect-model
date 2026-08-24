@@ -26,6 +26,12 @@ const UNRECOGNIZED_COMMAND_USAGE = COMMAND_USAGE.map(
     (usage) => `  ${usage}`,
 ).join("\n");
 
+/**
+ * Result of running one command through {@link parseCommand}: a
+ * discriminated union keyed on `ok`, forcing callers to check it before
+ * reading `architecture`. A success carries the updated architecture plus
+ * a message; a failure carries only the message.
+ */
 export type CommandResult =
     | {
           ok: true;
@@ -34,21 +40,31 @@ export type CommandResult =
       }
     | { ok: false; message: string };
 
-// callers always pass a normalizeLabel()'d string
+/**
+ * Checks whether a label is empty. Callers always pass an already-normalized
+ * string, so this just checks length.
+ */
 function isBlankLabel(label: string): boolean {
     return label.length === 0;
 }
 
-// Keeps a label short enough that every canvas-synthesized command
-// referencing it (e.g. "rename node <old> to <new>") still fits under
-// MAX_COMMAND_LENGTH - otherwise a node created via a long typed label
-// becomes unreachable from the canvas's mouse-driven rename/remove/move.
+/**
+ * Upper bound on a node label's length, so canvas-synthesized commands
+ * referencing it (e.g. "rename node <old> to <new>") stay under
+ * `MAX_COMMAND_LENGTH` and reachable from the canvas's mouse actions.
+ */
 export const MAX_LABEL_LENGTH = 200;
 
 function isTooLongLabel(label: string): boolean {
     return label.length > MAX_LABEL_LENGTH;
 }
 
+/**
+ * Converts a label into a URL/id-safe slug: lowercased, non-alphanumeric
+ * runs collapsed to a hyphen, edges trimmed.
+ * @param label - label to slugify
+ * @returns the slug; may be empty if the label had no alphanumeric characters
+ */
 export function slugify(label: string): string {
     return label
         .trim()
@@ -57,6 +73,13 @@ export function slugify(label: string): string {
         .replace(/(^-|-$)/g, "");
 }
 
+/**
+ * Builds a node id from a slug, appending a numeric suffix to avoid
+ * collisions.
+ * @param slug - base slug, see {@link slugify}
+ * @param nodeIndex - checked for id collisions
+ * @returns an id not already in `nodeIndex.ids`
+ */
 export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     let id = `node-${slug}`;
     let suffix = 2;
@@ -67,13 +90,30 @@ export function uniqueNodeId(slug: string, nodeIndex: NodeIndex): string {
     return id;
 }
 
-// A label->node lookup (plus the id set uniqueNodeId needs)
+/**
+ * Lookup Maps/Sets for an architecture's nodes and edges, built once per
+ * command instead of re-derived on every access. See {@link buildNodeIndex}.
+ */
 export type NodeIndex = {
+    /** Nodes keyed by folded label, for exact lookup. */
     byLabel: Map<string, ArchitectureNode>;
+    /** Every node id currently in use, for collision checks. */
     ids: Set<string>;
+    /** Every edge keyed by `"<sourceId>::<targetId>"` (see {@link edgeKey}). */
     edgesBySourceTarget: Map<string, ArchitectureEdge>;
+    /**
+     * Each node's single outgoing edge, keyed by source id. The parser
+     * caps nodes at one outgoing/incoming edge each, so connected nodes
+     * form disjoint chains, not an arbitrary graph.
+     */
     outgoingBySource: Map<string, ArchitectureEdge>;
+    /** Each node's single incoming edge, keyed by target id (see `outgoingBySource`). */
     incomingByTarget: Map<string, ArchitectureEdge>;
+    /**
+     * Root of the suffix trie for substring lookups over node labels - one
+     * step per query character instead of scanning every label. See
+     * {@link SubstringTrieNode}, {@link buildSubstringIndex}.
+     */
     substringIndex: SubstringTrieNode;
 };
 
@@ -81,9 +121,14 @@ function edgeKey(sourceId: string, targetId: string): string {
     return `${sourceId}::${targetId}`;
 }
 
-// A trie over every suffix of every folded label: walking it by the query's
+/**
+ * One trie node: edges keyed by the next folded character; each node
+ * caches labels reachable through it, for substring matching.
+ */
 type SubstringTrieNode = {
+    /** Child node per next folded character. */
     children: Map<string, SubstringTrieNode>;
+    /** Nodes whose label contains this path's substring. */
     matches: Set<ArchitectureNode>;
 };
 
@@ -91,6 +136,12 @@ function createSubstringTrieNode(): SubstringTrieNode {
     return { children: new Map(), matches: new Set() };
 }
 
+/**
+ * Inserts every suffix of a node's folded label, so a later query can
+ * match anywhere inside a label, not just its start.
+ * @param root - trie root
+ * @param node - node whose label is inserted
+ */
 function insertSuffixes(root: SubstringTrieNode, node: ArchitectureNode): void {
     const folded = foldLabel(node.data.label);
     for (let start = 0; start < folded.length; start += 1) {
@@ -108,6 +159,11 @@ function insertSuffixes(root: SubstringTrieNode, node: ArchitectureNode): void {
     }
 }
 
+/**
+ * Builds a suffix trie over every node's label for substring queries.
+ * @param nodes - nodes to index
+ * @returns root of the built trie
+ */
 function buildSubstringIndex(nodes: ArchitectureNode[]): SubstringTrieNode {
     const root = createSubstringTrieNode();
     for (const node of nodes) {
@@ -116,7 +172,13 @@ function buildSubstringIndex(nodes: ArchitectureNode[]): SubstringTrieNode {
     return root;
 }
 
-// Returns architecture.nodes-order matches for any substring, or [] if none.
+/**
+ * Walks the trie by `needle`'s characters, returning every node whose
+ * label contains it, in `architecture.nodes` order.
+ * @param root - trie to search
+ * @param needle - already-folded substring
+ * @returns matching nodes, or `[]` if none
+ */
 function querySubstringIndex(
     root: SubstringTrieNode,
     needle: string,
@@ -130,7 +192,13 @@ function querySubstringIndex(
     return Array.from(current.matches);
 }
 
-// Public substring lookup for callers outside this module
+/**
+ * Public substring lookup for callers outside this module (e.g. UI
+ * autocomplete), using the same trie the parser uses.
+ * @param nodeIndex - index to query
+ * @param needle - substring to search for
+ * @returns nodes whose label contains `needle`
+ */
 export function findNodesBySubstring(
     nodeIndex: NodeIndex,
     needle: string,
@@ -138,6 +206,14 @@ export function findNodesBySubstring(
     return querySubstringIndex(nodeIndex.substringIndex, needle);
 }
 
+/**
+ * Builds a {@link NodeIndex}: label lookup, id set, edge lookups, and
+ * substring trie built up front so parsing reads Maps/Sets instead of
+ * re-deriving them each access.
+ * @param nodes - nodes to index
+ * @param edges - edges to index (default none)
+ * @returns a fresh index reflecting the given nodes/edges
+ */
 export function buildNodeIndex(
     nodes: ArchitectureNode[],
     edges: ArchitectureEdge[] = [],
@@ -166,7 +242,14 @@ export function buildNodeIndex(
     };
 }
 
-// Would connecting source->target close a loop?
+/**
+ * True if connecting `sourceId` to `targetId` would close a loop (walks
+ * forward from the target to the source). Used by `connect`.
+ * @param sourceId - new edge's start id
+ * @param targetId - new edge's end id
+ * @param nodeIndex - forward-edge lookups
+ * @returns true if a cycle would form
+ */
 export function wouldCreateCycle(
     sourceId: string,
     targetId: string,
@@ -184,6 +267,14 @@ export function wouldCreateCycle(
     }
 }
 
+/**
+ * Resolves a typed label to the {@link ArchitectureNode} it names: exact
+ * match wins, else substring matching via the trie. One match resolves;
+ * multiple is ambiguous; none (or blank) is nothing.
+ * @param label - as-typed label text
+ * @param nodeIndex - index to resolve against
+ * @returns node, candidates if ambiguous, or null
+ */
 function findNodeOrAmbiguity(
     label: string,
     nodeIndex: NodeIndex,
@@ -200,6 +291,14 @@ function findNodeOrAmbiguity(
 
 const AMBIGUOUS_MATCHES_SHOWN = 20;
 
+/**
+ * Formats the error shown when a label substring-matches more than one
+ * node: lists up to `AMBIGUOUS_MATCHES_SHOWN`, summarizing the rest as a
+ * count.
+ * @param label - the ambiguous label typed
+ * @param matches - matched nodes
+ * @returns message asking the user to be more specific
+ */
 function ambiguousLabelMessage(
     label: string,
     matches: ArchitectureNode[],
@@ -221,7 +320,14 @@ function findNodeByExactLabel(
     return nodeIndex.byLabel.get(needle);
 }
 
-// Shared by add-node and rename-node, the only two commands that introduce a label
+/**
+ * Checks a candidate label for an exact duplicate among existing labels,
+ * unlike the substring matching used to reference nodes. Shared by
+ * `add node` and `rename node`.
+ * @param label - candidate label
+ * @param nodeIndex - index to check against
+ * @returns failure if taken, else null
+ */
 function duplicateLabelError(
     label: string,
     nodeIndex: NodeIndex,
@@ -235,7 +341,14 @@ function duplicateLabelError(
         : null;
 }
 
-// "<A> <sep> <B>" is ambiguous when a label itself contains a separator word
+/**
+ * Splits text after a command's verb into every possible source/target
+ * reading around each separator occurrence - a label can itself contain a
+ * separator word. Caller picks the best reading later.
+ * @param rest - text after the verb
+ * @param separators - words/phrases to split on
+ * @returns every possible split
+ */
 function splitConnectionArgs(
     rest: string,
     separators: string[],
@@ -248,9 +361,17 @@ function splitConnectionArgs(
     );
 }
 
-// null = no match, array = ambiguous (multiple substring matches, no exact one)
+/**
+ * Result of resolving a label: a single node on a clean match, candidates
+ * when ambiguous, or null when nothing matches.
+ */
 type EndpointMatch = ArchitectureNode | ArchitectureNode[] | null;
 
+/**
+ * One candidate reading of `connect <A> to <B>`, pairing each side's raw
+ * label with its resolved {@link EndpointMatch}. See
+ * {@link resolveConnectionEndpoints}.
+ */
 type ResolvedEndpoints = {
     sourceLabel: string;
     targetLabel: string;
@@ -262,7 +383,13 @@ function isSingleNode(match: EndpointMatch): match is ArchitectureNode {
     return match !== null && !Array.isArray(match);
 }
 
-// True when sourceLabel is the resolved node's whole label
+/**
+ * True when `sourceLabel` is the resolved node's whole label, not just a
+ * substring - used to prefer an exact match over an ambiguous split.
+ * @param sourceLabel - raw label as typed
+ * @param match - resolved {@link EndpointMatch}
+ * @returns true if `match` is a single node equal to `sourceLabel`
+ */
 function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
     return (
         isSingleNode(match) &&
@@ -270,7 +397,13 @@ function isExactLabelMatch(sourceLabel: string, match: EndpointMatch): boolean {
     );
 }
 
-// Turns a raw EndpointMatch into a resolved node or the CommandResult
+/**
+ * Turns a raw {@link EndpointMatch} into the resolved node or a failure
+ * message ("no node named…", or the ambiguity message).
+ * @param label - raw label, for the error message
+ * @param match - resolved {@link EndpointMatch}
+ * @returns the node, or a failure with the message
+ */
 function requireNode(
     label: string,
     match: EndpointMatch,
@@ -284,6 +417,15 @@ function requireNode(
     return { ok: true, node: match };
 }
 
+/**
+ * Resolves `connect`/`remove edge` args. Tries every split (see
+ * {@link splitConnectionArgs}); first where both sides resolve to one node
+ * wins, else the first split.
+ * @param rest - command text after the verb
+ * @param nodeIndex - index for label lookup
+ * @param separators - words to split on
+ * @returns best-guess endpoints, or null
+ */
 function resolveConnectionEndpoints(
     rest: string,
     nodeIndex: NodeIndex,
@@ -305,13 +447,27 @@ function resolveConnectionEndpoints(
     );
 }
 
+/**
+ * One candidate reading of `rename node <A> to <B>`, pairing the source's
+ * raw label with its resolved {@link EndpointMatch} and the new label
+ * text. Produced by {@link resolveRenameArgs}.
+ */
 type ResolvedRenameArgs = {
     sourceLabel: string;
     newLabel: string;
     source: EndpointMatch;
 };
 
-// A trailing " to " with nothing after it (a blank new label)
+/**
+ * Handles `rename node <A> to` with no new name typed yet: finds a
+ * trailing separator, treats the text before it as the source label, and
+ * returns a blank `newLabel` (so the caller reports "cannot be blank",
+ * not "no separator found").
+ * @param rest - text after the verb
+ * @param nodeIndex - index for the source label
+ * @param separators - separator words to look for
+ * @returns args with empty `newLabel`, or null
+ */
 function resolveTrailingSeparatorWithBlankTarget(
     rest: string,
     nodeIndex: NodeIndex,
@@ -339,7 +495,16 @@ function resolveTrailingSeparatorWithBlankTarget(
     };
 }
 
-// Unlike resolveConnectionEndpoints, only the left side is a node reference
+/**
+ * Resolves `rename node <A> to <B>` args - only `<A>` is a node reference.
+ * Prefers exact source match, then the blank-target case
+ * ({@link resolveTrailingSeparatorWithBlankTarget}), then a single-node
+ * split, else the first split.
+ * @param rest - text after the verb
+ * @param nodeIndex - index for the source label
+ * @param separators - words to split on
+ * @returns best-guess rename args, or null
+ */
 function resolveRenameArgs(
     rest: string,
     nodeIndex: NodeIndex,
@@ -371,13 +536,27 @@ function resolveRenameArgs(
     );
 }
 
+/**
+ * One candidate reading of `move node <label> to step <n>`, pairing the
+ * node's raw label with its resolved {@link EndpointMatch} and the raw
+ * step-number text. Produced by {@link resolveMoveNodeArgs}.
+ */
 type ResolvedMoveArgs = {
     sourceLabel: string;
     positionText: string;
     source: EndpointMatch;
 };
 
-// Unlike resolveConnectionEndpoints, the right side is a step number, not a node reference
+/**
+ * Resolves `move node <label> to step <n>` args - the right side is a step
+ * number, not a node reference. Prefers an exact source match with
+ * digits-only right side, then any single-node source, else the first
+ * split.
+ * @param rest - text after the verb
+ * @param nodeIndex - index for the source label
+ * @param separators - words to split on
+ * @returns best-guess move args, or null
+ */
 function resolveMoveNodeArgs(
     rest: string,
     nodeIndex: NodeIndex,
@@ -412,16 +591,41 @@ const ADD_NODE_PATTERNS = [
     /^add a node called(?:\s+(.*))?$/i,
 ];
 
+/**
+ * Extra input to {@link parseCommand} beyond the text, used by canvas
+ * actions that synthesize commands but also carry info a typed command
+ * wouldn't (e.g. a drop position).
+ */
 export type ParseCommandOptions = {
-    // Where a canvas-created node lands; typed "add node" ignores this
+    /** Where a canvas-created node lands; a typed "add node" ignores this. */
     position?: { x: number; y: number };
 };
 
 const MAX_COMMAND_LENGTH = 500;
 
-// Horizontal gap between simulation steps, left to right
+/**
+ * Horizontal pixel gap between simulation steps - used when placing a new
+ * node and re-laying-out `x` after `move node` reorders the chain. The
+ * trace is just node array order (no separate structure), so spacing
+ * visually communicates it.
+ */
 export const NODE_X_SPACING = 250;
 
+/**
+ * Parses one command line (typed or canvas-synthesized) into the
+ * resulting architecture, if recognized. Sole parser for the six verbs
+ * (add/connect/remove node, remove edge, rename node, move node) via
+ * fixed per-verb regexes, not NLP/an LLM. Enforces invariants (valid
+ * labels, edges only between distinct nodes, no cycles - see
+ * {@link wouldCreateCycle}); returns a message on failure instead of
+ * throwing, so callers (incl. the command log, doubling as the validation
+ * UI) can show the reason.
+ * @param input - raw command text to parse
+ * @param architecture - architecture to apply the command to
+ * @param options - extra input; see {@link ParseCommandOptions}
+ * @param nodeIndex - prebuilt index; omit to build fresh
+ * @returns the resulting {@link CommandResult}
+ */
 export function parseCommand(
     input: string,
     architecture: Architecture,

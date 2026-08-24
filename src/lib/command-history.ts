@@ -1,11 +1,25 @@
-// Shell-style Up/Down recall over previously submitted console commands
+/**
+ * State for shell-style Up/Down recall over submitted console commands,
+ * like a terminal's history. Distinct from undo-history.ts's app-state
+ * undo/redo, which reverses graph edits, not typed text.
+ */
 export type CommandHistoryState = {
-    // null = live editing; 0 = most recent command, 1 = the one before it, ...
+    /** null = live editing; 0 = most recent command, 1 = one before it, ... */
     index: number | null;
-    // the in-progress input, captured when recall started, restored on the way back
+    /** the in-progress input, captured when recall started, restored on the way back */
     draft: string;
 };
 
+/**
+ * Advances recall into the past (Up-arrow). First press captures the
+ * live input as the draft to restore later; further presses clamp at the
+ * oldest command.
+ *
+ * @param commands - Submitted commands, oldest first.
+ * @param state - Current recall state.
+ * @param liveValue - Input box text; saved as the draft on fresh recall.
+ * @returns Updated state and command text to show.
+ */
 export function recallOlderCommand(
     commands: string[],
     state: CommandHistoryState,
@@ -24,6 +38,15 @@ export function recallOlderCommand(
     };
 }
 
+/**
+ * Advances recall one step toward the present (Down-arrow). Stepping
+ * past the newest command exits recall and restores the draft captured
+ * when recall began.
+ *
+ * @param commands - Submitted commands, oldest first.
+ * @param state - Current recall state.
+ * @returns Updated state and command text to show.
+ */
 export function recallNewerCommand(
     commands: string[],
     state: CommandHistoryState,

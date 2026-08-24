@@ -45,27 +45,45 @@ import type {
     ArchitectureNode,
 } from "@/types/architecture";
 
+/**
+ * Props for {@link ArchitectureCanvas}: the architecture graph to draw, the
+ * simulation trace's current position (node/edges highlighted during playback),
+ * and the callbacks used to report user edits up to the state-owning parent.
+ */
 type ArchitectureCanvasProps = {
     architecture: Architecture;
+    /** Id of the node the simulation trace is currently paused on, if any. */
     highlightedNodeId?: string;
+    /** Ids of nodes the simulation trace has already stepped through. */
     traversedNodeIds?: Set<string>;
+    /** Ids of edges the simulation trace has already stepped through; drawn in a distinct style. */
     traversedEdgeIds?: Set<string>;
     onNodesChange: (nodes: ArchitectureNode[]) => void;
+    /** Creates a node at `position`; returns its new id, or null if creation was rejected. */
     onNodeCreate: (position: { x: number; y: number }) => string | null;
+    /** Renames a node; returns whether the rename was accepted. */
     onNodeRename: (nodeId: string, newLabel: string) => boolean;
     onNodeDelete: (nodeId: string) => void;
     onEdgeCreate: (sourceId: string, targetId: string) => void;
     onEdgeDelete: (edgeId: string) => void;
 };
 
+/**
+ * Stable empty-Set default for unset `traversedNodeIds`/`traversedEdgeIds`, so
+ * memoized values derived from them don't recompute every render.
+ */
 const EMPTY_ID_SET = new Set<string>();
+/** Highlight styling applied to edges the simulation trace has already walked. */
 const TRAVERSED_EDGE_STYLE = { stroke: "var(--danger)", strokeWidth: 2.5 };
 const TRAVERSED_EDGE_MARKER = {
     type: MarkerType.ArrowClosed,
     color: "var(--danger)",
 };
 
-// Overrides React Flow's default theming to follow this app's own color
+/**
+ * CSS custom-property overrides fed to React Flow via inline style, mapping
+ * background, edges, selection, controls, and minimap to this app's color tokens.
+ */
 const REACT_FLOW_THEME_VARS: Record<string, string> = {
     "--xy-background-pattern-dots-color": "var(--border-strong)",
     "--xy-edge-stroke": "var(--border-strong)",
@@ -88,7 +106,18 @@ const REACT_FLOW_THEME_VARS: Record<string, string> = {
     "--xy-minimap-node-background-color": "var(--border-strong)",
 };
 
-// Reconciles the canvas's own live render state
+/**
+ * Reconciles live render state with the latest architecture data from the parent,
+ * so local-only React Flow state on a node survives a re-render instead of being
+ * clobbered by stale data. A node with an unchanged reference is reused as-is; the
+ * mid-drag node keeps its local position; other nodes merge incoming data over
+ * existing local-only fields.
+ *
+ * @param current - Current render nodes, possibly ahead of `incoming` (e.g. mid-drag).
+ * @param incoming - Latest nodes from the parent's state.
+ * @param draggingNodeId - Id of the dragged node, or null.
+ * @returns Reconciled nodes to render.
+ */
 export function reconcileRenderNodes(
     current: ArchitectureNode[],
     incoming: ArchitectureNode[],
@@ -105,15 +134,31 @@ export function reconcileRenderNodes(
     });
 }
 
+/**
+ * Registers this app's custom node/edge renderers under React Flow's "default"
+ * type key, so the canvas uses this app's visuals instead of React Flow's built-in
+ * rendering.
+ */
 const NODE_TYPES = { default: ArchitectureNodeCard };
 const EDGE_TYPES = { default: ArchitectureEdgeCard };
 const DEFAULT_EDGE_OPTIONS = {
     markerEnd: { type: MarkerType.ArrowClosed },
 };
-// Above this many nodes the minimap's per-mutation redraw cost dominates
+/**
+ * Node-count threshold above which the minimap is hidden, since MiniMap's
+ * per-mutation redraw cost dominates past this size. One of this file's two
+ * deliberate perf fixes for large graphs.
+ */
 const MINIMAP_NODE_LIMIT = 300;
 
-// The `fitView` prop on <ReactFlow> only runs once, on mount
+/**
+ * Re-frames the view (`fitView`) when node ids change after mount, since
+ * `<ReactFlow>`'s `fitView` prop only runs once on mount. Debounced with delay
+ * reset on each change, so rapid mutations collapse into one re-frame - the
+ * file's other deliberate perf fix for large graphs. Renders no UI.
+ *
+ * @param nodeIds - Comma-joined node ids; a change-detection key to retrigger the effect.
+ */
 function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
     const { fitView } = useReactFlow();
     const isFirstRun = useRef(true);
@@ -131,6 +176,16 @@ function FitViewOnNodesChange({ nodeIds }: { nodeIds: string }) {
     return null;
 }
 
+/**
+ * Renders the interactive architecture diagram: a React Flow canvas showing the
+ * graph, highlighting the simulation trace's path, and translating canvas gestures
+ * into the callbacks a typed command triggers. Owns render-state reconciliation
+ * ({@link reconcileRenderNodes}) and two large-graph perf guards: minimap hidden
+ * past {@link MINIMAP_NODE_LIMIT} nodes, debounced re-framing via
+ * {@link FitViewOnNodesChange}.
+ *
+ * @param props - See {@link ArchitectureCanvasProps}.
+ */
 export function ArchitectureCanvas({
     architecture,
     highlightedNodeId,
@@ -249,10 +304,10 @@ export function ArchitectureCanvas({
             architecture.edges.map((edge) =>
                 traversedEdgeIds.has(edge.id)
                     ? {
-                        ...edge,
-                        style: TRAVERSED_EDGE_STYLE,
-                        markerEnd: TRAVERSED_EDGE_MARKER,
-                    }
+                          ...edge,
+                          style: TRAVERSED_EDGE_STYLE,
+                          markerEnd: TRAVERSED_EDGE_MARKER,
+                      }
                     : edge,
             ),
         [architecture.edges, traversedEdgeIds],
@@ -298,8 +353,8 @@ export function ArchitectureCanvas({
                             {/* The minimap redraws every node's position */}
                             {architecture.nodes.length <=
                                 MINIMAP_NODE_LIMIT && (
-                                    <MiniMap pannable zoomable />
-                                )}
+                                <MiniMap pannable zoomable />
+                            )}
                             <Panel
                                 position="top-left"
                                 className="flex items-center gap-2"

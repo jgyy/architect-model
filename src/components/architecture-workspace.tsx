@@ -50,7 +50,14 @@ import {
 } from "@/lib/undo-history";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-// A plain loop (not Math.max(...ids))
+/**
+ * Highest `id` used across `entries`, so `nextLogIdRef` can resume without
+ * colliding with restored ids. Uses a plain loop rather than
+ * `Math.max(...ids)` to avoid a stack overflow on a log near
+ * {@link MAX_LOG_ENTRIES}.
+ * @param entries - the log entries to scan
+ * @returns the largest `id` found, or 0 if empty
+ */
 function maxLogId(entries: LogEntry[]): number {
     let max = 0;
     for (const entry of entries) {
@@ -59,10 +66,19 @@ function maxLogId(entries: LogEntry[]): number {
     return max;
 }
 
-// Bounds the console's scrollback
+/**
+ * Max entries the command log keeps at once, so console scrollback and the
+ * autosaved JSON don't grow without limit.
+ */
 const MAX_LOG_ENTRIES = 5000;
 
-// A Blob + temporary <a download> is the standard no-backend way to hand the browser
+/**
+ * Triggers a browser download of `json` as `filename`, used by the "export"
+ * command. Uses a `Blob` plus a temporary, auto-clicked `<a download>` -
+ * this app has no server to serve the export from.
+ * @param json - file contents to download
+ * @param filename - suggested filename for the save dialog
+ */
 function downloadJsonFile(json: string, filename: string): void {
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -73,6 +89,13 @@ function downloadJsonFile(json: string, filename: string): void {
     URL.revokeObjectURL(url);
 }
 
+/**
+ * Appends one entry to the log, trimming from the front once it exceeds
+ * {@link MAX_LOG_ENTRIES}.
+ * @param entries - the current log
+ * @param entry - entry to append
+ * @returns the updated, length-capped log
+ */
 function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
     const next = [...entries, entry];
     return next.length > MAX_LOG_ENTRIES
@@ -80,7 +103,16 @@ function appendLogEntry(entries: LogEntry[], entry: LogEntry): LogEntry[] {
         : next;
 }
 
-// Keeps the simulation's "current" step pointing at the same node
+/**
+ * Recomputes the step index so it still points at the same node after a
+ * command changes the architecture (e.g. undo/redo, or a merge that inserts
+ * nodes earlier in the trace). Falls back to `stepIndex` if that node no
+ * longer exists in `after`.
+ * @param before - architecture before the change
+ * @param stepIndex - step index before the change
+ * @param after - architecture after the change
+ * @returns the index of the same node in `after`, or `stepIndex` if gone
+ */
 function nextStepIndexForSameNode(
     before: Architecture,
     stepIndex: number,
@@ -92,10 +124,22 @@ function nextStepIndexForSameNode(
     return newIndex === -1 ? stepIndex : newIndex;
 }
 
+/**
+ * Props for {@link ArchitectureWorkspace}: the architecture to start from
+ * before any persisted session loads, and to reset to on "clear history".
+ */
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
 };
 
+/**
+ * The app's single top-level stateful screen ("use client"): owns the
+ * architecture graph, command log, undo/redo history, simulation playback
+ * position, and syncing to `localStorage`. Sole call site of `parseCommand`
+ * - every typed command and canvas gesture runs through its `runCommand`,
+ * which validates, records undo, updates the simulation, and persists.
+ * Renders the canvas, console/simulation sidebar, and merge picker dialog.
+ */
 export function ArchitectureWorkspace({
     initialArchitecture,
 }: ArchitectureWorkspaceProps) {
@@ -123,6 +167,13 @@ export function ArchitectureWorkspace({
     // Next id to hand out via nextLogId()
     const nextLogIdRef = useRef(1);
 
+    /**
+     * Replaces the visible session with `state` (architecture, log, step,
+     * speed). Used for initial hydration and for adopting changes from
+     * another tab. Undo/redo resets to empty (it's ephemeral, per-tab, not
+     * persisted), and the log id counter fast-forwards past `state`'s ids.
+     * @param state - the full session snapshot to adopt
+     */
     const applyPersisted = useCallback((state: PersistedState) => {
         setArchitecture(state.architecture);
         setLog(state.log);
@@ -132,6 +183,11 @@ export function ArchitectureWorkspace({
         nextLogIdRef.current = maxLogId(state.log) + 1;
     }, []);
 
+    /**
+     * Discards the current session and starts over from
+     * `initialArchitecture` with an empty log, as if nothing was persisted.
+     * Used when storage is cleared, by this tab or another.
+     */
     const resetToInitial = useCallback(() => {
         applyPersisted({
             architecture: initialArchitecture,
@@ -147,7 +203,15 @@ export function ArchitectureWorkspace({
         return id;
     }
 
-    // Every logged command allocates its id and appends in one step.
+    /**
+     * Appends one outcome to the command log: allocates its id and appends
+     * in one step. Every submitted command, typed or from a canvas gesture,
+     * is recorded with whether it succeeded and why - the log doubles as
+     * this app's validation UI.
+     * @param input - the command text that was run
+     * @param ok - whether it succeeded
+     * @param message - human-readable outcome to display
+     */
     const logResult = useCallback(
         (input: string, ok: boolean, message: string) => {
             const id = nextLogId();
@@ -158,6 +222,12 @@ export function ArchitectureWorkspace({
         [],
     );
 
+    /**
+     * Runs once on mount to hydrate the session from `localStorage`, if a
+     * previous one was saved. Deferred to an effect since `localStorage`
+     * isn't available during server rendering; `hydrated` gates the
+     * autosave effect below until this initial read has run.
+     */
     /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const persisted = loadPersistedState(window.localStorage);
@@ -170,10 +240,20 @@ export function ArchitectureWorkspace({
     }, [applyPersisted]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    // Reacts to storage changes made by *other* tabs
+    /**
+     * Reacts to storage changes made by *other* tabs, so every open tab
+     * converges on the same session: adopts updates, resets on a clear, and
+     * repairs storage if something unreadable landed there. The `storage`
+     * event only fires in other tabs - this tab's own writes are already
+     * reflected.
+     */
     useEffect(() => {
+        /**
+         * Drops a merge mid-review in the picker dialog: its selections
+         * and added edges were computed against an architecture that's now
+         * stale (another tab changed it).
+         */
         function cancelStalePendingMerge() {
-            // The merge picker's selection/added-edges
             if (!pendingMerge) return;
             setPendingMerge(null);
             logResult(
@@ -182,6 +262,13 @@ export function ArchitectureWorkspace({
                 "Cancelled: the architecture changed in another tab while the merge picker was open.",
             );
         }
+        /**
+         * Classifies and applies one `storage` event: adopts another tab's
+         * update, resets on a clear, or - if the write doesn't parse -
+         * overwrites storage with this tab's last known-good state so the
+         * corruption doesn't keep propagating.
+         * @param event - the browser `storage` event to react to
+         */
         function handleStorage(event: StorageEvent) {
             const change = interpretStorageEvent(event.key, event.newValue);
             if (change.type === "updated") {
@@ -204,7 +291,12 @@ export function ArchitectureWorkspace({
         return () => window.removeEventListener("storage", handleStorage);
     }, [applyPersisted, resetToInitial, pendingMerge, logResult]);
 
-    // a remove-node command can shrink the simulation trace out from under it
+    /**
+     * The step index actually safe to render/look up this render, clamped
+     * into the current trace's bounds. Needed because `currentStepIndex`
+     * can point past the trace's end after a command shrinks it (e.g.
+     * remove node).
+     */
     const safeStepIndex = clampStepIndex(
         currentStepIndex,
         architecture.nodes.length,
@@ -213,6 +305,13 @@ export function ArchitectureWorkspace({
     // Whether the user has already been warned this "outage"
     const persistenceWarnedRef = useRef(false);
 
+    /**
+     * Persists the session to `localStorage` whenever architecture, log,
+     * step, or speed change, so a refresh or new tab resumes where this one
+     * left off. Skips writing if serialized state is unchanged (avoids
+     * redundant `storage` events elsewhere), and logs once per failure
+     * streak if storage fails (e.g. full, private browsing).
+     */
     useEffect(() => {
         if (!hydrated) return;
         const nextState: PersistedState = {
@@ -237,6 +336,12 @@ export function ArchitectureWorkspace({
         }
     }, [architecture, log, safeStepIndex, speedIndex, hydrated, logResult]);
 
+    /**
+     * Handles the console's "clear history" action: wipes the persisted
+     * session and resets visible state to `initialArchitecture` regardless
+     * of whether the storage removal succeeded, logging a warning only if
+     * the old session might reappear on reload.
+     */
     function handleClearHistory() {
         const cleared = clearPersistedState(window.localStorage);
         lastPersistedRef.current = null;
@@ -251,12 +356,22 @@ export function ArchitectureWorkspace({
     }
 
     const highlightedNodeId = architecture.nodes[safeStepIndex]?.id;
+    /**
+     * Nodes and edges the simulation has already passed through, up to
+     * `safeStepIndex`. Memoized so the canvas doesn't recompute its
+     * traversed-path styling on every unrelated state change.
+     */
     const traversedPath = useMemo(
         () => getTraversedPath(architecture, safeStepIndex),
         [architecture, safeStepIndex],
     );
 
-    // Stable across unrelated re-renders (e.g. every command-input keystroke)
+    /**
+     * Updates the current step from the simulation panel's scrubber/
+     * controls, clamped to the trace's bounds. Memoized so its identity
+     * stays stable across unrelated re-renders (e.g. input keystrokes).
+     * @param index - step index to move to
+     */
     const handleStepChange = useCallback(
         (index: number) => {
             setCurrentStepIndex(
@@ -266,18 +381,43 @@ export function ArchitectureWorkspace({
         [architecture.nodes.length],
     );
 
-    // Stable across unrelated re-renders, same reason as handleStepChange
+    /**
+     * Adopts a new node array from the canvas (e.g. after a drag) without
+     * touching edges. Stable across re-renders, same reason as
+     * `handleStepChange`.
+     * @param nodes - the updated node array to store
+     */
     const handleNodesChange = useCallback((nodes: ArchitectureNode[]) => {
         setArchitecture((current) => ({ ...current, nodes }));
     }, []);
 
-    // Node lookups (by label, id-collision check) and edge connectivity lookups
+    /**
+     * Map/Set-backed index over the architecture: node lookups by label
+     * (resolving a command's typed reference) and by id (collision checks),
+     * plus edge connectivity. Rebuilt via `useMemo` only when nodes/edges
+     * change, and passed into `parseCommand` to avoid re-deriving it.
+     */
     const nodeIndex = useMemo(
         () => buildNodeIndex(architecture.nodes, architecture.edges),
         [architecture.nodes, architecture.edges],
     );
 
-    // Runs a command line exactly the same way whether it was typed
+    /**
+     * Runs one command line the same way whether typed into the console or
+     * synthesized from a canvas gesture - the app's single entry point for
+     * every mutation and sole call site of `parseCommand`. Handles `help`,
+     * `export`, `undo`, and `redo` directly since they're non-mutating or
+     * act on history; every other command goes through `parseCommand` and,
+     * on success, is recorded onto the two-stack undo/redo history (undo
+     * pops an entry and pushes its inverse onto redo; a new command clears
+     * the redo stack) before the architecture state updates. Every outcome
+     * is logged.
+     * @param text - raw command text to run
+     * @param options - forwarded to `parseCommand` (e.g. drop position for
+     * a canvas-created node)
+     * @returns the `CommandResult` discriminated union describing the
+     * outcome, or null if `text` was blank
+     */
     const runCommand = useCallback(
         (text: string, options?: ParseCommandOptions): CommandResult | null => {
             const trimmed = text.trim();
@@ -354,6 +494,11 @@ export function ArchitectureWorkspace({
         [architecture, nodeIndex, undoRedo, logResult],
     );
 
+    /**
+     * Wires the console's input form to `runCommand`: runs the input and
+     * clears the box, ignoring blank/whitespace-only submits.
+     * @param event - the form's submit event
+     */
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!input.trim()) return;
@@ -361,6 +506,12 @@ export function ArchitectureWorkspace({
         setInput("");
     }
 
+    /**
+     * Handles deleting an edge on the canvas: synthesizes and runs the same
+     * "remove edge" command text a typed instruction would produce, so
+     * gestures and typed commands share one validated, undo-able path.
+     * @param edgeId - id of the edge to remove
+     */
     const handleEdgeDelete = useCallback(
         (edgeId: string) => {
             const command = buildRemoveEdgeCommand(edgeId, architecture);
@@ -369,6 +520,12 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    /**
+     * Handles connecting two nodes by canvas drag: synthesizes and runs
+     * the equivalent "connect" command text.
+     * @param sourceId - node the drag started from
+     * @param targetId - node the drag ended on
+     */
     const handleEdgeCreate = useCallback(
         (sourceId: string, targetId: string) => {
             const command = buildConnectCommand(
@@ -381,6 +538,13 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    /**
+     * Handles renaming a node inline on the canvas via the "rename"
+     * command.
+     * @param nodeId - id of the node being renamed
+     * @param newLabel - label text entered
+     * @returns whether it succeeded (false e.g. on a duplicate label)
+     */
     const handleNodeRename = useCallback(
         (nodeId: string, newLabel: string): boolean => {
             const command = buildRenameNodeCommand(
@@ -394,6 +558,10 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    /**
+     * Handles deleting a node on the canvas via the "remove node" command.
+     * @param nodeId - id of the node to remove
+     */
     const handleNodeDelete = useCallback(
         (nodeId: string) => {
             const command = buildRemoveNodeCommand(nodeId, architecture);
@@ -402,6 +570,13 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    /**
+     * Handles dragging a node to a new position in the simulation panel's
+     * step list via the "move node" command. `runCommand` keeps the
+     * current step pointing at the same node across the reorder.
+     * @param nodeId - id of the node being reordered
+     * @param toIndex - zero-based drop position
+     */
     const handleStepReorder = useCallback(
         (nodeId: string, toIndex: number) => {
             // runCommand itself keeps the current step's identity stable
@@ -415,6 +590,12 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
+    /**
+     * Handles creating a node via double-click: generates the next default
+     * label and runs "add node" with the drop position attached.
+     * @param position - canvas coordinates for the new node
+     * @returns the new node's id, or null if the command failed
+     */
     const handleNodeCreate = useCallback(
         (position: { x: number; y: number }): string | null => {
             const label = nextDefaultNodeLabel(architecture);
@@ -426,7 +607,12 @@ export function ArchitectureWorkspace({
         [architecture, runCommand],
     );
 
-    // A whole-architecture replacement, so it's recorded like any other
+    /**
+     * Handles importing a file as a full replacement of the architecture:
+     * reads, validates, and on success swaps it in wholesale. Bypasses
+     * `parseCommand` but is still recorded onto undo history.
+     * @param file - the file selected or dropped to import
+     */
     const handleImportFile = useCallback(
         (file: File) => {
             const label = `import "${file.name}"`;
@@ -456,7 +642,12 @@ export function ArchitectureWorkspace({
         [architecture, logResult],
     );
 
-    // Only parses and opens the picker; the actual merge happens on confirm
+    /**
+     * First half of merging a file: reads and validates it, then stashes
+     * the result as `pendingMerge` to open the merge picker. The actual
+     * merge happens on confirm, in `handleConfirmMerge`.
+     * @param file - the file selected or dropped to merge
+     */
     const handleMergeFile = useCallback(
         (file: File) => {
             file.text()
@@ -489,6 +680,16 @@ export function ArchitectureWorkspace({
 
     const handleCancelMerge = useCallback(() => setPendingMerge(null), []);
 
+    /**
+     * Handles the merge picker's "confirm" action: applies the user's
+     * choices to merge `pendingMerge.incoming` into the architecture,
+     * records it onto undo history, and logs a summary including any
+     * incoming labels renamed to avoid collisions.
+     * @param selectedNodeIds - incoming node ids to keep
+     * @param excludedEdgeIds - incoming edge ids to drop
+     * @param addedEdges - extra connections drawn in the picker
+     * @param insertAtStep - trace position to insert merged nodes at
+     */
     const handleConfirmMerge = useCallback(
         (
             selectedNodeIds: Set<string>,
