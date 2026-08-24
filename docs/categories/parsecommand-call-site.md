@@ -1,6 +1,6 @@
 # Sole `parseCommand` call site
 
-`runCommand` (a `useCallback` in `ArchitectureWorkspace`) is the single place in the component tree that calls `parseCommand`. It first trims the input and short-circuits four non-mutating or history commands (`help`, `export`, `undo`, `redo`) without touching the parser; anything else is handed to `parseCommand` along with the current `architecture`, optional `ParseCommandOptions`, and the memoized `nodeIndex`. Only when `parseCommand` reports success does it record undo history, advance `currentStepIndex`, and commit the new `architecture` via `setArchitecture`; every path — success or failure — ends by appending an entry to the command log through `logResult`. Because both the text input form (`handleSubmit`) and programmatic callers like `handleEdgeDelete` funnel through this one function, command parsing, state mutation, and logging stay in lockstep no matter how a command is triggered.
+`runCommand`, a `useCallback` in `ArchitectureWorkspace` that both `handleSubmit` and programmatic callers funnel through, is the sole call site for `parseCommand`, short-circuiting `help`/`export`/`undo`/`redo` locally and only committing `setArchitecture(result.architecture)` when `result.ok` is true.
 
 **Source:** `src/components/architecture-workspace.tsx:421-495`
 
@@ -44,5 +44,3 @@ sequenceDiagram
     RC->>Log: logResult(trimmed, result.ok, result.message)
     RC-->>Form: return result
 ```
-
-The diagram makes visible that `logResult` runs unconditionally on the `parseCommand` branch — a failed parse still gets a log entry — while `setArchitecture` only fires inside the `result.ok` guard, so a rejected command never mutates the graph.

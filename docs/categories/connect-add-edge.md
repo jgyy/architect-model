@@ -1,6 +1,6 @@
 # `connect` (add edge)
 
-This slice handles the `connect <A> to <B>` command: it resolves both endpoint labels via `resolveConnectionEndpoints`/`requireNode`, then runs a sequence of guard checks — self-loop, an existing outgoing edge on the source, an existing incoming edge on the target, and a cycle check via `wouldCreateCycle` — before appending a new edge. The one-outgoing/one-incoming constraint keeps the architecture graph a simple chain (matching the simulation player's step-by-step model), and `wouldCreateCycle` walks forward from the target through `outgoingBySource` looking for a path back to the source, which also guards against runaway loops since the chain is otherwise singly-linked. Each failure path returns a specific, user-facing message rather than a generic error, reusing the already-resolved node labels for readability.
+Because the one-outgoing/one-incoming constraint already keeps the graph a simple chain, `wouldCreateCycle` only needs to catch the edge case where the new edge closes that chain back on itself.
 
 **Source:** `src/lib/architecture-commands.ts:680-752`
 
@@ -33,5 +33,3 @@ flowchart TD
     H -- false --> I[build edge: edge-source-target]
     I --> J[return ok: architecture with new edge]
 ```
-
-The outgoing/incoming checks run before the cycle check, so on a graph that is already a simple chain, `wouldCreateCycle` only ever needs to catch the case where the new edge closes the chain back on itself.
