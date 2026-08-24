@@ -1,5 +1,11 @@
 import type { Architecture } from "@/types/architecture";
 
+/**
+ * Sample architecture graph loaded as the app's starting point instead of a
+ * blank canvas. Models a minimal attack path (Internet to Web Server to
+ * Database) as three nodes and two edges; the simulation trace lives in
+ * each node's `data.description`, not a separate structure.
+ */
 export const exampleArchitecture: Architecture = {
     nodes: [
         {

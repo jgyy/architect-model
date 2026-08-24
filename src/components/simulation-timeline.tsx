@@ -6,14 +6,30 @@ import { useState } from "react";
 import { stepDescription } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 
+/**
+ * Props for {@link SimulationTimeline}: the architecture (node order is the trace), active
+ * step, and navigate/reorder callbacks. No other state besides the in-progress drag.
+ */
 type SimulationTimelineProps = {
+    /** Architecture graph; node array order *is* the step sequence. */
     architecture: Architecture;
+    /** Index of the step currently shown; highlights the active row here. */
     currentStepIndex: number;
+    /** Called to jump the simulation to a clicked step. */
     onStepChange: (index: number) => void;
+    /**
+     * Moves the node with the given id to a new step position (drag-and-drop or up/down
+     * button). Only reorders steps (and node x-positions/numbering) - never adds, removes, or
+     * rewires edges.
+     */
     onReorder: (nodeId: string, toIndex: number) => void;
 };
 
-// All steps at a glance - click any to jump straight to it, or drag to reorder
+/**
+ * Shows every simulation step at a glance, one row per node in `architecture.nodes` order.
+ * Clicking a row jumps to that step; dragging (or the up/down buttons) reorders the trace,
+ * re-laying out node x-positions and step numbers without touching edges.
+ */
 export function SimulationTimeline({
     architecture,
     currentStepIndex,

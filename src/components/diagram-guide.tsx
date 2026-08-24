@@ -4,6 +4,7 @@ import { Panel } from "@xyflow/react";
 import { HelpCircle, X } from "lucide-react";
 import { useState } from "react";
 
+/** A guide popover row: a title paired with its explanatory text. */
 type GuideTip = { title: string; description: string };
 
 const TIPS: GuideTip[] = [
@@ -40,7 +41,12 @@ const TIPS: GuideTip[] = [
     },
 ];
 
-// Floating "?" overlay explaining how to navigate the React Flow canvas.
+/**
+ * Floating "?" overlay explaining how to navigate the React Flow canvas.
+ * Toggles a popover listing canvas gestures (pan, zoom,
+ * add/connect/rename/delete nodes) and the console/simulation workflow for
+ * first-time users.
+ */
 export function DiagramGuide() {
     const [open, setOpen] = useState(false);
 
