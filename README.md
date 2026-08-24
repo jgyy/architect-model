@@ -35,7 +35,9 @@ npm run dev
 ```
 
 Open http://localhost:3000. `npm test` runs the unit tests; `npm run check` runs lint, typecheck,
-format, and tests together. Sample JSON files for import/export/merge are in `docs/`.
+format, and tests together. Sample JSON files for import/export/merge are in `docs/`. Stack, type
+patterns, and the data structures/algorithms behind them are covered in
+[`docs/terminology.md`](docs/terminology.md).
 
 ## Supported commands
 
@@ -116,7 +118,7 @@ The Simulation panel steps through `architecture.nodes` in order - **Prev**/**Ne
 
 ## What I'd improve with more time
 
-- A cross-tab `storage` event can overwrite local state with a remote snapshot mid-autosave; a real fix needs synchronous persistence or version tracking - out of proportion for this app's size.
+- A cross-tab `storage` event can overwrite local state with a remote snapshot mid-autosave; a real fix needs synchronous persistence or version tracking.
 - The page paints the seed architecture first, then swaps in localStorage's saved state on mount -
   a visible flash. A synchronous read would remove it but risks hydration-mismatch warnings.
 - A proper user story on how users could actually benefit from this visualization.
