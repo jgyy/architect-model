@@ -19,10 +19,7 @@ import {
 } from "@/lib/node-reference";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-/**
- * A pending autocomplete suggestion: the input span a picked node would
- * replace, plus the ranked candidate nodes.
- */
+/** Autocomplete suggestion: input span to replace plus ranked candidate nodes. */
 export type NodeSuggestion = {
     /** Start offset (char index) of the argument span to replace. */
     replaceFrom: number;
@@ -35,16 +32,9 @@ export type NodeSuggestion = {
 const DEFAULT_LIMIT = 8;
 
 /**
- * Ranks nodes for the autocomplete dropdown: exact match, then prefix
- * match, then other substring matches, ties alphabetical. Substring
- * search uses `nodeIndex`'s suffix trie (findNodesBySubstring), costing
- * roughly the needle's length rather than a full scan. Empty partial
- * returns every node, alphabetized.
- *
- * @param partial - Text typed so far.
- * @param nodeIndex - Lookup structure to search.
- * @param limit - Max suggestions to return.
- * @returns Top-ranked matches, capped at `limit`.
+ * Ranks by exact/prefix/substring match, ties alphabetical; empty partial returns all nodes. Substring search is O(needle length) via suffix trie, not O(nodes).
+ * @param partial - Typed text.
+ * @returns Ranked matches, capped at `limit`.
  */
 function rankMatches(
     partial: string,
@@ -76,17 +66,10 @@ function rankMatches(
 }
 
 /**
- * Builds a suggestion for a single-node-reference command, e.g. "remove
- * node <A>". The argument runs from `rest`'s start to the end of input
- * (per node-reference.ts's patterns). Returns null once the cursor is
- * before that span.
- *
- * @param input - Full raw command text.
- * @param rest - Captured argument text (match group), if any.
- * @param nodeIndex - Lookup structure for ranking candidates.
- * @param limit - Max suggestions to return.
- * @param cursor - Caret offset in `input`.
- * @returns Suggestion for the argument span, or null if cursor is outside it.
+ * Suggestion for a single-node command (e.g. "remove node <A>"); argument spans to end of input. Null if cursor is before that span.
+ * @param rest - Captured argument, if any.
+ * @param cursor - Caret offset.
+ * @returns Suggestion, or null outside the span.
  */
 function singleSlotSuggestion(
     input: string,
@@ -107,12 +90,9 @@ function singleSlotSuggestion(
 }
 
 /**
- * Reports whether normalized `text` exactly matches an existing node
- * label (vs. one still being typed).
- *
- * @param text - Candidate label text.
- * @param nodeIndex - Lookup structure to check against.
- * @returns True if `text` matches an existing label exactly.
+ * True if normalized `text` exactly matches an existing node label (vs. still being typed).
+ * @param text - Candidate label.
+ * @returns Whether it matches exactly.
  */
 function isCompleteNodeLabel(text: string, nodeIndex: NodeIndex): boolean {
     const needle = normalizeLabel(text).toLowerCase();
@@ -121,16 +101,10 @@ function isCompleteNodeLabel(text: string, nodeIndex: NodeIndex): boolean {
 }
 
 /**
- * Picks which occurrence of a separator (e.g. " to " in "connect A to
- * B") splits the two references, since it may also appear inside a
- * label. Prefers the occurrence whose non-edited side (`cursorInRest`)
- * is a complete node label; else uses the rightmost.
- *
- * @param rest - Text after the keyword, with both references and separator(s).
- * @param separators - Accepted separator strings (e.g. " to ", " and ").
- * @param nodeIndex - Lookup structure to test candidate labels.
+ * Picks which separator occurrence splits the two references (a separator like " to " may also appear inside a label). Prefers the occurrence whose non-edited side is a complete node label; else the rightmost.
+ * @param rest - Text after the keyword.
  * @param cursorInRest - Cursor position relative to `rest`.
- * @returns Chosen separator's offset/length in `rest`, or null if none occur.
+ * @returns Offset/length in `rest`, or null.
  */
 function bestSeparatorSplit(
     rest: string,
@@ -156,17 +130,10 @@ function bestSeparatorSplit(
 }
 
 /**
- * Suggestion for a two-node command, e.g. "connect <A> to <B>": finds
- * the separator via bestSeparatorSplit and completes whichever side the
- * cursor is on; with none, treats the remainder as the first argument.
- *
- * @param input - Full raw command text.
- * @param rest - Captured text after the keyword, both node references.
- * @param separators - Separator strings this form accepts.
- * @param nodeIndex - Lookup structure for ranking candidates.
- * @param limit - Max suggestions to return.
- * @param cursor - Caret offset in `input`.
- * @returns Suggestion for whichever argument span the cursor is in.
+ * Suggestion for a two-node command (e.g. "connect <A> to <B>"): completes whichever side the cursor is on; with no separator found, treats the remainder as the first argument.
+ * @param rest - Text after the keyword.
+ * @param cursor - Caret offset.
+ * @returns Suggestion for the cursor's argument.
  */
 function twoSlotSuggestion(
     input: string,
@@ -214,18 +181,10 @@ function twoSlotSuggestion(
 }
 
 /**
- * Builds a suggestion for commands where only one side is a node
- * reference - "rename node <A> to <B>" (B a fresh label) or "move node
- * <A> to step <n>" (a step number). Completes A while the cursor is
- * there; null once past the separator.
- *
- * @param input - Full raw command text.
- * @param rest - Captured text after the keyword.
- * @param separators - Separator strings this form accepts.
- * @param nodeIndex - Lookup structure for ranking and anchoring the split.
- * @param limit - Max suggestions to return.
- * @param cursor - Caret offset in `input`.
- * @returns Suggestion for the node-reference argument, or null once past it.
+ * Suggestion for commands where only one side is a node reference - "rename node <A> to <B>" (B is a fresh label) or "move node <A> to step <n>". Completes A; null once past the separator.
+ * @param rest - Text after the keyword.
+ * @param cursor - Caret offset.
+ * @returns Suggestion for the reference argument, or null past it.
  */
 function renameNodeSuggestion(
     input: string,
@@ -260,17 +219,10 @@ function renameNodeSuggestion(
 }
 
 /**
- * Live-typing completion hint for a command's node-reference argument(s):
- * matches input against each command form (connect/link, remove edge,
- * remove/rename node, move node) and returns the span to replace plus
- * ranked suggestions for the cursor's argument. Entry point for the
- * autocomplete dropdown.
- *
- * @param input - Full raw command text in the input box.
- * @param architecture - Graph (nodes/edges) suggestions are drawn from.
- * @param cursor - Caret offset in `input`; defaults to the end.
- * @param limit - Max suggestions; defaults to DEFAULT_LIMIT.
- * @param nodeIndex - Lookup structure; built from `architecture` if omitted, so callers can reuse one.
+ * Autocomplete entry point: matches `input` against each command form (connect, remove edge, remove/rename node, move node) and returns the replace-span plus ranked suggestions for the cursor's argument.
+ * @param cursor - Defaults to end of input.
+ * @param limit - Defaults to DEFAULT_LIMIT.
+ * @param nodeIndex - Built from `architecture` if omitted; pass to reuse across calls.
  * @returns Suggestion for the cursor's argument, or null if no form matches.
  */
 export function suggestNodeReference(
@@ -347,13 +299,9 @@ export function suggestNodeReference(
 }
 
 /**
- * Reports whether a suggestion's argument-span text exactly matches one
- * of its candidate nodes - lets the dropdown dismiss once a valid label
- * is fully typed.
- *
- * @param input - Full raw command text.
- * @param suggestion - Suggestion whose span and matches to check.
- * @returns True if the typed span case-insensitively matches a candidate node.
+ * True if the suggestion's argument span exactly matches one of its candidate nodes - lets the dropdown dismiss once a label is fully typed.
+ * @param suggestion - Span and candidates to check.
+ * @returns Whether the typed span matches, case-insensitively.
  */
 export function suggestionIsCompleteMatch(
     input: string,
@@ -369,14 +317,10 @@ export function suggestionIsCompleteMatch(
 }
 
 /**
- * Splices a node's label into the suggestion's span, replacing the typed
- * partial, and pads with spaces (leading if needed, trailing always) for
- * a caret ready to continue typing.
- *
- * @param input - Raw command text before the suggestion is applied.
- * @param suggestion - Identifies which span of `input` to replace.
- * @param node - Node whose label is inserted.
- * @returns Updated input text and caret position after the inserted label and its trailing space.
+ * Splices the node's label into the suggestion's span, padding with a leading space if needed and a trailing space always, so the caret is ready to continue typing.
+ * @param suggestion - Span of `input` to replace.
+ * @param node - Node to insert.
+ * @returns Updated text and caret position after the label.
  */
 export function applyNodeSuggestion(
     input: string,

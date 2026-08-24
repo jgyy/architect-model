@@ -17,20 +17,14 @@ import type { NodeIndex } from "@/lib/architecture-commands";
 import type { LogEntry } from "@/lib/persistence";
 import type { Architecture } from "@/types/architecture";
 
-/**
- * Clickable example commands shown in the empty-log state so a first-time
- * user has something to try instead of guessing the syntax.
- */
+/** Example commands shown in the empty-log state to guide first-time users. */
 const EXAMPLE_COMMANDS = [
     "add node Cache",
     "connect Web Server to Cache",
     "help",
 ];
 
-/**
- * Props for {@link ConsolePanel}: log/input state plus callbacks for the
- * toolbar actions (undo/redo, export/import/merge, clear).
- */
+/** Props for {@link ConsolePanel}: log/input state and toolbar callbacks. */
 type ConsolePanelProps = {
     /** Commands and outcomes, rendered as the scrolling log. */
     log: LogEntry[];
@@ -42,11 +36,7 @@ type ConsolePanelProps = {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     /** Graph passed to {@link CommandInput} for suggestions. */
     architecture: Architecture;
-    /**
-     * Precomputed lookup index over the architecture (Maps/a Set by label,
-     * id, edge endpoints), built once per command. Used by
-     * {@link CommandInput} for node-name autocomplete.
-     */
+    /** Lookup index (by label/id/edge), rebuilt per command; feeds {@link CommandInput} autocomplete. */
     nodeIndex?: NodeIndex;
     /** Whether undo has an entry. */
     canUndo: boolean;
@@ -62,12 +52,7 @@ type ConsolePanelProps = {
     onMerge: (file: File) => void;
 };
 
-/**
- * The command console: a REPL-style panel logging every submitted command
- * with its success/failure outcome, doubling as the app's validation UI.
- * Also hosts the undo/redo and export/import/merge toolbar, and renders
- * the live command input.
- */
+/** REPL-style console: logs each command's outcome (doubling as validation UI) and hosts the undo/redo/export/import/merge toolbar. */
 export function ConsolePanel({
     log,
     onClear,
@@ -107,11 +92,8 @@ export function ConsolePanel({
 
     const NEAR_BOTTOM_THRESHOLD_PX = 32;
 
-    /**
-     * Updates {@link stickToBottomRef} from the current scroll position, so
-     * the auto-scroll effect knows whether to keep pinning to the bottom or
-     * leave the user's scroll-up alone.
-     * @param event - the log container's scroll event
+    /** Updates {@link stickToBottomRef} so auto-scroll knows whether to stay pinned.
+     * @param event - scroll event
      */
     function handleScroll(event: React.UIEvent<HTMLDivElement>) {
         const el = event.currentTarget;
@@ -121,11 +103,9 @@ export function ConsolePanel({
             distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
     }
 
-    /**
-     * Reads the picked file from the hidden import/merge input and forwards
-     * it to the wired callback.
+    /** Reads the picked file and forwards it to the callback.
      * @param event - change event
-     * @param onPicked - callback for the file (import or merge)
+     * @param onPicked - import or merge handler
      */
     function handleFilePicked(
         event: React.ChangeEvent<HTMLInputElement>,

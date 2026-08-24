@@ -15,39 +15,23 @@ import {
 } from "@/lib/node-suggestions";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-/**
- * Stable "not recalling history" state, reused instead of allocating a
- * fresh object literal each render.
- */
+/** Reused idle history state; avoids a fresh object literal each render. */
 const IDLE_HISTORY: CommandHistoryState = { index: null, draft: "" };
 
-/**
- * Props for {@link CommandInput}: controlled value/handlers plus what
- * autocomplete and history recall need.
- */
+/** Props for {@link CommandInput}: value/handlers plus autocomplete/history inputs. */
 type CommandInputProps = {
     value: string;
     onChange: (value: string) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     /** Graph used to resolve autocomplete node-reference arguments. */
     architecture: Architecture;
-    /**
-     * Caller's memoized lookup index over `architecture`: Maps/Set keyed by
-     * label, id, and edge endpoints, plus a suffix trie (built from every
-     * label suffix) enabling substring search. Passed in so a keystroke
-     * never rebuilds it.
-     */
+    /** Memoized lookup index over `architecture` (label/id/edge maps + suffix trie); passed in so a keystroke never rebuilds it. */
     nodeIndex?: NodeIndex;
     // previously submitted command text, oldest first, recalled with Up/Down
     commands: string[];
 };
 
-/**
- * The console's text input: a terminal-style prompt combining a controlled
- * text field, an inline node-reference autocomplete dropdown, and
- * shell-style Up/Down history recall over `commands`. The component users
- * type architecture-editing commands into.
- */
+/** Terminal-style command prompt: text field, node-reference autocomplete dropdown, and shell-style Up/Down history recall. */
 export function CommandInput({
     value,
     onChange,
@@ -107,11 +91,10 @@ export function CommandInput({
     }
 
     /**
-     * Applies a chosen autocomplete candidate: splices its label into
-     * `value`, queues the cursor position, and dismisses the dropdown. Also
-     * resets history recall since the text no longer matches it.
+     * Applies a chosen suggestion and resets history recall, which would
+     * otherwise go stale.
      *
-     * @param node - The picked candidate, or undefined if empty.
+     * @param node - Picked candidate, or undefined.
      */
     function selectSuggestion(node: ArchitectureNode | undefined) {
         if (!suggestion || !node) return;
@@ -131,10 +114,7 @@ export function CommandInput({
         onChange(result.value);
     }
 
-    /**
-     * Steps history recall toward the present (Down arrow); a no-op when
-     * not currently recalling.
-     */
+    /** Steps history recall toward the present (Down arrow); a no-op when not recalling. */
     function recallNewer() {
         if (historyState.index === null) return;
         const result = recallNewerCommand(commands, historyState);
@@ -143,13 +123,10 @@ export function CommandInput({
     }
 
     /**
-     * Routes a keypress to whichever feature owns arrow-key/Enter/Tab
-     * behavior: with autocomplete options open, arrows move the highlighted
-     * candidate and Enter/Tab accept it (unless the text already matches
-     * uniquely, letting Enter submit normally); otherwise arrows drive
-     * history recall.
+     * Routes arrow/Enter/Tab keys to autocomplete when open (Enter submits
+     * if already unambiguous), else to history recall.
      *
-     * @param event - Keydown event from the input.
+     * @param event - Keydown event.
      */
     function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
         if (options.length > 0) {

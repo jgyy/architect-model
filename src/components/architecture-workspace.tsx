@@ -39,20 +39,15 @@ import { HELP_MESSAGE } from "@/lib/supported-commands";
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
 /**
- * Props for {@link ArchitectureWorkspace}: the architecture to start from
- * before any persisted session loads, and to reset to on "clear history".
+ * Seed architecture; also the reset target for "clear history".
  */
 type ArchitectureWorkspaceProps = {
     initialArchitecture: Architecture;
 };
 
 /**
- * The app's single top-level stateful screen ("use client"): owns the
- * architecture graph, command log, undo/redo history, simulation playback
- * position, and syncing to `localStorage`. Sole call site of `parseCommand`
- * - every typed command and canvas gesture runs through its `runCommand`,
- * which validates, records undo, updates the simulation, and persists.
- * Renders the canvas, console/simulation sidebar, and merge picker dialog.
+ * Top-level stateful screen: owns architecture, undo/redo, and simulation
+ * state; sole call site of `parseCommand`.
  */
 export function ArchitectureWorkspace({
     initialArchitecture,
@@ -81,9 +76,7 @@ export function ArchitectureWorkspace({
 
     const highlightedNodeId = architecture.nodes[safeStepIndex]?.id;
     /**
-     * Nodes and edges the simulation has already passed through, up to
-     * `safeStepIndex`. Memoized so the canvas doesn't recompute its
-     * traversed-path styling on every unrelated state change.
+     * Nodes/edges traversed up to `safeStepIndex`; memoized for perf.
      */
     const traversedPath = useMemo(
         () => getTraversedPath(architecture, safeStepIndex),
@@ -91,9 +84,7 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Adopts a new node array from the canvas (e.g. after a drag) without
-     * touching edges.
-     * @param nodes - the updated node array to store
+     * Adopts nodes from a canvas drag; leaves edges untouched.
      */
     const handleNodesChange = useCallback(
         (nodes: ArchitectureNode[]) => {
@@ -103,20 +94,12 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Runs one command line the same way whether typed into the console or
-     * synthesized from a canvas gesture - the app's single entry point for
-     * every mutation and sole call site of `parseCommand`. Handles `help`,
-     * `export`, `undo`, and `redo` directly since they're non-mutating or
-     * act on history; every other command goes through `parseCommand` and,
-     * on success, is recorded onto the two-stack undo/redo history (undo
-     * pops an entry and pushes its inverse onto redo; a new command clears
-     * the redo stack) before the architecture state updates. Every outcome
-     * is logged.
-     * @param text - raw command text to run
-     * @param options - forwarded to `parseCommand` (e.g. drop position for
-     * a canvas-created node)
-     * @returns the `CommandResult` discriminated union describing the
-     * outcome, or null if `text` was blank
+     * Single entry point for every mutation, typed or canvas-triggered.
+     * `help`/`export`/`undo`/`redo` run directly; other commands go through
+     * `parseCommand` and push onto undo history on success (clearing redo).
+     * @param text - command text
+     * @param options - forwarded to `parseCommand`
+     * @returns `CommandResult`, or null if blank
      */
     const runCommand = useCallback(
         (text: string, options?: ParseCommandOptions): CommandResult | null => {
@@ -203,9 +186,7 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Wires the console's input form to `runCommand`: runs the input and
-     * clears the box, ignoring blank/whitespace-only submits.
-     * @param event - the form's submit event
+     * Runs input via `runCommand`, clears box; ignores blank submits.
      */
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -215,10 +196,7 @@ export function ArchitectureWorkspace({
     }
 
     /**
-     * Handles deleting an edge on the canvas: synthesizes and runs the same
-     * "remove edge" command text a typed instruction would produce, so
-     * gestures and typed commands share one validated, undo-able path.
-     * @param edgeId - id of the edge to remove
+     * Deletes an edge via the equivalent "remove edge" command text.
      */
     const handleEdgeDelete = useCallback(
         (edgeId: string) => {
@@ -229,10 +207,7 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Handles connecting two nodes by canvas drag: synthesizes and runs
-     * the equivalent "connect" command text.
-     * @param sourceId - node the drag started from
-     * @param targetId - node the drag ended on
+     * Connects two nodes via the equivalent "connect" command text.
      */
     const handleEdgeCreate = useCallback(
         (sourceId: string, targetId: string) => {
@@ -247,11 +222,8 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Handles renaming a node inline on the canvas via the "rename"
-     * command.
-     * @param nodeId - id of the node being renamed
-     * @param newLabel - label text entered
-     * @returns whether it succeeded (false e.g. on a duplicate label)
+     * Renames a node inline via the "rename" command.
+     * @returns false e.g. on a duplicate label
      */
     const handleNodeRename = useCallback(
         (nodeId: string, newLabel: string): boolean => {
@@ -267,8 +239,7 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Handles deleting a node on the canvas via the "remove node" command.
-     * @param nodeId - id of the node to remove
+     * Deletes a node via the "remove node" command.
      */
     const handleNodeDelete = useCallback(
         (nodeId: string) => {
@@ -279,10 +250,7 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Handles dragging a node to a new position in the simulation panel's
-     * step list via the "move node" command. `runCommand` keeps the
-     * current step pointing at the same node across the reorder.
-     * @param nodeId - id of the node being reordered
+     * Reorders via "move node"; `runCommand` pins the step to the same node.
      * @param toIndex - zero-based drop position
      */
     const handleStepReorder = useCallback(
@@ -299,10 +267,8 @@ export function ArchitectureWorkspace({
     );
 
     /**
-     * Handles creating a node via double-click: generates the next default
-     * label and runs "add node" with the drop position attached.
-     * @param position - canvas coordinates for the new node
-     * @returns the new node's id, or null if the command failed
+     * Creates a node via double-click with a default label at the drop position.
+     * @returns new node id, or null on failure
      */
     const handleNodeCreate = useCallback(
         (position: { x: number; y: number }): string | null => {

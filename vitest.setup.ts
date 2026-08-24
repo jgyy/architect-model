@@ -6,11 +6,7 @@
 // render and interact with the UI as if a real browser were present.
 import "@testing-library/jest-dom/vitest";
 
-/**
- * Stub for jsdom's missing ResizeObserver, used by React Flow to detect
- * canvas resizes. `observe()` just reports the target's current dimensions
- * once, without tracking real changes.
- */
+/** Stub for jsdom's missing ResizeObserver; `observe()` reports current dimensions once, without tracking real changes. */
 class ResizeObserverStub {
     #callback: ResizeObserverCallback;
 
@@ -19,10 +15,9 @@ class ResizeObserverStub {
     }
 
     /**
-     * Schedules a microtask that reads `target`'s current bounding box and
-     * reports it as one resize entry, since jsdom has no real layout to
-     * track over time.
-     * @param target - element to report a resize entry for
+     * Reports `target`'s current bounding box as one resize entry (jsdom has no real
+     * layout to track over time).
+     * @param target - element to report on
      */
     observe(target: Element) {
         queueMicrotask(() => {
@@ -42,18 +37,11 @@ class ResizeObserverStub {
     disconnect() {}
 }
 
-/**
- * Stub for jsdom's missing DOMMatrixReadOnly, used by React Flow to read a
- * node's zoom from its CSS transform. Parses only `m22`, the vertical scale
- * factor React Flow's zoom math reads.
- */
+/** Stub for jsdom's missing DOMMatrixReadOnly; parses only `m22`, the vertical scale factor React Flow's zoom math reads. */
 class DOMMatrixReadOnlyStub {
     m22 = 1;
 
-    /**
-     * @param transform - CSS transform string; when omitted or
-     *   unparseable, `m22` defaults to 1 (no zoom)
-     */
+    /** @param transform - CSS transform; omitted/unparseable defaults `m22` to 1 (no zoom) */
     constructor(transform?: string) {
         const match = transform?.match(/matrix\(([^)]+)\)/);
         const values = match?.[1].split(",").map((value) => parseFloat(value));
@@ -76,12 +64,8 @@ if (typeof window !== "undefined") {
     // jsdom does no layout, so the stubs below give every element a fixed
     // size instead of a measured one.
     /**
-     * True if `element` is React Flow's pannable viewport container
-     * (`react-flow__renderer` class), not an ordinary node. Used by the
-     * layout stubs to give the canvas room while everything else gets a
-     * placeholder size.
+     * True if `element` is React Flow's pannable viewport container, not an ordinary node.
      * @param element - element being measured
-     * @returns true if it's React Flow's viewport container
      */
     function isViewportContainer(element: Element): boolean {
         return element.classList?.contains("react-flow__renderer") ?? false;

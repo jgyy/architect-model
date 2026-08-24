@@ -8,13 +8,8 @@ function findNode(
 }
 
 /**
- * Builds "remove edge A to B" command text for an edge deleted on the
- * canvas, so it runs through the console path instead of a direct mutation.
- * Mirrors every canvas gesture in this file.
- *
- * @param edgeId - id of the removed edge
- * @param architecture - graph state used to resolve the edge and its endpoints
- * @returns the command string, or null if the edge or an endpoint can't be found
+ * Builds "remove edge A to B" text so canvas edge deletions run through the console command path, not a direct mutation.
+ * @returns command string, or null if edge/endpoint missing
  */
 export function buildRemoveEdgeCommand(
     edgeId: string,
@@ -33,14 +28,8 @@ export function buildRemoveEdgeCommand(
 }
 
 /**
- * Builds "connect A to B" command text for a drag-to-connect gesture,
- * turning the source/target node ids React Flow reports into
- * typed-instruction text.
- *
- * @param sourceId - id of the drag's source node
- * @param targetId - id of the drop target node
- * @param architecture - graph state used to resolve both nodes
- * @returns the command string, or null if either node can't be found
+ * Builds "connect A to B" text for a drag-to-connect gesture, from React Flow's source/target node ids.
+ * @returns command string, or null if either node missing
  */
 export function buildConnectCommand(
     sourceId: string,
@@ -55,12 +44,8 @@ export function buildConnectCommand(
 }
 
 /**
- * Builds "rename node A to B" command text for an inline canvas rename.
- *
- * @param nodeId - id of the renamed node
- * @param newLabel - new label for the node
- * @param architecture - graph state used to resolve the node
- * @returns the command string, or null if the node can't be found
+ * Builds "rename node A to B" text for an inline canvas rename.
+ * @returns command string, or null if node missing
  */
 export function buildRenameNodeCommand(
     nodeId: string,
@@ -74,11 +59,8 @@ export function buildRenameNodeCommand(
 }
 
 /**
- * Builds "remove node A" command text for a node deleted from the canvas.
- *
- * @param nodeId - id of the removed node
- * @param architecture - graph state used to resolve the node
- * @returns the command string, or null if the node can't be found
+ * Builds "remove node A" text for a node deleted from the canvas.
+ * @returns command string, or null if node missing
  */
 export function buildRemoveNodeCommand(
     nodeId: string,
@@ -91,13 +73,8 @@ export function buildRemoveNodeCommand(
 }
 
 /**
- * Builds "move node A to step N" command text for reordering a node within
- * the simulation trace (the node array's order).
- *
- * @param nodeId - id of the moved node
- * @param targetPosition - target step number
- * @param architecture - graph state used to resolve the node
- * @returns the command string, or null if the node can't be found
+ * Builds "move node A to step N" text for reordering a node within the simulation trace (the node array's order).
+ * @returns command string, or null if node missing
  */
 export function buildMoveNodeCommand(
     nodeId: string,
@@ -111,12 +88,8 @@ export function buildMoveNodeCommand(
 }
 
 /**
- * Picks a default label ("Node N") for a node created on the canvas rather
- * than typed. Checks existing labels case-insensitively so it never
- * collides with a user-created "Node N".
- *
- * @param architecture - graph whose existing node labels are checked for collisions
- * @returns unused default label, e.g. "Node 3"
+ * Picks the next unused "Node N" label, checked case-insensitively so it won't collide with a user-created one.
+ * @returns e.g. "Node 3"
  */
 export function nextDefaultNodeLabel(architecture: Architecture): string {
     const used = new Set(
@@ -127,23 +100,15 @@ export function nextDefaultNodeLabel(architecture: Architecture): string {
     return `Node ${n}`;
 }
 
-/**
- * A click's screen position and timestamp, recorded to detect double-clicks
- * (see isDoubleClick).
- */
+/** A click's screen position and timestamp, for double-click detection. */
 export type ClickPoint = { x: number; y: number; time: number };
 
 const DOUBLE_CLICK_MAX_INTERVAL_MS = 400;
 const DOUBLE_CLICK_MAX_DISTANCE_PX = 10;
 
 /**
- * Emulates native double-click detection for React Flow's onPaneClick,
- * which only ever reports single clicks. Two clicks count as a
- * double-click when close enough in time and distance.
- *
- * @param current - the click just received
- * @param previous - the previous click, or null if none yet
- * @returns true if the clicks form a double-click
+ * Emulates double-click detection for React Flow's onPaneClick, which only ever reports single clicks.
+ * @returns true if within the time/distance thresholds
  */
 export function isDoubleClick(
     current: ClickPoint,

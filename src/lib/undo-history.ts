@@ -1,10 +1,6 @@
 import type { Architecture } from "@/types/architecture";
 
-/**
- * One undo/redo entry: an architecture snapshot paired with the command
- * that moved the app away from it. Same shape on both stacks: past state
- * on undo, future state on redo.
- */
+/** One undo/redo entry: snapshot paired with the command that produced it. */
 export type HistoryEntry = {
     command: string;
     // The architecture state to restore if this entry is popped.
@@ -12,10 +8,8 @@ export type HistoryEntry = {
 };
 
 /**
- * Two-stack undo/redo record for one architecture's edit history: each
- * command pushes an entry onto `undoStack`; undo pops it onto `redoStack`
- * inverted, and redo reverses that. Tracks the architecture graph only -
- * unrelated to command-history.ts, which replays typed console text.
+ * Two-stack undo/redo record for one architecture's edit history. Distinct
+ * from command-history.ts, which replays typed console text.
  */
 export type UndoRedoState = {
     undoStack: HistoryEntry[];
@@ -29,23 +23,17 @@ export const EMPTY_UNDO_REDO_STATE: UndoRedoState = {
 };
 
 /**
- * Bounds memory for a long session, since each entry carries a full
- * architecture. `recordCommand` enforces this by slicing the undo stack
- * to the most recent entries once exceeded, like a fixed-size ring
- * buffer.
+ * Caps undo stack memory (each entry holds a full architecture);
+ * `recordCommand` slices to the most recent entries like a ring buffer.
  */
 export const MAX_UNDO_HISTORY_ENTRIES = 500;
 
 /**
- * Called after a command changes the architecture from `before`. Pushes an
- * undo entry and clears the redo stack, since a fresh edit invalidates any
- * undone future.
+ * Pushes an undo entry for `before` and clears the redo stack (a new edit
+ * invalidates any undone future).
  *
- * @param state - undo/redo state
- * @param command - command text for the change
- * @param before - architecture snapshot prior to `command`
- * @returns updated state: `before` pushed onto the undo stack (capped at
- * {@link MAX_UNDO_HISTORY_ENTRIES}), redo cleared
+ * @param before - snapshot prior to `command`
+ * @returns updated state, capped at {@link MAX_UNDO_HISTORY_ENTRIES}
  */
 export function recordCommand(
     state: UndoRedoState,
@@ -63,10 +51,8 @@ export function recordCommand(
 }
 
 /**
- * Result of an undo or redo step, as a discriminated union rather than a
- * thrown error, forcing callers to check `ok` before use. `ok: true`
- * carries the architecture to switch to, the command undone/redone, and
- * the updated state; `ok: false` means the relevant stack was empty.
+ * Result of an undo/redo step as a discriminated union (not a thrown
+ * error), forcing callers to check `ok` before use.
  */
 export type UndoRedoResult =
     | {
@@ -78,14 +64,10 @@ export type UndoRedoResult =
     | { ok: false };
 
 /**
- * Reverts to the state before the last recorded command, if any. Pops
- * the top undo entry, returns its snapshot, and pushes an inverse entry
- * (same command, current architecture) onto the redo stack.
+ * Pops the top undo entry and pushes an inverse entry (same command,
+ * `current`) onto the redo stack.
  *
- * @param state - undo/redo state
- * @param current - architecture now, saved onto the redo stack
- * @returns `{ ok: false }` if the undo stack is empty; otherwise the
- * restored architecture, undone command, and updated state
+ * @returns `{ ok: false }` if the undo stack is empty
  */
 export function undo(
     state: UndoRedoState,
@@ -108,14 +90,10 @@ export function undo(
 }
 
 /**
- * Re-applies the last undone command by restoring the snapshot atop the
- * redo stack. Pops that entry, returns its snapshot, and pushes an
- * inverse entry (same command, current architecture) onto the undo stack.
+ * Pops the top redo entry and pushes an inverse entry (same command,
+ * `current`) onto the undo stack.
  *
- * @param state - undo/redo state
- * @param current - architecture now, saved onto the undo stack
- * @returns `{ ok: false }` if the redo stack is empty; otherwise the
- * restored architecture, redone command, and updated state
+ * @returns `{ ok: false }` if the redo stack is empty
  */
 export function redo(
     state: UndoRedoState,

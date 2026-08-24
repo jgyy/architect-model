@@ -11,32 +11,25 @@ import {
 } from "@/lib/simulation";
 import type { Architecture } from "@/types/architecture";
 
-/**
- * Props for {@link SimulationPanel}. Controlled component: step, playback state, and speed
- * live in the parent; these props pass that state down plus callbacks to request changes.
- */
+/** Props for {@link SimulationPanel}: controlled component - state lives in the parent. */
 type SimulationPanelProps = {
-    /**
-     * The graph being walked. The trace is just this array's node order (see
-     * {@link stepDescription}).
-     */
+    /** Trace is this array's node order (see {@link stepDescription}). */
     architecture: Architecture;
-    /** Current step index into `architecture.nodes`. */
+    /** Index into `architecture.nodes`. */
     currentStepIndex: number;
-    /** Requests moving to a step index. */
+    /** Requests a step change. */
     onStepChange: (index: number) => void;
-    /** Current speed index into {@link PLAY_SPEEDS}. */
+    /** Index into {@link PLAY_SPEEDS}. */
     speedIndex: number;
-    /** Requests speed change to this {@link PLAY_SPEEDS} index. */
+    /** Requests a {@link PLAY_SPEEDS} change. */
     onSpeedChange: (index: number) => void;
-    /** Requests moving node `nodeId` to `toIndex` in trace order. */
+    /** Requests moving `nodeId` to `toIndex`. */
     onReorder: (nodeId: string, toIndex: number) => void;
 };
 
 /**
- * Playback control for the simulation trace: shows the current step's narrative line, steps
- * forward/backward, plays/pauses at a chosen speed, and (via {@link SimulationTimeline}) jumps
- * to or reorders steps. Renders nothing with no nodes.
+ * Playback control for the trace: step/play/pause/speed, plus (via {@link SimulationTimeline})
+ * jump/reorder. Renders nothing with no nodes.
  */
 export function SimulationPanel({
     architecture,

@@ -1,10 +1,6 @@
 import type { Architecture, ArchitectureNode } from "@/types/architecture";
 
-/**
- * Autoplay speeds for the simulation trace (architecture nodes, in array order). Each pairs
- * a label with the step delay; the index also serves as "current speed" elsewhere (see
- * {@link DEFAULT_SPEED_INDEX}).
- */
+/** Autoplay speeds for the simulation trace; index doubles as the "current speed" index (see {@link DEFAULT_SPEED_INDEX}). */
 export const PLAY_SPEEDS = [
     { label: "0.5x", intervalMs: 3000 },
     { label: "1x", intervalMs: 1500 },
@@ -14,53 +10,41 @@ export const PLAY_SPEEDS = [
 /** Default {@link PLAY_SPEEDS} index for new simulations (1x). */
 export const DEFAULT_SPEED_INDEX = 1;
 
-/**
- * Narrative line for a simulation step: the node's own description, or a generated sentence
- * for nodes saved before descriptions existed.
- * @param node - the step's node
- * @returns the description text
- */
+/** Step's description, or a generated fallback for legacy nodes without one. */
 export function stepDescription(node: ArchitectureNode): string {
     return node.data.description ?? `Reaches "${node.data.label}".`;
 }
 
 /**
- * Clamps a step index to a trace's valid range, guarding against stale indices after nodes
- * are added or removed.
+ * Clamps a step index into [0, length-1] (0 if empty); guards stale indices after node changes.
  * @param index - candidate index
- * @param length - steps in the trace
- * @returns clamped index in [0, length-1], or 0 if empty
+ * @param length - trace length
  */
 export function clampStepIndex(index: number, length: number): number {
     return Math.min(Math.max(index, 0), Math.max(length - 1, 0));
 }
 
 /**
- * Next step index for autoplay, or null once the trace is finished.
+ * Next autoplay step index, or null once the trace is finished.
  * @param index - current step index
- * @param length - steps in the current trace
- * @returns next index, or null when already at the last step
+ * @param length - trace length
  */
 export function getNextPlayIndex(index: number, length: number): number | null {
     const next = index + 1;
     return next < length ? next : null;
 }
 
-/**
- * Nodes and edges traversed up to and including the current step; used by the canvas to
- * highlight the traversed path.
- */
+/** Node/edge ids traversed up to the current step, for canvas highlighting. */
 export type TraversedPath = {
     nodeIds: Set<string>;
     edgeIds: Set<string>;
 };
 
 /**
- * Traversed path up to currentStepIndex: a node counts as traversed if its array position is
- * at or before the step; an edge counts once both endpoints do.
- * @param architecture - graph (nodes in trace order, plus edges)
+ * Traversed ids as of currentStepIndex: a node counts if its array index <= step; an edge
+ * counts once both endpoints do.
+ * @param architecture - nodes (trace order) plus edges
  * @param currentStepIndex - step being viewed
- * @returns ids of traversed nodes and edges
  */
 export function getTraversedPath(
     architecture: Architecture,
