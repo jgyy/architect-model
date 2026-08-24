@@ -4,6 +4,8 @@ React Flow emits a `position`-type `NodeChange` on every pointer-move frame of a
 
 **Source:** `src/lib/node-changes.ts:1-20`
 
+**Filtering settled position changes**
+
 ```mermaid
 flowchart TD
     A["applyPersistableNodeChanges(changes, nodes)"] --> B["changes.filter(isSettledPositionChange)"]
@@ -12,6 +14,13 @@ flowchart TD
     C -->|false, per change| E[dropped]
     D --> F{"persistable.length === 0?"}
     E --> F
+```
+
+**Returning the reference or the merged result**
+
+```mermaid
+flowchart TD
+    F{"persistable.length === 0?"}
     F -->|yes| G["return nodes (same reference)"]
     F -->|no| H["return applyNodeChanges(persistable, nodes)"]
 ```

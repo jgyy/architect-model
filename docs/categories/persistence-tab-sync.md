@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/persistence.ts:24,64-170`
 
+**Save and cross-tab storage event**
+
 ```mermaid
 sequenceDiagram
     participant A as Tab A
@@ -14,6 +16,14 @@ sequenceDiagram
     A->>LS: setItem(STORAGE_KEY, JSON.stringify(nextState))
     LS-->>B: "storage" event (key, newValue)
     B->>B: interpretStorageEvent(event.key, event.newValue)
+```
+
+**Classifying the storage event**
+
+```mermaid
+sequenceDiagram
+    participant B as Tab B (handleStorage)
+
     alt key !== STORAGE_KEY
         B->>B: type: "irrelevant"
     else newValue === null

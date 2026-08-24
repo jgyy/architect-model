@@ -4,10 +4,18 @@
 
 **Source:** `src/components/architecture-canvas.tsx:114,291-301`
 
+**Node-count guard check**
+
 ```mermaid
 flowchart TD
     A[architecture.nodes.length] --> B{"<= MINIMAP_NODE_LIMIT (300)?"}
-    B -->|yes| C["MiniMap pannable zoomable rendered"]
+```
+
+**Minimap render outcome**
+
+```mermaid
+flowchart TD
+    B{"<= MINIMAP_NODE_LIMIT (300)?"} -->|yes| C["MiniMap pannable zoomable rendered"]
     B -->|no| D[MiniMap omitted]
 ```
 

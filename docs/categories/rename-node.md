@@ -4,6 +4,8 @@ The rename-node handler matches the command against `RENAME_NODE_PATTERNS`, then
 
 **Source:** `src/lib/architecture-commands.ts:610-666`
 
+**Matching and label validation**
+
 ```mermaid
 flowchart TD
     A["matchFirst(RENAME_NODE_PATTERNS, trimmed)"] -->|"no match"| Z1["fall through to next command"]
@@ -20,7 +22,13 @@ flowchart TD
     H -->|"yes"| E5["ok:false — already named that"]
     H -->|"no"| I["duplicateLabelError(normalizedNewLabel, nodeIndex)"]
     I -->|"error"| E6["return duplicateError"]
-    I -->|"none"| J["map architecture.nodes"]
+```
+
+**Node rewrite and result**
+
+```mermaid
+flowchart TD
+    I["duplicateLabelError(normalizedNewLabel, nodeIndex)"] -->|"none"| J["map architecture.nodes"]
     J --> K["matching node: set data.label = normalizedNewLabel"]
     K --> L["set data.description = Reaches &quot;normalizedNewLabel&quot;"]
     J --> M["all other nodes: returned unchanged"]

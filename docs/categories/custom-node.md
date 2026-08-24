@@ -4,6 +4,8 @@
 
 **Source:** `src/components/architecture-node.tsx:1-173`
 
+**Entering edit, highlight, and traversal states**
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
@@ -12,6 +14,12 @@ stateDiagram-v2
     AutoEditing --> Editing
     Idle --> Highlighted: current (id === currentNodeId)
     Idle --> Traversed: traversed (in traversedNodeIds, not current)
+```
+
+**Exiting, resetting, and side transitions**
+
+```mermaid
+stateDiagram-v2
     Highlighted --> Idle: currentNodeId changes away
     Traversed --> Idle: traversedNodeIds no longer has id
     Editing --> Idle: commitEditing() - draft.trim() === data.label

@@ -14,6 +14,8 @@ yanked back down when a new entry arrives.
 
 **Source:** `src/components/console-panel.tsx:1-246`
 
+**Submission and auto-scroll**
+
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -31,6 +33,16 @@ sequenceDiagram
     else user scrolled away
         CP-->>DOM: no scroll (position preserved)
     end
+```
+
+**Entry rendering and scroll tracking**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CP as ConsolePanel
+    participant DOM as scrollRef container
+
     CP->>CP: log.map(entry => ...)
     alt entry.ok
         CP-->>U: render CheckCircle2 + entry.message

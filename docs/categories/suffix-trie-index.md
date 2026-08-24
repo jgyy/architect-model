@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/architecture-commands.ts:84-199`
 
+**Building the trie**
+
 ```mermaid
 flowchart TD
     subgraph Build["buildSubstringIndex(nodes)"]
@@ -14,6 +16,13 @@ flowchart TD
         E --> C
     end
 
+    Build -.builds.-> Trie[(SubstringTrieNode:<br/>children Map + matches Set)]
+```
+
+**Querying and consuming the index**
+
+```mermaid
+flowchart TD
     subgraph Query["querySubstringIndex(root, needle)"]
         Q1[current = root] --> Q2{for each char in needle}
         Q2 -->|child exists| Q3[current = child]
@@ -22,8 +31,7 @@ flowchart TD
         Q2 -->|needle exhausted| Q5[return Array.from<br/>current.matches]
     end
 
-    Build -.builds.-> Trie[(SubstringTrieNode:<br/>children Map + matches Set)]
-    Query -.reads.-> Trie
+    Trie[(SubstringTrieNode:<br/>children Map + matches Set)] -.reads.-> Query
 
     Trie --> Caller1[findNodesBySubstring<br/>public export]
     Trie --> Caller2[findNodeOrAmbiguity<br/>exact byLabel miss, then substring fallback]

@@ -4,14 +4,21 @@
 
 **Source:** `src/lib/architecture-commands.ts:201-214,729-731`
 
+**Pattern matching and unrecognized commands**
+
 ```mermaid
 flowchart TD
     A["parseCommand(input)"] --> B["trimmed = stripInvisibleChars(input).trim()"]
     B --> C{"matchFirst(PATTERN, trimmed)\nfor add/connect/rename/move/..."}
     C -->|"no pattern matched"| D["fall through to final return"]
     D --> E["Unrecognized command: trimmed\n+ UNRECOGNIZED_COMMAND_USAGE\n+ help hint"]
+```
 
-    C -->|"pattern matched"| F["findNodeOrAmbiguity(label, nodeIndex)"]
+**Node resolution and ambiguity messaging**
+
+```mermaid
+flowchart TD
+    C{"matchFirst(PATTERN, trimmed)\nfor add/connect/rename/move/..."} -->|"pattern matched"| F["findNodeOrAmbiguity(label, nodeIndex)"]
     F --> G{"matches.length"}
     G -->|"0"| H["return null -> No node named label"]
     G -->|"1"| I["return matches[0] -> single node"]

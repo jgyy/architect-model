@@ -4,6 +4,8 @@ This handler reorders `architecture.nodes` by relocating one node to a new 1-bas
 
 **Source:** `src/lib/architecture-commands.ts:667-725`
 
+**Command parsing and validation**
+
 ```mermaid
 flowchart TD
     A["moveNodeMatch = matchFirst(MOVE_NODE_PATTERNS, trimmed)"] -->|no match| Z["fall through to\nUnrecognized command"]
@@ -17,7 +19,13 @@ flowchart TD
     H -->|no| I["error: step out of range"]
     H -->|yes| J{"targetIndex === currentIndex ?"}
     J -->|yes| K["error: already at that step"]
-    J -->|no| L["withoutNode = nodes.filter(id !== source.id)"]
+```
+
+**Node reorder and x-relayout**
+
+```mermaid
+flowchart TD
+    J{"targetIndex === currentIndex ?"} -->|no| L["withoutNode = nodes.filter(id !== source.id)"]
     L --> M["splice source into withoutNode at targetIndex"]
     M --> N["map: position.x = index * NODE_X_SPACING"]
     N --> O["return ok with reorderedNodes\n(edges untouched)"]

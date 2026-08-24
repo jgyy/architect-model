@@ -4,6 +4,8 @@ These five files are the test suite for `src/lib/architecture-commands.ts`, spli
 
 **Source:** `src/lib/test/architecture-commands-*.test.ts`
 
+**Node and edge command tests**
+
 ```mermaid
 flowchart TB
     PC["parseCommand\n(src/lib/architecture-commands.ts)"]
@@ -21,6 +23,16 @@ flowchart TB
         E4["buildNodeIndex\n(O(1) source/target lookup)"]
     end
 
+    PC --> NODE
+    PC --> EDGE
+```
+
+**Reorder, simulation, and parsing tests**
+
+```mermaid
+flowchart TB
+    PC["parseCommand\n(src/lib/architecture-commands.ts)"]
+
     subgraph REORDER["architecture-commands-reorder.test.ts (198 lines)"]
         R1["move node <label> to step <n>"]
         R2["x-position recompute,\ny preserved"]
@@ -36,8 +48,6 @@ flowchart TB
         P2["missing separator /\nblank source label"]
     end
 
-    PC --> NODE
-    PC --> EDGE
     PC --> REORDER
     PC --> SIM
     PC --> PARSE

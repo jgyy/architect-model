@@ -4,6 +4,8 @@ The simulation has no separate trace data structure: the "trace" is simply `arch
 
 **Source:** `src/lib/simulation.ts:12-51`
 
+**Step advancement and clamping**
+
 ```mermaid
 stateDiagram-v2
     [*] --> Step0: index = 0
@@ -15,6 +17,13 @@ stateDiagram-v2
     Step0 --> Step0: clampStepIndex\nclamps to [0, length-1]
     StepN --> StepN: clampStepIndex\nclamps to [0, length-1]
 
+    Stopped --> [*]
+```
+
+**Traversed-path computation**
+
+```mermaid
+stateDiagram-v2
     state "getTraversedPath(architecture, currentStepIndex)" as Traverse {
         [*] --> CollectNodeIds: nodes[0..currentStepIndex]
         CollectNodeIds --> CollectEdgeIds: edge kept if\nsource & target both traversed
@@ -23,8 +32,6 @@ stateDiagram-v2
 
     Step0 --> Traverse
     StepN --> Traverse
-
-    Stopped --> [*]
 ```
 
 The two-set edge filter is the subtle part: an edge only lights up once *both* endpoints have been stepped through, so a fan-out or fan-in edge stays dark until the trace actually reaches its far side, not just its near side.

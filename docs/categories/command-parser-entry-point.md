@@ -4,6 +4,8 @@
 
 **Source:** `src/lib/architecture-commands.ts:425-731`
 
+**Trim, length guard, and the add/connect/remove-node branches**
+
 ```mermaid
 flowchart TD
     Start["parseCommand(input)"] --> Trim["stripInvisibleChars + trim"]
@@ -18,7 +20,17 @@ flowchart TD
     ConnM -->|no| RemNM{"matches REMOVE_NODE_PATTERNS?"}
 
     RemNM -->|yes| RemoveNode["remove node handler:\nfindNodeOrAmbiguity,\nfilter node + its edges"]
-    RemNM -->|no| RemEM{"matches REMOVE_EDGE_PATTERNS?"}
+
+    AddNode --> Result["CommandResult { ok, architecture?, message }"]
+    Connect --> Result
+    RemoveNode --> Result
+```
+
+**Remove-edge/rename/move-node branches and the fallback**
+
+```mermaid
+flowchart TD
+    RemNM{"matches REMOVE_NODE_PATTERNS?"} -->|no| RemEM{"matches REMOVE_EDGE_PATTERNS?"}
 
     RemEM -->|yes| RemoveEdge["remove edge handler:\nresolveConnectionEndpoints,\nlookup edgesBySourceTarget,\nfilter edge"]
     RemEM -->|no| RenM{"matches RENAME_NODE_PATTERNS?"}
@@ -29,10 +41,7 @@ flowchart TD
     MoveM -->|yes| MoveNode["move node handler:\nresolveMoveNodeArgs,\nvalidate step number,\nreorder + re-space x"]
     MoveM -->|no| Unrecognized["error: Unrecognized command\n+ usage text"]
 
-    AddNode --> Result["CommandResult { ok, architecture?, message }"]
-    Connect --> Result
-    RemoveNode --> Result
-    RemoveEdge --> Result
+    RemoveEdge --> Result["CommandResult { ok, architecture?, message }"]
     Rename --> Result
     MoveNode --> Result
 ```

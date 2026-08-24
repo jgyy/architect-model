@@ -4,6 +4,8 @@ This slice handles the `connect <A> to <B>` command: it resolves both endpoint l
 
 **Source:** `src/lib/architecture-commands.ts:476-548`
 
+**Endpoint resolution and guard checks**
+
 ```mermaid
 flowchart TD
     A[connectMatch via matchFirst] --> B{resolveConnectionEndpoints}
@@ -21,6 +23,13 @@ flowchart TD
     G -- yes --> G1[fail: one incoming connection only]
     G -- no --> H{wouldCreateCycle source target}
     H -- true --> H1[fail: would create a circular loop]
+```
+
+**Edge construction and result**
+
+```mermaid
+flowchart TD
+    H{wouldCreateCycle source target}
     H -- false --> I[build edge: edge-source-target]
     I --> J[return ok: architecture with new edge]
 ```

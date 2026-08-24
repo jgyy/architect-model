@@ -4,6 +4,8 @@
 
 **Source:** `src/components/simulation-panel.tsx:1-129`
 
+**Paused controls and entering play**
+
 ```mermaid
 stateDiagram-v2
     [*] --> Paused
@@ -11,7 +13,12 @@ stateDiagram-v2
     Paused --> Paused: Next (onStepChange(i+1), disabled at atLastStep)
     Paused --> Paused: speed select (onSpeedChange)
     Paused --> Playing: Play\n(disabled if stepCount<=1 or atLastStep)
+```
 
+**Playback loop and stopping**
+
+```mermaid
+stateDiagram-v2
     state Playing {
         [*] --> Waiting
         Waiting --> Waiting: setTimeout(PLAY_SPEEDS[speedIndex].intervalMs)
