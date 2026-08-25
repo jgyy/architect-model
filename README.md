@@ -5,8 +5,6 @@ simulation trace through it. Visual editing mirrors text editing - every mouse a
 
 ## Demo proof
 
-https://www.youtube.com/watch?v=ILF7BVzN8e8
-
 ```mermaid
 graph LR
     Internet:::done -->|traversed| WebServer["Web Server"]:::done -->|traversed| Database:::current
